@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import chromadb
 
 from src.config import CHROMA_PATH, COLLECTION
-from src.ingest.chroma_guard import claim_chroma_port
 
 parser = argparse.ArgumentParser(description="Print the chunks stored in ChromaDB (whole collection by default)")
 parser.add_argument("--source", help="only show chunks from this PDF filename")
@@ -17,7 +16,6 @@ parser.add_argument("--full", action="store_true", help="print the full chunk te
 parser.add_argument("--summary", action="store_true", help="only print the per-document summary")
 args = parser.parse_args()
 
-claim_chroma_port()
 collection = chromadb.PersistentClient(path=str(CHROMA_PATH)).get_collection(COLLECTION)
 print(f"Collection '{COLLECTION}': {collection.count()} chunks, metadata {collection.metadata}")
 

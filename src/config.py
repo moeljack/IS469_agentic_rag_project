@@ -14,7 +14,3 @@ COLLECTION = "manuals"
 MODELS_DIR = ROOT / "models"
 DOCLING_ARTIFACTS = MODELS_DIR / "docling"
 EMBED_MODEL_DIR = MODELS_DIR / EMBED_MODEL.split("/")[-1]
-
-# Where `chroma run --path chroma_db` listens (used only to detect a running server before touching chroma_db/)
-CHROMA_SERVER_HOST = "localhost"
-CHROMA_SERVER_PORT = 8000

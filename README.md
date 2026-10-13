@@ -32,9 +32,8 @@ What it does: PDF -> Docling -> chunks -> embeddings -> ChromaDB (`chroma_db/`, 
 | `python src/ingest/ingest.py --reset` | Wipe the collection and rebuild (required after changing `EMBED_MODEL`) |
 
 Inspecting with a GUI: after ingest finishes, run `chroma run --path chroma_db` and connect the GUI to
-`http://localhost:8000`; press Ctrl+C when done. `ingest.py` holds port 8000 while it runs
-(see `src/ingest/chroma_guard.py`), so it refuses to start if the server is up, and the server refuses to start
-if ingest is running. If you run the server on another port, set `CHROMA_SERVER_PORT` in `src/config.py`.
+`http://localhost:8000`. **Stop the server (Ctrl+C) before running `ingest.py` or `inspect_db.py`**: two processes
+using `chroma_db/` at the same time can lock or corrupt it.
 
 Notes:
 - OCR is off, so scanned (image-only) PDFs produce no text and are reported as failed.

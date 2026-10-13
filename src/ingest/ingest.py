@@ -17,7 +17,6 @@ from src.config import (
     CHROMA_PATH, COLLECTION, DOCLING_ARTIFACTS, EMBED_MODEL, EMBED_MODEL_DIR,
     MANUAL_DIR, MAX_TOKENS,
 )
-from src.ingest.chroma_guard import claim_chroma_port
 from src.ingest.chunking import build_chunker, fix_structure
 from src.ingest.download_models import ensure_models
 
@@ -95,7 +94,6 @@ def main():
     args = parser.parse_args()
     force = args.force or args.reset
 
-    claim_chroma_port()   # fail fast if a server runs; and block `chroma run` until we exit
     ensure_models()   # first run only: downloads into ./models (no HF cache symlinks)
 
     pdfs = sorted(MANUAL_DIR.glob("*.pdf"))
