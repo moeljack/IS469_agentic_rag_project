@@ -4,3 +4,4 @@ chroma_db/
 projenv/
 .env
 data/processed/
+models/

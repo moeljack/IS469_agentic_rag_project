@@ -3,3 +3,4 @@ transformers==4.57.1
 torch==2.8.0
 sentence-transformers==5.1.2
 chromadb==1.5.9
+hf_xet==1.7.0
