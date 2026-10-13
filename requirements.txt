@@ -1,0 +1,5 @@
+docling==2.63.0
+transformers==4.57.1
+torch==2.8.0
+sentence-transformers==5.1.2
+chromadb==1.5.9
