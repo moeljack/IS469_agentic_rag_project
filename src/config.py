@@ -14,3 +14,8 @@ COLLECTION = "manuals"
 MODELS_DIR = ROOT / "models"
 DOCLING_ARTIFACTS = MODELS_DIR / "docling"
 EMBED_MODEL_DIR = MODELS_DIR / EMBED_MODEL.split("/")[-1]
+
+# Retrieval: hybrid search (vector + BM25 keyword) then cross-encoder reranking
+RERANK_MODEL = "BAAI/bge-reranker-base"
+RERANK_MODEL_DIR = MODELS_DIR / RERANK_MODEL.split("/")[-1]
+CANDIDATES = 20      # chunks pulled from each ranking and handed to the reranker

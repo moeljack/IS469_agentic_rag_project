@@ -1,6 +1,6 @@
 """Download the models into ./models so nothing depends on the symlink-based HF cache.
 
-ingest.py calls ensure_models() automatically on the first run. To download ahead of time
+ingest.py calls ensure_models() on its first run; the retriever calls ensure_reranker() when it first reranks. To download ahead of time
 (or after changing EMBED_MODEL):  python src/ingest/download_models.py
 """
 import sys
@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # make `src` importable
 
-from src.config import DOCLING_ARTIFACTS, EMBED_MODEL, EMBED_MODEL_DIR
+from src.config import DOCLING_ARTIFACTS, EMBED_MODEL, EMBED_MODEL_DIR, RERANK_MODEL, RERANK_MODEL_DIR
 
 DONE_MARKER = ".download_complete"   # written last, so an interrupted download is retried, not trusted
 
@@ -42,6 +42,19 @@ def ensure_models():
         (EMBED_MODEL_DIR / DONE_MARKER).touch()
 
 
+def ensure_reranker():
+    """Download the reranking model (used only at query time) if it is missing."""
+    from huggingface_hub import snapshot_download
+
+    if not _is_done(RERANK_MODEL_DIR):
+        print(f"Downloading {RERANK_MODEL} (about 1.1 GB) to {RERANK_MODEL_DIR} ...")
+        # the repo ships the weights in several formats (.bin, onnx/); one copy is enough
+        snapshot_download(repo_id=RERANK_MODEL, local_dir=RERANK_MODEL_DIR,
+                          ignore_patterns=["*.bin", "*.onnx", "onnx/*", "*.h5", "*.msgpack", "*.ot"])
+        (RERANK_MODEL_DIR / DONE_MARKER).touch()
+
+
 if __name__ == "__main__":
     ensure_models()
+    ensure_reranker()
     print("Models ready.")
