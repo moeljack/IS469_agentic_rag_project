@@ -1,38 +1,152 @@
 [
-  {"question": "By when must the trustee file the Form UT each year?",
-   "expect": "by 15 April each year"},
-  {"question": "How long does the CIT take to tell an applicant the outcome of a tax transparency application?",
-   "expect": "within two months from the date of receipt of the application"},
-  {"question": "What conditions must be met to get tax transparency treatment?",
-   "expect": "The tax transparency treatment is subject to the following conditions"},
-  {"question": "What must the trustee obtain when units are held through more than one tier of nominees?",
-   "expect": "confirmation from the ultimate beneficiaries"},
-  {"question": "Who counts as a qualifying unit holder that receives distributions without tax deducted?",
-   "expect": "without deduction of tax. They comprise"},
-  {"question": "What should the trustee do if nominees gave wrong information and too little tax was deducted?",
-   "expect": "recover from the nominees the shortfall"},
-  {"question": "Is the trustee taxed on distributions from an S-REIT that come out of non-taxable income?",
-   "expect": "6.6 The above non-taxable income/receipts"},
-  {"question": "How are non-taxable capital gains distributed by a REIT ETF treated for the unit holder?",
-   "expect": "8.6 The above non-taxable income/receipts"},
-  {"question": "Which unit holders is withholding tax deducted from?",
-   "expect": "Withholding tax requirement applies to distributions made to non-resident nonindividual unit holders"},
-  {"question": "What number do I call for enquiries about the REIT ETF e-Tax Guide?",
-   "expect": "18003568 622"},
-  {"question": "In which year of assessment is a unit holder taxed on income distributed by a REIT ETF?",
-   "expect": "follows the YA in which the income is derived by the REIT ETF"},
-  {"question": "Does the tax exemption apply to individuals who receive distributions through a partnership?",
-   "expect": "10.1 The trustee has to inform the unit holders"},
-  {"question": "What is the maximum IBNR percentage for motor insurance?",
-   "expect": "Motor | 20"},
-  {"question": "Which method of estimating IBNR claims has IRAS agreed to accept?",
-   "expect": "IRAS has agreed to accept this method"},
-  {"question": "What reserving percentages apply to captive insurers by development year?",
-   "expect": "DEVELOPMENT YEAR - 1"},
-  {"question": "How are long-tailed risks defined?",
-   "expect": "Policy obligations are often very difficult to quantify"},
-  {"question": "Can foreign insurers use head office statistics to estimate IBNR?",
-   "expect": "use Head Office statistics or methodologies"},
-  {"question": "Is Fidelity Guarantee a short, medium or long tail class of insurance?",
-   "expect": "Fidelity Guarantee"}
+ {
+  "question": "What is the corporate tax rate in Singapore?",
+  "expect": "taxed at a flat rate of 17% of its chargeable income",
+  "tier": "webpage"
+ },
+ {
+  "question": "How much tax exemption does a new start-up company get?",
+  "expect": "The maximum exemption for each YA is $125,000",
+  "tier": "webpage"
+ },
+ {
+  "question": "Can a foreign company claim the start-up tax exemption?",
+  "expect": "A foreign company or its Singapore branch cannot claim the tax exemption for new start-up companies",
+  "tier": "webpage"
+ },
+ {
+  "question": "When is the deadline to file my company's tax return this year?",
+  "expect": "deadline of 30 Nov 2026",
+  "tier": "webpage"
+ },
+ {
+  "question": "When do I have to file my company's ECI?",
+  "expect": "has to file ECI within 3 months from the end of your financial year",
+  "tier": "webpage"
+ },
+ {
+  "question": "Do I still need to file ECI if my company has no profit?",
+  "expect": "You do not need to file the ECI for your company if it is nil",
+  "tier": "webpage"
+ },
+ {
+  "question": "What happens if I file my ECI late or not at all?",
+  "expect": "a Notice of Assessment may be issued based on an estimation of your company's income",
+  "tier": "webpage"
+ },
+ {
+  "question": "Can I pay my corporate income tax in instalments?",
+  "expect": "minimum monthly GIRO deduction amount of $50",
+  "tier": "webpage"
+ },
+ {
+  "question": "Do I need to hire a tax agent to file my company's taxes?",
+  "expect": "It is not a requirement. Whilst deciding whether to engage professional help",
+  "tier": "webpage"
+ },
+ {
+  "question": "My company did no business and made a loss, do I still have to file a tax return?",
+  "expect": "your company must file the Form C-S/ Form C-S (Lite)/ Form C by the filing due date of 30 Nov",
+  "tier": "webpage"
+ },
+ {
+  "question": "What is a Certificate of Residence and what is it used for?",
+  "expect": "The Certificate of Residence (COR) is a letter issued by IRAS to certify that the company is a tax resident of Singapore",
+  "tier": "webpage"
+ },
+ {
+  "question": "How do I know if my company is a Singapore tax resident?",
+  "expect": "control and management of its business was exercised in Singapore",
+  "tier": "webpage"
+ },
+ {
+  "question": "What is the difference between Form C-S and Form C-S (Lite)?",
+  "expect": "The only difference is in the annual revenue condition",
+  "tier": "webpage"
+ },
+ {
+  "question": "How do I change my company's financial year end?",
+  "expect": "must be filed with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+",
+  "tier": "webpage"
+ },
+ {
+  "question": "Where do I find my company's tax reference number for filing?",
+  "expect": "Local Companies with UEN (yyyynnnnnX format)",
+  "tier": "webpage"
+ },
+ {
+  "question": "What will IRAS do if my company never files its tax return?",
+  "expect": "IRAS may issue an estimated Notice of Assessment based on your company",
+  "tier": "webpage"
+ },
+ {
+  "question": "What is the maximum fine for failing to file a company tax return?",
+  "expect": "up to $5,000 per offence",
+  "tier": "webpage"
+ },
+ {
+  "question": "Do I need to settle my taxes before striking off my company?",
+  "expect": "settle all outstanding tax liabilities and obligations with IRAS before applying for strike off",
+  "tier": "webpage"
+ },
+ {
+  "question": "Does a company in liquidation need a tax clearance letter?",
+  "expect": "they are not required to apply for tax clearance",
+  "tier": "webpage"
+ },
+ {
+  "question": "Which business expenses can my company deduct from its income?",
+  "expect": "deductible business expenses are those",
+  "tier": "webpage"
+ },
+ {
+  "question": "Is income earned overseas taxable in Singapore for a company?",
+  "expect": "such income is taxable in Singapore when remitted to and received in Singapore",
+  "tier": "webpage"
+ },
+ {
+  "question": "Can I pay my company tax with a credit card?",
+  "expect": "We do not offer credit cards as a payment mode",
+  "tier": "webpage"
+ },
+ {
+  "question": "What can I do if my company cannot afford to pay its tax bill?",
+  "expect": "IRAS may offer a suitable payment arrangement, such as a longer instalment plan",
+  "tier": "webpage"
+ },
+ {
+  "question": "Can my company carry forward its trade losses to future years?",
+  "expect": "unutilised capital allowances and trade losses can be carried forward indefinitely",
+  "tier": "webpage"
+ },
+ {
+  "question": "How much CIT rebate will my company get for YA 2026?",
+  "expect": "the enhanced CIT Rebate will be 50% of the corporate tax payable",
+  "tier": "webpage"
+ },
+ {
+  "question": "What conditions must be met to get tax transparency treatment?",
+  "expect": "The tax transparency treatment is subject to the following conditions",
+  "tier": "pdf"
+ },
+ {
+  "question": "Is the trustee taxed on distributions from an S-REIT that come out of non-taxable income?",
+  "expect": "6.6 The above non-taxable income/receipts",
+  "tier": "pdf"
+ },
+ {
+  "question": "Which unit holders is withholding tax deducted from?",
+  "expect": "Withholding tax requirement applies to distributions made to non-resident nonindividual unit holders",
+  "tier": "pdf"
+ },
+ {
+  "question": "What is the maximum IBNR percentage for motor insurance?",
+  "expect": "Motor | 20",
+  "tier": "pdf"
+ },
+ {
+  "question": "Which method of estimating IBNR claims has IRAS agreed to accept?",
+  "expect": "IRAS has agreed to accept this method",
+  "tier": "pdf"
+ }
 ]

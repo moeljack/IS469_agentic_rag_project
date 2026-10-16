@@ -19,3 +19,7 @@ EMBED_MODEL_DIR = MODELS_DIR / EMBED_MODEL.split("/")[-1]
 RERANK_MODEL = "BAAI/bge-reranker-base"
 RERANK_MODEL_DIR = MODELS_DIR / RERANK_MODEL.split("/")[-1]
 CANDIDATES = 20      # chunks pulled from each ranking and handed to the reranker
+
+# Scraped web pages (JSON lines: url, title, text, retrieved_at, source, source_type) and web-first retrieval
+RAW_DIR = ROOT / "data" / "raw"
+WEB_FIRST_MIN_SCORE = 0.93  # best web hit must score this (reranker 0-1) or the search falls back to the PDFs; calibrated with evaluate.py

@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # make `src` importable
 
 import chromadb
-from chromadb.errors import NotFoundError
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -14,11 +13,11 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 
 from src.config import (
-    CHROMA_PATH, COLLECTION, DOCLING_ARTIFACTS, EMBED_MODEL, EMBED_MODEL_DIR,
-    MANUAL_DIR, MAX_TOKENS,
+    CHROMA_PATH, COLLECTION, DOCLING_ARTIFACTS, EMBED_MODEL_DIR, MANUAL_DIR, MAX_TOKENS,
 )
 from src.ingest.chunking import build_chunker, fix_structure
 from src.ingest.download_models import ensure_models
+from src.ingest.store import open_collection
 
 BATCH_SIZE = 16
 
@@ -27,28 +26,6 @@ def build_converter():
     # OCR off (text PDFs only) and models read from a local folder, so no HF cache symlinks are needed
     opts = PdfPipelineOptions(artifacts_path=DOCLING_ARTIFACTS, do_ocr=False)
     return DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)})
-
-
-def open_collection(client, embedder, reset=False):
-    """Open the collection, refusing to mix vectors from different embedding models."""
-    expected = {"embed_model": EMBED_MODEL, "embed_dim": embedder.get_sentence_embedding_dimension()}
-    if reset:
-        try:
-            client.delete_collection(COLLECTION)
-        except NotFoundError:
-            pass
-    collection = client.get_or_create_collection(COLLECTION, metadata={"hnsw:space": "cosine", **expected})
-    stored = {k: (collection.metadata or {}).get(k) for k in expected}
-    if stored != expected:   # Chroma silently keeps the old metadata of an existing collection
-        if collection.count() == 0:
-            client.delete_collection(COLLECTION)
-            return client.create_collection(COLLECTION, metadata={"hnsw:space": "cosine", **expected})
-        sys.exit(
-            f"Collection '{COLLECTION}' was built with {stored}, but config now says {expected}.\n"
-            "Mixing models would quietly degrade retrieval. Re-run with --reset to rebuild everything "
-            "(or restore EMBED_MODEL in src/config.py)."
-        )
-    return collection
 
 
 def ingest_pdf(pdf, converter, chunker, tok, embedder, collection, window):

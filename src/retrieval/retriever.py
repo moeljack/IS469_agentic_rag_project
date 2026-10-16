@@ -11,7 +11,7 @@ from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder, SentenceTransformer
 
 from src.config import (
-    CANDIDATES, CHROMA_PATH, COLLECTION, EMBED_MODEL, EMBED_MODEL_DIR, RERANK_MODEL_DIR,
+    CANDIDATES, CHROMA_PATH, COLLECTION, EMBED_MODEL, EMBED_MODEL_DIR, RERANK_MODEL_DIR, WEB_FIRST_MIN_SCORE,
 )
 
 RRF_K = 60   # reciprocal-rank-fusion constant; 60 is the standard default
@@ -60,22 +60,30 @@ class Retriever:
         data = self.collection.get(include=["documents", "metadatas"])   # whole collection, for BM25 and reranking
         self._ids = data["ids"]
         self._chunks = {
-            id_: {"text": text, "source": meta["source"], "pages": meta["pages"], "headings": meta["headings"]}
+            id_: {"text": text, "source": meta["source"], "pages": meta["pages"], "headings": meta["headings"],
+                  "source_type": meta.get("source_type", ""), "title": meta.get("title", "")}
             for id_, text, meta in zip(data["ids"], data["documents"], data["metadatas"])
         }
         self._bm25 = BM25Okapi([_tokens(f"{self._chunks[i]['headings']} {self._chunks[i]['text']}") for i in self._ids])
         self._reranker = None   # loaded on first use
 
     # ---- stages ----
-    def _vector_ranking(self, query, n, source):
+    @staticmethod
+    def _where(source, source_type):
+        conditions = [{"source": source}] if source else []
+        if source_type:
+            conditions.append({"source_type": source_type})
+        return None if not conditions else conditions[0] if len(conditions) == 1 else {"$and": conditions}
+
+    def _vector_ranking(self, query, n, source, source_type):
         vector = self.model.encode(query, prompt_name="query", normalize_embeddings=True)   # asymmetric: query prompt
         res = self.collection.query(
             query_embeddings=[vector.tolist()], n_results=n,
-            where={"source": source} if source else None, include=["distances"],
+            where=self._where(source, source_type), include=["distances"],
         )
         return {id_: round(1 - dist, 4) for id_, dist in zip(res["ids"][0], res["distances"][0])}   # cosine similarity
 
-    def _bm25_ranking(self, query, n, source):
+    def _bm25_ranking(self, query, n, source, source_type):
         scores = self._bm25.get_scores(_tokens(query))
         order = np.argsort(-scores)
         ranking = {}
@@ -83,7 +91,8 @@ class Retriever:
             id_ = self._ids[i]
             if scores[i] <= 0 or len(ranking) >= n:
                 break
-            if source is None or self._chunks[id_]["source"] == source:
+            chunk = self._chunks[id_]
+            if (source is None or chunk["source"] == source) and (source_type is None or chunk["source_type"] == source_type):
                 ranking[id_] = float(scores[i])
         return ranking
 
@@ -96,18 +105,20 @@ class Retriever:
         return dict(zip(ids, self._reranker.predict(pairs, batch_size=8).tolist()))   # 0..1 relevance
 
     # ---- public ----
-    def search(self, query, k=5, source=None, min_score=None, hybrid=True, rerank=True, candidates=CANDIDATES):
+    def search(self, query, k=5, source=None, min_score=None, hybrid=True, rerank=True, candidates=CANDIDATES,
+               source_type=None):
         """Top-k chunks for `query`, best first.
 
-        source:    only search this PDF filename.
+        source:    only search this document (PDF filename or page URL).
+        source_type: only search "pdf" or "webpage" documents.
         hybrid:    also use BM25 keyword search and merge it with the vector results.
         rerank:    re-score the candidates with the cross-encoder (slower, usually more accurate).
         min_score: drop hits whose final `score` is below this. `score` is the reranker's 0-1 relevance when
                    rerank=True, otherwise the vector cosine similarity (or the fused rank score if hybrid).
         """
         n = max(candidates, k)
-        vec = self._vector_ranking(query, n, source)
-        bm25 = self._bm25_ranking(query, n, source) if hybrid else {}
+        vec = self._vector_ranking(query, n, source, source_type)
+        bm25 = self._bm25_ranking(query, n, source, source_type) if hybrid else {}
 
         if hybrid:   # reciprocal rank fusion: chunks ranked high in either list rise to the top
             fused = {}
@@ -131,3 +142,18 @@ class Retriever:
             for i in order[:k]
         ]
         return [h for h in hits if min_score is None or h["score"] >= min_score]
+
+    def search_tiered(self, query, k=5, min_score=None, web_threshold=WEB_FIRST_MIN_SCORE, **options):
+        """Web pages first; the PDFs only if the web pages don't answer the question.
+
+        The web pages are searched on their own. If their best hit reaches `web_threshold` (the reranker's 0-1
+        relevance), those hits are returned. Otherwise the PDFs are searched and their hits are returned, each marked
+        `fallback=True` so the caller can tell the answer did not come from the web pages.
+        Reranking is always on here, because the threshold is a reranker score.
+        """
+        options.pop("rerank", None)
+        web = self.search(query, k=k, min_score=min_score, source_type="webpage", rerank=True, **options)
+        if web and web[0]["score"] >= web_threshold:
+            return [{**h, "fallback": False} for h in web]
+        pdf = self.search(query, k=k, min_score=min_score, source_type="pdf", rerank=True, **options)
+        return [{**h, "fallback": True} for h in pdf]

@@ -31,6 +31,24 @@ What it does: PDF -> Docling -> chunks -> embeddings -> ChromaDB (`chroma_db/`, 
 | `python src/ingest/ingest.py --force` | Re-ingest every PDF |
 | `python src/ingest/ingest.py --reset` | Wipe the collection and rebuild (required after changing `EMBED_MODEL`) |
 
+### Scraped web pages
+
+Put the scraper output (JSON lines with `url`, `title`, `text`, `retrieved_at`, `source`, `source_type: "webpage"`) in `data/raw/`, then run:
+
+```powershell
+python src/ingest/ingest_web.py            # new or re-scraped pages only (--force redoes everything)
+```
+
+Exact duplicate pages are merged, text is cleaned, and each page is split by section and table into chunks stored in
+the same collection as the PDFs (`source` = the page URL, `source_type` = `webpage`).
+
+## Searching
+
+Edit the settings at the top of `src/retrieval/query.py`, then run `python src/retrieval/query.py`.
+With `WEB_FIRST = True` the web pages are searched first and the PDFs are used only when no web page answers the
+question (`WEB_FIRST_MIN_SCORE` in `src/config.py`). `python src/retrieval/evaluate.py` scores retrieval on
+`src/retrieval/eval_questions.json` (add your own questions there).
+
 Inspecting with a GUI: after ingest finishes, run `chroma run --path chroma_db` and connect the GUI to
 `http://localhost:8000`. **Stop the server (Ctrl+C) before running `ingest.py` or `inspect_db.py`**: two processes
 using `chroma_db/` at the same time can lock or corrupt it.
