@@ -1,4 +1,5 @@
-"""Clean scraped web pages and split them into section-aware chunks.
+"""
+Clean scraped web pages and split them into section-aware chunks.
 
 The scraped text has no blank lines and almost no Markdown headings, so structure is recovered from the lines
 themselves: Markdown headings (`## Title`) if the scraper provides them, otherwise short Title-Case lines. A wrong

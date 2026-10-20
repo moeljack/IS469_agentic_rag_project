@@ -1,4 +1,5 @@
-"""Download the models into ./models so nothing depends on the symlink-based HF cache.
+"""
+Download the models into ./models so nothing depends on the symlink-based HF cache.
 
 ingest.py calls ensure_models() on its first run; the retriever calls ensure_reranker() when it first reranks. To download ahead of time
 (or after changing EMBED_MODEL):  python src/ingest/download_models.py

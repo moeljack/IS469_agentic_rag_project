@@ -1,4 +1,6 @@
-"""Chunk, embed and store scraped web pages (data/raw/*.jsonl) in the same ChromaDB collection as the PDFs."""
+"""
+Chunk, embed and store scraped web pages (data/raw/*.jsonl) in the same ChromaDB collection as the PDFs.
+"""
 import argparse
 import hashlib
 import json

@@ -1,4 +1,7 @@
-"""Chunking helpers: readable tables and correct section headings for IRAS-style PDFs."""
+"""
+Chunking helpers: readable tables and correct section headings for IRAS-style PDFs.
+This module optimises document layout and chunk serialization before vectorization:
+"""
 import re
 
 from docling.chunking import HybridChunker

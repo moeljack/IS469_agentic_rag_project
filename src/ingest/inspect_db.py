@@ -1,3 +1,7 @@
+"""
+Shows stored document chunks and metadata inside ChromaDB.
+"""
+
 import argparse
 import sys
 from collections import Counter

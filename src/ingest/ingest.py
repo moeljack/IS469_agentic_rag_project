@@ -1,3 +1,8 @@
+"""
+PDF Ingestion & ChromaDB Indexing 
+extracts, chunks, embeds, and indexes text-based PDF documents into ChromaDB.
+"""
+
 import argparse
 import sys
 from pathlib import Path

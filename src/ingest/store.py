@@ -1,4 +1,8 @@
-"""Shared by the PDF and web ingest scripts: open the collection and refuse to mix embedding models."""
+"""
+Shared by the PDF and web ingest scripts: open the collection and refuse to mix embedding models.
+
+opens, initialises, and verifies a ChromaDB vector collection.
+"""
 import sys
 from pathlib import Path
 
