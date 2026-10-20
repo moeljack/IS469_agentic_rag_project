@@ -47,7 +47,7 @@ def ensure_reranker():
     from huggingface_hub import snapshot_download
 
     if not _is_done(RERANK_MODEL_DIR):
-        print(f"Downloading {RERANK_MODEL} (about 1.1 GB) to {RERANK_MODEL_DIR} ...")
+        print(f"Downloading {RERANK_MODEL} (under 1 GB for the default reranker) to {RERANK_MODEL_DIR} ...")
         # the repo ships the weights in several formats (.bin, onnx/); one copy is enough
         snapshot_download(repo_id=RERANK_MODEL, local_dir=RERANK_MODEL_DIR,
                           ignore_patterns=["*.bin", "*.onnx", "onnx/*", "*.h5", "*.msgpack", "*.ot"])

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]   # src/config.py -> project root
@@ -16,10 +17,11 @@ DOCLING_ARTIFACTS = MODELS_DIR / "docling"
 EMBED_MODEL_DIR = MODELS_DIR / EMBED_MODEL.split("/")[-1]
 
 # Retrieval: hybrid search (vector + BM25 keyword) then cross-encoder reranking
-RERANK_MODEL = "BAAI/bge-reranker-base"
+RERANK_MODEL = os.environ.get("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")   # reads up to 8192 tokens; set the RERANK_MODEL environment variable to try another
 RERANK_MODEL_DIR = MODELS_DIR / RERANK_MODEL.split("/")[-1]
-CANDIDATES = 20      # chunks pulled from each ranking and handed to the reranker
+RERANK_QUANTIZE = os.environ.get("RERANK_QUANTIZE", "0") == "1"   # int8 weights on CPU: faster reranking, tiny accuracy change (see evaluate.py)
+RERANK_MAX_LENGTH = 1024   # tokens of (question + chunk) the reranker reads; our longest chunks need about 620
+CANDIDATES = int(os.environ.get("CANDIDATES", 10))   # chunks pulled from each ranking and handed to the reranker
 
-# Scraped web pages (JSON lines: url, title, text, retrieved_at, source, source_type) and web-first retrieval
+# Scraped web pages (JSON lines: url, title, text, retrieved_at, source, source_type)
 RAW_DIR = ROOT / "data" / "raw"
-WEB_FIRST_MIN_SCORE = 0.93  # best web hit must score this (reranker 0-1) or the search falls back to the PDFs; calibrated with evaluate.py

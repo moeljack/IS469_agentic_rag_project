@@ -12,11 +12,8 @@ QUERIES = [
     "What is the corporate income tax rate?",
 ]
 K = 5               # chunks to return per question
-WEB_FIRST = True    # search the web pages first; use the PDFs only if the web pages do not answer (always reranks)
-SOURCE = None       # e.g. "etaxguide_....pdf" or a page URL to search one document only (ignored if WEB_FIRST)
-MIN_SCORE = 0.5     # drop weak matches. With reranking this is the reranker's 0-1 relevance; None keeps all K
-HYBRID = True       # also use BM25 keyword search (exact terms like "Annex 2B") next to vector search
-RERANK = True       # re-score the candidates with the cross-encoder: slower, more accurate (ignored if WEB_FIRST)
+SOURCE = None       # e.g. "etaxguide_....pdf" or a page URL to search one document only
+MIN_SCORE = None    # drop weak matches: the reranker's 0-1 relevance, e.g. 0.5; None keeps all K
 FULL_TEXT = False   # True prints the whole chunk instead of a 300-character preview
 # --------------------------------------------------------------
 
@@ -24,13 +21,7 @@ retriever = Retriever()   # loads the models once for all queries
 
 for query in QUERIES:
     print(f"\n{'=' * 80}\n{query}\n{'=' * 80}")
-    if WEB_FIRST:
-        hits = retriever.search_tiered(query, k=K, min_score=MIN_SCORE, hybrid=HYBRID)
-        if hits:
-            print("(answered from the web pages)" if not hits[0]["fallback"]
-                  else "(not found on the web pages: showing PDF results)")
-    else:
-        hits = retriever.search(query, k=K, source=SOURCE, min_score=MIN_SCORE, hybrid=HYBRID, rerank=RERANK)
+    hits = retriever.search(query, k=K, source=SOURCE, min_score=MIN_SCORE)
     if not hits:
         print("No results.")
     for rank, h in enumerate(hits, 1):
