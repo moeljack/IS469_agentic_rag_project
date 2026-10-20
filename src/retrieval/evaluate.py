@@ -1,4 +1,5 @@
-"""Measure retrieval quality on eval_questions.json.
+"""
+Measure retrieval quality on eval_questions.json.
 
 Each question has:
   type     "simple" (one fact in one chunk) or "multi" (two or more facts, each in a different chunk)

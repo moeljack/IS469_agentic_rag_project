@@ -1,3 +1,18 @@
+"""
+Executes a multi-stage search across indexed document chunks
+
+retrieval.search() returns in a json format
+| Key | Description |
+| :--- | :--- |
+| `id` | Unique chunk ID (`file:index`). |
+| `score` | Cross-encoder relevance (`0.0–1.0`). |
+| `text` | Clean passage text for LLM context. |
+| `headings` | Hierarchical section path. |
+| `source` / `source_type` | File/URL and format (`pdf`/`webpage`). |
+| `pages` | Original PDF page numbers. |
+| `vector_score` / `bm25_score` | Dense cosine similarity and sparse lexical match scores. |
+"""
+
 import re
 import sys
 from pathlib import Path

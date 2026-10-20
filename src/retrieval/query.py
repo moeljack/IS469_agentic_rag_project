@@ -1,3 +1,7 @@
+"""
+tests and inspects retrieval and semantic reranking results against ChromaDB
+"""
+
 import sys
 from pathlib import Path
 
