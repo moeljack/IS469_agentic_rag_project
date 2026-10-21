@@ -1,6 +1,7 @@
 import json
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
+from openai import OpenAI
 
 # ---------------------------------------------------------------------------
 # Pydantic Schemas for Supervisor Routing
@@ -22,8 +23,9 @@ class AuditorResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Auditor Prompt
 # ---------------------------------------------------------------------------
+# Notice we add "return as JSON" to help the smaller model lock into the format
 AUDITOR_PROMPT = """You are a Tax Auditor Agent for IRAS Corporate Income Tax.
-Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
+Evaluate if the retrieved chunks sufficiently answer the current sub-prompt. 
 
 ### Overarching User Query: {original_query}
 ### Current Sub-Prompt: {sub_prompt}
@@ -33,17 +35,17 @@ Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
 
 ### Instructions:
 1. Review EACH chunk individually.
-2. Determine if the chunk is useful for answering the current sub-prompt (keep the overarching query in mind for context, like specific YA or entity types).
+2. Determine if the chunk is useful for answering the current sub-prompt.
 3. Assign a status of "approved" or "rejected" to each chunk_id.
 4. Provide a precise reason for your decision.
+5. Return your response strictly as JSON matching the requested schema.
 """
 
 # ---------------------------------------------------------------------------
 # Auditor Agent Implementation
 # ---------------------------------------------------------------------------
 class AuditorAgent:
-    def __init__(self, client, model: str = "gpt-4o-mini"):
-        """client: standard OpenAI client supporting beta.chat.completions.parse"""
+    def __init__(self, client, model: str = "phi3.5"):
         self.client = client
         self.model = model
 
@@ -61,7 +63,6 @@ class AuditorAgent:
     def evaluate(self, original_query: str, sub_prompt: str, chunks: list) -> AuditorResponse:
         """Called by the Supervising Agent to evaluate a specific sub-prompt."""
         
-        # FIXED: Matches the updated AuditorResponse schema
         if not chunks:
             return AuditorResponse(
                 is_sufficient=False,
@@ -75,11 +76,41 @@ class AuditorAgent:
             chunks_text=self._format_chunks(chunks)
         )
 
+        # Using Ollama's local OpenAI-compatible endpoint
         response = self.client.beta.chat.completions.parse(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             response_format=AuditorResponse,
-            temperature=0.0,
+            temperature=0.0, # Temperature 0 is critical for strict logic
         )
 
         return response.choices[0].message.parsed
+
+# ---------------------------------------------------------------------------
+# Execution Example
+# ---------------------------------------------------------------------------
+# if __name__ == "__main__":
+#     # Point the OpenAI client to your local Ollama instance
+#     local_client = OpenAI(
+#         base_url="http://localhost:11434/v1",
+#         api_key="ollama", # Required by the SDK, but ignored by Ollama
+#     )
+
+#     auditor = AuditorAgent(client=local_client, model="phi3.5")
+
+#     # Example Input from your Retriever
+#     sample_chunks = [
+#         {
+#             "id": "web:a5627a3f6e:1",
+#             "text": "You can use your credit card to pay your tax on AXS e-Station... payment limit of $20,000.00.",
+#             "headings": "Payments > Credit Card Payment"
+#         }
+#     ]
+
+#     result = auditor.evaluate(
+#         original_query="Can I pay via credit card and what happens if I am late?",
+#         sub_prompt="Can corporate tax be paid by credit card?",
+#         chunks=sample_chunks
+#     )
+
+#     print(result.model_dump_json(indent=2))
