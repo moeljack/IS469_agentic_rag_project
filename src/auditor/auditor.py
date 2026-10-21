@@ -5,45 +5,37 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 # Pydantic Schemas for Supervisor Routing
 # ---------------------------------------------------------------------------
-class RequirementCheck(BaseModel):
-    requirement: str = Field(description="A distinct factual aspect of the sub-prompt.")
-    is_addressed: bool = Field(description="True if the chunks explicitly contain the answer.")
-    evidence_or_gap: str = Field(description="Quote from text, or description of missing data.")
+class ChunkEvaluation(BaseModel):
+    chunk_id: str = Field(description="The exact 'id' of the chunk being evaluated (e.g., web:a5627a3f6e:1)")
+    status: Literal["approved", "rejected"] = Field(
+        description="'approved' if it contains relevant facts to answer the prompt, 'rejected' if irrelevant or insufficient."
+    )
+    reason: str = Field(
+        description="Brief explanation of why it was approved or rejected (e.g., 'Missing late penalty information')."
+    )
 
 class AuditorResponse(BaseModel):
-    is_sufficient: bool = Field(
-        description="True if the sub-prompt is fully answered without hallucination. False otherwise."
-    )
-    analysis: List[RequirementCheck] = Field(
-        description="Step-by-step check of the sub-prompt's requirements."
-    )
-    missing_information: List[str] = Field(
-        default_factory=list,
-        description="Specific tax terms, dates, or rules missing from the text."
-    )
-    recommended_search_query: Optional[str] = Field(
-        default=None,
-        description="If insufficient, an optimized keyword query for the Retrieval Agent."
-    )
+    is_sufficient: bool = Field(description="True if the approved chunks combined fully answer the prompt.")
+    chunk_evaluations: List[ChunkEvaluation] = Field(description="Evaluation of each individual chunk.")
+    recommended_search_query: Optional[str] = Field(default=None)
 
 # ---------------------------------------------------------------------------
 # Auditor Prompt
 # ---------------------------------------------------------------------------
-AUDITOR_PROMPT = """You are the Tax Auditor Agent in an IRAS Corporate Income Tax RAG system. 
-The Supervising Agent has broken down a complex user query into smaller sub-prompts. 
-Your job is to evaluate if the retrieved chunks sufficiently answer the CURRENT SUB-PROMPT.
+AUDITOR_PROMPT = """You are a Tax Auditor Agent for IRAS Corporate Income Tax.
+Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
 
-### CONTEXT
-Original Overarching Query: {original_query}
-Current Sub-Prompt to Evaluate: {sub_prompt}
+### Overarching User Query: {original_query}
+### Current Sub-Prompt: {sub_prompt}
 
-### RETRIEVED CHUNKS
+### Retrieved Chunks:
 {chunks_text}
 
-### EVALUATION RULES
-1. Evaluate ONLY against the Current Sub-Prompt, but use the Original Query for context (e.g., if the original query mentions "YA 2026", ensure the rules retrieved apply to YA 2026).
-2. Tax constraints matter: If the sub-prompt asks for a deadline, percentage, or specific form, and the chunks only provide general summaries, mark `is_sufficient` as False.
-3. If `is_sufficient` is False, provide a `recommended_search_query` that the Retrieval Agent can use to find the missing data.
+### Instructions:
+1. Review EACH chunk individually.
+2. Determine if the chunk is useful for answering the current sub-prompt (keep the overarching query in mind for context, like specific YA or entity types).
+3. Assign a status of "approved" or "rejected" to each chunk_id.
+4. Provide a precise reason for your decision.
 """
 
 # ---------------------------------------------------------------------------
@@ -69,11 +61,11 @@ class AuditorAgent:
     def evaluate(self, original_query: str, sub_prompt: str, chunks: list) -> AuditorResponse:
         """Called by the Supervising Agent to evaluate a specific sub-prompt."""
         
+        # FIXED: Matches the updated AuditorResponse schema
         if not chunks:
             return AuditorResponse(
                 is_sufficient=False,
-                analysis=[],
-                missing_information=["No context retrieved."],
+                chunk_evaluations=[],
                 recommended_search_query=sub_prompt
             )
 
