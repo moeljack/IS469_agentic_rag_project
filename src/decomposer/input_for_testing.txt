@@ -1,0 +1,289 @@
+================================================================================
+
+IRAS SINGAPORE CORPORATE INCOME TAX - TEST PROMPTS FOR INTAKE_PLANNER.PY
+
+================================================================================
+
+
+
+1. COMPUTATION (Tax Payable & Relief Calculations)
+
+--------------------------------------------------------------------------------
+
+Tests extracting `chargeable_income`, `ya`/`fye`, and expanding sub-queries to
+
+include Partial Tax Exemption (PTE), Start-Up Tax Exemption (SUTE), and CIT Rebates.
+
+
+
+[Standard PTE + CIT Rebate]
+
+"Our company has a chargeable income of S$450,000 for YA 2026. How much corporate income tax do we need to pay after the Partial Tax Exemption and CIT Rebate?"
+
+
+
+[New Start-Up Computation (SUTE)]
+
+"We are a newly incorporated company in 2024 with S$180,000 chargeable income in YA 2026. Assuming we qualify for the Start-Up Tax Exemption, what is our net tax payable?"
+
+
+
+[Implicit YA via FYE (Tests `_normalise` deriving YA = FYE year + 1)]
+
+"Calculate the corporate tax payable for a company whose financial year ended on 31 December 2025 with a chargeable income of S$85,000."
+
+
+
+[Missing Income (Triggers `Clarify` for `chargeable_income`)]
+
+"Can you help me calculate how much corporate tax my Pte Ltd has to pay for YA 2026?"
+
+
+
+
+
+2. ELIGIBILITY (Qualifying Conditions for Schemes & Forms)
+
+--------------------------------------------------------------------------------
+
+Tests extracting company attributes (`is_new_company`, `incorporation_year`,
+
+revenue caps) and routing to statutory conditions.
+
+
+
+[Start-Up Tax Exemption (SUTE) Shareholding Rule]
+
+"We incorporated our Pte Ltd in 2025 with two corporate shareholders holding 50% each. Do we qualify for the Start-Up Tax Exemption for YA 2026?"
+
+
+
+[Investment Holding Company Exclusion]
+
+"Our newly incorporated company only holds commercial properties for rental income. Are we eligible to claim the Start-Up Tax Exemption?"
+
+
+
+[Form C-S vs. Form C-S (Lite) vs. Form C]
+
+"Our Singapore-incorporated company had an annual revenue of S$180,000 in FY 2025 and only claims capital allowances. Can we file Form C-S (Lite) for YA 2026?"
+
+
+
+[Foreign Tax Credit / Unabsorbed Losses]
+
+"Our company had a 60% change in shareholders this year. Are we still eligible to carry forward our unabsorbed trade losses from YA 2024?"
+
+
+
+[Missing Incorporation Status (Triggers `Clarify` for `incorporation`)]
+
+"Does my company qualify for the Start-Up Tax Exemption (SUTE) for YA 2026?"
+
+
+
+
+
+3. DEADLINE (Filing & Payment Due Dates)
+
+--------------------------------------------------------------------------------
+
+Tests extracting `fye` (Financial Year End) and distinguishing between Estimated
+
+Chargeable Income (ECI) and Corporate Income Tax Return (Form C-S / Form C).
+
+
+
+[ECI Filing Deadline (3 months from FYE)]
+
+"If our company's financial year end is 31 March 2026, when is the deadline to file our Estimated Chargeable Income (ECI)?"
+
+
+
+[Form C-S / Form C Filing Deadline]
+
+"Our financial year ended on 30 September 2025. What is the due date for filing our YA 2026 Form C-S?"
+
+
+
+[ECI Waiver Deadline Check]
+
+"Our FYE is 31 December 2025 and our revenue is S$3 million with zero chargeable income. By what date do we need to file ECI, or are we waived?"
+
+
+
+[Missing FYE (Triggers `Clarify` for `fye`)]
+
+"When is the deadline to submit our ECI to IRAS?"
+
+
+
+
+
+4. LOOKUP (Tax Rates, Deductibility Rules & Caps)
+
+--------------------------------------------------------------------------------
+
+Tests general knowledge retrieval where no personal calculation or
+
+missing-entity clarification is needed.
+
+
+
+[Headline Rate & Exemption Tiers]
+
+"What is the current headline corporate income tax rate in Singapore, and how do the Partial Tax Exemption tiers work for YA 2026?"
+
+
+
+[Business Expense Deductibility (Medical Cap)]
+
+"What is the cap on tax deductions for staff medical expenses if our company does not implement Portable Medical Benefits?"
+
+
+
+[Section 14Q (Renovation & Refurbishment)]
+
+"What is the expenditure cap over a 3-year period for Section 14Q renovation and refurbishment tax deductions, and are designer fees included?"
+
+
+
+[Capital Allowances (PIC / Automation)]
+
+"Can a company claim 100% write-off in one year for computers and prescribed automation equipment under capital allowances?"
+
+
+
+[Enterprise Innovation Scheme (EIS)]
+
+"What is the enhanced tax deduction rate for qualifying R&D expenditure conducted in Singapore under the Enterprise Innovation Scheme?"
+
+
+
+
+
+5. PROCEDURE (How to File, Amend, or Claim)
+
+--------------------------------------------------------------------------------
+
+Tests step-by-step administrative workflows on myTax Portal.
+
+
+
+[Waiver to File Form C-S (Dormant Company)]
+
+"Our company was dormant throughout FY 2025 with zero revenue. How do we apply for a waiver to file Form C-S on myTax Portal?"
+
+
+
+[Revising an ECI / Objecting to Notice of Assessment (NOA)]
+
+"We realized our actual chargeable income is much lower than the ECI we submitted last month. How do we file a revised ECI or object to a Notice of Assessment?"
+
+
+
+[Corppass Authorisation for Tax Filing]
+
+"How do I authorize our external tax agent via Corppass to submit Form C-S on behalf of our company?"
+
+
+
+
+
+6. OUT_OF_SCOPE (Boundary Tests for `Refuse`)
+
+--------------------------------------------------------------------------------
+
+Tests that the model does not get tricked by other Singapore taxes (handled by
+
+IRAS, but not Corporate Income Tax) or foreign corporate taxes.
+
+
+
+[GST Trap (IRAS, but not Corporate Income Tax)]
+
+"Our company's taxable turnover just crossed S$1 million over the past 12 months. How do we register for GST with IRAS and is the rate still 9%?"
+
+
+
+[Personal Income Tax Director Trap]
+
+"As the sole director of a Pte Ltd earning S$120,000 in director's fees and salary, how much personal income tax do I need to pay for YA 2026?"
+
+
+
+[Property Tax / Stamp Duty Trap]
+
+"How much Additional Buyer's Stamp Duty (ABSD) and commercial property tax does a company pay when buying an office unit in Singapore?"
+
+
+
+[Foreign Jurisdiction Trap]
+
+"How much corporate tax does our subsidiary incorporated in Malaysia pay to LHDN for FY 2025?"
+
+
+
+
+
+================================================================================
+
+QUICK TEST MATRIX FOR INTAKE_PLANNER.PY
+
+================================================================================
+
+
+
+1. Happy Path Plan (Computation)
+
+   Input:    "How much tax does a company with S$250,000 chargeable income pay for YA 2026?"
+
+   Expected: Plan(intent='computation', ya=2026, ...)
+
+
+
+2. Date Math `_normalise` (FYE -> YA)
+
+   Input:    "What are the tax exemptions for a company with FYE 30 June 2025 and S$100,000 chargeable income?"
+
+   Expected: Plan(intent='computation', ya=2026, fye='2025-06-30')
+
+
+
+3. Multi-Turn Clarify (computation)
+
+   Turn 1:   "Compute our corporate tax for YA 2026."
+
+   Output 1: Clarify(missing=['chargeable_income'])
+
+   Turn 2:   "S$150,000"
+
+   Output 2: Plan(chargeable_income=150000)
+
+
+
+4. Multi-Turn Clarify (deadline)
+
+   Turn 1:   "When is our ECI due?"
+
+   Output 1: Clarify(missing=['fye'])
+
+   Turn 2:   "2025-12-31"
+
+   Output 2: Plan(fye='2025-12-31', ya=2026)
+
+
+
+5. Regex Backstop (`text_hints`)
+
+   Input:    "We are a newly set up company in 2025 with S$80k chargeable income. Can we get SUTE?"
+
+   Expected: Plan(is_new_company=True, topics=['Start-Up Tax Exemption'])
+
+
+
+6. Guardrail (`Refuse`)
+
+   Input:    "Can our company claim GST input tax on staff entertainment?"
+
+   Expected: Refuse(reason='This assistant only covers Singapore corporate income tax.')
