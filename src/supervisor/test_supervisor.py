@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))       # supervisor
 import chromadb
 import pytest
 
-from src.decomposer.decomposer import resolve
+from decomposer import resolve
 from src.decomposer.decomposer_general_schemas import (
     CITEntities, Clarify, Decompose, IndividualTaxEntities, Intent, LLMOutput, PlannedQuery, PropertyTaxEntities,
     Refuse, SearchFilter, SubQueryDraft, TaxDomain,
@@ -456,3 +456,143 @@ def test_real_decomposer_refuses_and_clarifies_through_the_supervisor(store):
     out = sup.supervise("u1", clar, "q")
     assert out.status == "clarify" and "chargeable income" in out.message and llm.answer_calls == []
     assert store.pop_pending("u1").ya == 2026
+
+
+# ---------------------------------------------------------------- speed knobs: fewer queries and chunks
+def plan_with_queries(*texts):
+    p = plan()
+    p.queries = planned(*texts)
+    return p
+
+
+def test_first_search_uses_at_most_max_queries_in_order(store):
+    sup, _, ret = make(store, [D("answer")], batches=([C(1)],), judge=judge_script(({1}, [])))
+    sup.max_queries = 2
+    out = sup.supervise("u1", plan_with_queries("q1", "q2", "q3", "q4"), "q")
+    assert ret.calls[0][0] == ["q1", "q2"] and any("2 of 4 planned queries" in t for t in out.trace)
+
+
+def test_follow_up_searches_are_capped_too(store):
+    sup, _, ret = make(store, [D("search", queries=["a", "b", "c"]), D("answer")], batches=([C(1)], [C(2)]),
+                       judge=judge_script(({1}, []), ({1}, [])))
+    sup.max_queries = 2
+    sup.supervise("u1", plan(), "q")
+    assert ret.calls[1][0] == ["a", "b"]
+
+
+def test_default_caps_are_small():
+    from supervisor import DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES
+    assert (DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES) == (3, 6, 2)
+    assert RetrievalAgent(FakeRetriever({})).k == 3
+
+
+def test_retrieval_agent_passes_candidates_only_when_set():
+    seen = []
+
+    class R:
+        def search(self, query, k=5, min_score=None, **kw):
+            seen.append(kw)
+            return []
+    p = plan(); p.queries = planned("a")
+    RetrievalAgent(R()).run(p)
+    RetrievalAgent(R(), candidates=12).run(p)
+    assert seen == [{}, {"candidates": 12}]
+
+
+# ---------------------------------------------------------------- timing in the trace
+def test_handle_turn_records_stage_timings_and_a_timing_line(store):
+    sup, _, _ = make(store, [D("answer")], intake=lambda m, t, prior: plan())
+    out = sup.handle_turn("u1", [{"role": "user", "content": "rate?"}], TODAY)
+    stages = [n for n, _ in out.timings]
+    assert stages[0] == "intake" and stages[-1] == "total"
+    assert {"retrieval", "audit", "decide", "answer"} <= set(stages)
+    assert out.trace[-1].startswith("timing: intake ") and "total " in out.trace[-1] and "answer " in out.trace[-1]
+
+
+def test_timing_line_aggregates_repeated_stages_and_reports_other():
+    from supervisor import timing_line
+    line = timing_line([("intake", 2.0), ("retrieval", 1.0), ("retrieval", 0.5), ("answer", 3.0), ("total", 7.0)])
+    assert line == "timing: intake 2.0s | retrieval 1.5s (x2) | answer 3.0s | other 0.5s | total 7.0s"
+
+
+def test_timings_are_recorded_even_when_a_stage_raises(store):
+    from supervisor import _timed
+    sink = []
+    with pytest.raises(RuntimeError):
+        _timed(sink, "audit", lambda: (_ for _ in ()).throw(RuntimeError("x")))
+    assert [n for n, _ in sink] == ["audit"]
+
+
+def test_supervise_alone_returns_stage_timings_without_intake_or_total(store):
+    sup, _, _ = make(store, [D("answer")])
+    out = sup.supervise("u1", plan(), "q")
+    assert [n for n, _ in out.timings][:2] == ["retrieval", "audit"] and "total" not in dict(out.timings)
+
+
+# ---------------------------------------------------------------- keeping the Ollama models resident
+@pytest.fixture
+def fake_ollama(monkeypatch):
+    import types
+    mod = types.ModuleType("ollama")
+    mod.calls, mod.resident = [], None
+
+    def chat(**kw):
+        mod.calls.append(kw)
+        return {"message": {"content": "{}"}}
+
+    def generate(**kw):
+        mod.calls.append(("generate", kw))
+
+    mod.chat, mod.generate = chat, generate
+    mod.ps = lambda: SimpleNamespace(models=[SimpleNamespace(model=m) for m in (mod.resident or [])])
+    monkeypatch.setitem(sys.modules, "ollama", mod)
+    return mod
+
+
+def test_pin_keep_alive_adds_default_but_respects_explicit_and_is_idempotent(fake_ollama):
+    from supervisor import pin_ollama_keep_alive
+    pin_ollama_keep_alive("10m")
+    pin_ollama_keep_alive("99m")                       # second call must not wrap again
+    import ollama
+    ollama.chat(model="m")
+    ollama.chat(model="m", keep_alive="1h")
+    assert [c["keep_alive"] for c in fake_ollama.calls] == ["10m", "1h"]
+
+
+def test_warm_models_loads_each_once_and_reports_ok_when_all_resident(fake_ollama):
+    from supervisor import warm_models
+    fake_ollama.resident = ["qwen3.5:4b", "phi3.5:3.8b"]
+    notes = warm_models(["qwen3.5:4b", "qwen3.5:4b", "phi3.5:3.8b"], keep_alive="5m")
+    gens = [c[1] for c in fake_ollama.calls if isinstance(c, tuple)]
+    assert [g["model"] for g in gens] == ["qwen3.5:4b", "phi3.5:3.8b"] and all(g["keep_alive"] == "5m" for g in gens)
+    assert len(notes) == 1 and notes[0].startswith("models resident")
+
+
+def test_warm_models_explains_eviction_when_a_model_did_not_stay_loaded(fake_ollama):
+    from supervisor import warm_models
+    fake_ollama.resident = ["phi3.5:3.8b"]
+    notes = warm_models(["qwen3.5:4b", "phi3.5:3.8b"])
+    assert len(notes) == 1 and "qwen3.5:4b" in notes[0] and "OLLAMA_MAX_LOADED_MODELS=2" in notes[0]
+
+
+def test_warm_models_never_raises(fake_ollama):
+    from supervisor import warm_models
+
+    def boom(**kw): raise RuntimeError("no server")
+    fake_ollama.generate = boom
+    fake_ollama.ps = boom
+    notes = warm_models(["qwen3.5:4b"])
+    assert any("could not load" in n for n in notes) and any("could not check" in n for n in notes)
+
+
+def test_default_llm_and_auditor_pass_keep_alive(fake_ollama):
+    from supervisor import KEEP_ALIVE, default_llm
+    default_llm("m")([{"role": "user", "content": "hi"}])
+    assert fake_ollama.calls[-1]["keep_alive"] == KEEP_ALIVE
+    sys.path.insert(0, str(_ROOT / "src" / "auditor"))
+    from auditor import AuditorAgent
+    got = {}
+    client = SimpleNamespace(chat=lambda **kw: got.update(kw) or {"message": {"content": json.dumps(
+        {"is_sufficient": True, "chunk_evaluations": [], "recommended_search_query": None})}})
+    AuditorAgent(client=client, keep_alive="7m").evaluate("q", "q", [{"id": "a", "text": "t", "headings": ""}])
+    assert got["keep_alive"] == "7m" and got["model"] == "phi3.5:3.8b"

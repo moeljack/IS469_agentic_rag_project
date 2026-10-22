@@ -85,8 +85,11 @@ Notes:
 Each agent is described by what to call, what goes in and what comes out, so the supervisor can be built against
 mock data. Only the Retrieval agent is filled in; owners complete the others in the same format.
 
+### Harness
+- **Call:** python3 src/supervisor/harness.py --user <id> --trace
+
 ### Supervisor agent
-- **Call:** TODO (file, function)
+- **Call:** TODO
 - **Input:** TODO
 - **Output:** TODO
 

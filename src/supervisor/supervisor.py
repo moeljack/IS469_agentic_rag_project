@@ -32,10 +32,12 @@ All model calls go through one injectable `llm(messages, schema=None) -> str`, a
   handle_turn(user_id, messages)  full harness: loads the profile, runs intake, supervises the result
   supervise(user_id, result, question)  takes an already-computed decomposer Result
 """
+import functools
 import json
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -52,11 +54,19 @@ from src.decomposer.decomposer_general_schemas import (
 from src.retrieval.user_store import PERSISTENT_FIELDS
 
 MODEL = os.environ.get("SUPERVISOR_MODEL", os.environ.get("INTAKE_MODEL", "qwen3.5:4b"))
-AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "phi3.5:8b")   # the auditor runs its own local model, not the supervisor's
+AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "phi3.5:3.8b")   # the auditor runs its own local model, not the supervisor's
 NUM_CTX = 8192
-DOC_CHARS = 1500                    # per-chunk text shown to the model when answering
-AUDIT_CHARS = 1200                  # per-chunk text shown to the auditor
-MAX_DOCS = 8
+KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE_CLIENT", "30m")   # how long Ollama keeps our models in memory after a call
+
+# Speed knobs: every chunk costs a reranker pass, auditor prompt tokens and answer prompt tokens, and every planned
+# query costs a full retrieval (embedding + BM25 + rerank). These defaults trade a little recall for a lot of latency;
+# harness.py exposes them as flags (--k, --max-chunks, --max-queries, --candidates).
+DEFAULT_K = 3                       # chunks kept per query after reranking
+DEFAULT_MAX_CHUNKS = 6              # chunks handed to the auditor per search
+DEFAULT_MAX_QUERIES = 2             # planned / follow-up queries per search (the decomposer may plan up to 4)
+DOC_CHARS = 1200                    # per-chunk text shown to the model when answering
+AUDIT_CHARS = 800                   # per-chunk text shown to the auditor
+MAX_DOCS = 6                        # vetted chunks put in the answer prompt
 
 NO_CONTEXT = "The IRAS sources I have don't cover this. Please check iras.gov.sg or rephrase your question."
 
@@ -126,8 +136,12 @@ class RetrievalAgent:
     The plan's SearchFilter (year / doc type) is not applied: the collection carries no such metadata yet.
     """
 
-    def __init__(self, retriever, k: int = 5, min_score: Optional[float] = None, max_chunks: int = 8):
+    def __init__(self, retriever, k: int = DEFAULT_K, min_score: Optional[float] = None,
+                 max_chunks: int = DEFAULT_MAX_CHUNKS, candidates: Optional[int] = None):
+        """candidates: size of the pool the reranker scores per query (None = the retriever's CANDIDATES setting).
+        The reranker is the heaviest step on CPU, so this is the biggest lever on retrieval time."""
         self.retriever, self.k, self.min_score, self.max_chunks = retriever, k, min_score, max_chunks
+        self.candidates = candidates
         self.last_notes: list[str] = []
 
     def run(self, plan: Decompose, queries=None, exclude=()) -> list[Chunk]:
@@ -135,7 +149,8 @@ class RetrievalAgent:
         chosen = queries if queries is not None else plan.queries
         seen, found = set(exclude), {}
         for q in chosen:
-            hits = self.retriever.search(q.text, k=self.k, min_score=self.min_score)
+            extra = {} if self.candidates is None else {"candidates": self.candidates}
+            hits = self.retriever.search(q.text, k=self.k, min_score=self.min_score, **extra)
             new = 0
             for h in hits:
                 if h["id"] in seen:
@@ -166,7 +181,7 @@ def agent_judge(agent=None, model: str = AUDITOR_MODEL) -> Callable:
     def judge(question: str, chunks: list, kept_context: str) -> dict:
         if holder["agent"] is None:
             from src.auditor.auditor import AuditorAgent
-            holder["agent"] = AuditorAgent(model=model)
+            holder["agent"] = AuditorAgent(model=model, keep_alive=KEEP_ALIVE)
         sub_prompt = question
         if kept_context.strip():
             sub_prompt += f"\n(Topics already covered by approved chunks:\n{kept_context})"
@@ -218,6 +233,31 @@ class SupervisorResult:
     sources: list[str] = field(default_factory=list)
     profile_changes: list[tuple] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)
+    timings: list[tuple] = field(default_factory=list)   # [(stage, seconds)], one entry per call
+
+
+def _timed(sink: list, name: str, fn: Callable, *args, **kw):
+    """Call fn and record how long it took under `name`, even if it raises."""
+    t0 = time.perf_counter()
+    try:
+        return fn(*args, **kw)
+    finally:
+        sink.append((name, time.perf_counter() - t0))
+
+
+def timing_line(timings: list[tuple]) -> str:
+    """'timing: intake 2.1s | retrieval 3.4s (x2) | audit 5.2s (x2) | answer 4.0s | other 0.3s | total 15.0s'"""
+    agg: dict = {}
+    for name, secs in timings:
+        total, n = agg.get(name, (0.0, 0))
+        agg[name] = (total + secs, n + 1)
+    parts = [f"{n} {t:.1f}s" + (f" (x{c})" if c > 1 else "") for n, (t, c) in agg.items() if n != "total"]
+    if "total" in agg:
+        other = agg["total"][0] - sum(t for n, (t, _) in agg.items() if n != "total")
+        if other >= 0.05:
+            parts.append(f"other {other:.1f}s")                  # profile store, model loading, glue
+        parts.append(f"total {agg['total'][0]:.1f}s")
+    return "timing: " + " | ".join(parts)
 
 
 @dataclass
@@ -227,15 +267,71 @@ class _Run:
     judged: set = field(default_factory=set)
     audits: list = field(default_factory=list)
     tool_out: dict = field(default_factory=dict)        # tool name -> text
+    timings: list = field(default_factory=list)         # [(stage, seconds)]
     tried: list = field(default_factory=list)           # queries already searched
     log: list = field(default_factory=list)             # one line per action, shown back to the model
     suggestions: list = field(default_factory=list)     # auditor's latest suggested queries
 
 
+# ---------------------------------------------------------------- Ollama runtime: keep the models loaded
+def pin_ollama_keep_alive(keep_alive: str = KEEP_ALIVE) -> None:
+    """Make every `ollama.chat(...)` in this process ask Ollama to keep its model loaded for `keep_alive`.
+
+    Ollama unloads a model 5 minutes after its last call unless the call says otherwise; the decomposer's call
+    doesn't, so without this its model can be evicted between turns. An explicit keep_alive on a call still wins.
+    """
+    import ollama
+    if getattr(ollama.chat, "_keep_alive_pinned", False):
+        return
+    original = ollama.chat
+
+    @functools.wraps(original)
+    def chat(*args, **kwargs):
+        kwargs.setdefault("keep_alive", keep_alive)
+        return original(*args, **kwargs)
+
+    chat._keep_alive_pinned = True
+    ollama.chat = chat
+
+
+def warm_models(models: list[str], keep_alive: str = KEEP_ALIVE) -> list[str]:
+    """Load each Ollama model now (empty prompt) so the first question doesn't pay for it, then check they all
+    stayed resident. Returns human-readable notes: problems, or an 'ok' line. Never raises."""
+    import ollama
+    models = list(dict.fromkeys(models))
+    notes = []
+    for m in models:
+        try:
+            ollama.generate(model=m, prompt="", keep_alive=keep_alive)
+        except Exception as e:
+            notes.append(f"could not load {m}: {e}")
+    try:
+        resp = ollama.ps()
+        items = getattr(resp, "models", None)
+        if items is None:
+            items = resp.get("models", [])
+        loaded = set()
+        for it in items:
+            name = getattr(it, "model", None) or (it.get("model") if hasattr(it, "get") else None)
+            if name:
+                loaded.add(name)
+    except Exception as e:
+        return notes + [f"could not check which models are loaded: {e}"]
+    missing = [m for m in models if m not in loaded and not any(n.startswith(m) for n in loaded)]
+    if missing:
+        notes.append(f"{missing} not resident after loading ({sorted(loaded) or 'nothing loaded'}). Ollama is evicting "
+                     "models to fit memory, so each turn will reload them. Start the Ollama server with "
+                     "OLLAMA_MAX_LOADED_MODELS=2 (or use smaller models) and rerun.")
+    elif not notes:
+        notes.append(f"models resident: {models}")
+    return notes
+
+
 def default_llm(model: str = MODEL) -> Callable:
     def llm(messages: list[dict], schema: Optional[dict] = None) -> str:
         import ollama
-        kw = dict(model=model, messages=messages, options={"temperature": 0, "num_ctx": NUM_CTX})
+        kw = dict(model=model, messages=messages, options={"temperature": 0, "num_ctx": NUM_CTX},
+                  keep_alive=KEEP_ALIVE)
         if schema:
             kw["format"] = schema
         try:
@@ -248,7 +344,8 @@ def default_llm(model: str = MODEL) -> Callable:
 
 class Supervisor:
     def __init__(self, store, retrieval, auditor, llm: Optional[Callable] = None, intake: Callable = None,
-                 tools: Optional[dict] = None, max_steps: int = 4):
+                 tools: Optional[dict] = None, max_steps: int = 4,
+                 max_queries: int = DEFAULT_MAX_QUERIES):
         """
         store:      UserStore
         retrieval:  RetrievalAgent (anything with .run(plan, queries=None, exclude=()) -> list[Chunk])
@@ -257,11 +354,13 @@ class Supervisor:
         intake:     callable(messages, today, prior) -> Result; defaults to decomposer.intake_and_plan
         tools:      {"compute_tax": fn(plan) -> str, ...}; offered to the model only for COMPUTATION questions (Decompose has no tools field)
         max_steps:  action budget before the supervisor must answer with what it has
+        max_queries: most queries run per search (first search: the planned ones, in order; follow-ups: new ones)
         """
         self.store, self.retrieval, self.auditor = store, retrieval, auditor
         self.llm = llm or default_llm()
         self.tools = tools or {}
         self.max_steps = max_steps
+        self.max_queries = max(1, max_queries)
         if intake is None:
             def intake(messages, today, prior):          # imported on first use: pulls in ollama
                 from decomposer import intake_and_plan
@@ -270,16 +369,21 @@ class Supervisor:
 
     # ------------------------------------------------------------ full turn
     def handle_turn(self, user_id: str, messages: list[dict], today: Optional[date] = None) -> SupervisorResult:
+        t_start = time.perf_counter()
         profile, created = self.store.ensure_profile(user_id)
         stored = self.store.profile_entities(user_id)
         pending = self.store.pop_pending(user_id)         # entities from a clarification we asked last turn
         prior = _merge(stored, pending)
         question = next(m["content"] for m in reversed(messages) if m["role"] == "user")
 
+        t_intake = time.perf_counter()
         result = self.intake(messages, today or date.today(), prior)
+        intake_s = time.perf_counter() - t_intake
         out = self.supervise(user_id, result, question, reused=_set_fields(stored))
+        out.timings = [("intake", intake_s), *out.timings, ("total", time.perf_counter() - t_start)]
         out.trace.insert(0, f"profile {'created' if created else 'loaded'} for {user_id}; "
                             f"saved facts: {_set_fields(stored) or 'none'}")
+        out.trace.append(timing_line(out.timings))
         return out
 
     # ------------------------------------------------------------ planner output in
@@ -312,7 +416,7 @@ class Supervisor:
 
         def out(status, message, **kw):
             return SupervisorResult(status, message, plan=plan, audits=run.audits, stop_reason=stop,
-                                    profile_changes=changes, trace=trace, **kw)
+                                    profile_changes=changes, trace=trace, timings=run.timings, **kw)
 
         if ask:
             self.store.save_pending(user_id, plan.entities)
@@ -324,7 +428,8 @@ class Supervisor:
         docs = self._documents(run)
         partial = stop in ("max_steps", "no_new_queries") or bool(run.audits and not run.audits[-1].all_relevant)
         try:
-            draft = self.llm(self._answer_messages(question, plan, docs, assumptions, partial)).strip()
+            draft = _timed(run.timings, "answer", self.llm,
+                           self._answer_messages(question, plan, docs, assumptions, partial)).strip()
         except Exception as e:
             trace.append(f"answer model failed: {e}")
             return out("no_answer", "I couldn't generate an answer right now. Please try again.")
@@ -343,17 +448,19 @@ class Supervisor:
             if step == 1:
                 d = {"action": "search", "queries": [], "reason": "opening search with the planned queries"}
             else:
-                d = self._decide(question, plan, run, available, trace)
+                d = _timed(run.timings, "decide", self._decide, question, plan, run, available, trace)
             action = d["action"]
             trace.append(f"step {step}: {action} - {d.get('reason', '')[:120]}")
 
             if action == "search":
                 if step == 1:
-                    queries = None                                            # the plan's own queries
+                    queries = plan.queries[: self.max_queries]                # the planned queries, capped
+                    if len(plan.queries) > len(queries):
+                        trace.append(f"  using {len(queries)} of {len(plan.queries)} planned queries (max_queries)")
                 else:
                     wanted = d.get("queries") or run.suggestions
                     flt = plan.queries[0].filter if plan.queries else SearchFilter(domain=plan.domain, year=plan.tax_year)
-                    queries = [PlannedQuery(text=q, filter=flt) for q in _new_queries(wanted, run.tried)]
+                    queries = [PlannedQuery(text=q, filter=flt) for q in _new_queries(wanted, run.tried)[: self.max_queries]]
                     if not queries:
                         run.log.append("search skipped: no new queries")
                         return "no_new_queries", None
@@ -364,7 +471,7 @@ class Supervisor:
                     run.log.append(f"run_tool {name!r}: not available or already run")
                     continue
                 try:
-                    run.tool_out[name] = str(self.tools[name](plan))
+                    run.tool_out[name] = str(_timed(run.timings, "tool", self.tools[name], plan))
                     run.log.append(f"run_tool {name}: done")
                 except Exception as e:
                     run.log.append(f"run_tool {name}: failed ({e})")
@@ -383,10 +490,9 @@ class Supervisor:
         return "max_steps", None
 
     def _search(self, plan: Decompose, audit_q: str, queries, run: _Run, trace: list[str]) -> None:
-        batch = (self.retrieval.run(plan, queries=queries, exclude=run.judged) if queries is not None
-                 else self.retrieval.run(plan))
+        batch = _timed(run.timings, "retrieval", self.retrieval.run, plan, queries=queries, exclude=run.judged)
         trace += [f"  {n}" for n in getattr(self.retrieval, "last_notes", [])]
-        used = [q.text for q in (queries if queries is not None else plan.queries)]
+        used = [q.text for q in queries]
         run.tried += used
         batch = [c for c in batch if c.id not in run.judged]
         if not batch:
@@ -395,7 +501,7 @@ class Supervisor:
             return
         kept = "\n".join(f"- {c.metadata.get('headings') or c.metadata.get('source', '')}"
                          for c in run.vetted.values())
-        audit = self.auditor.audit(audit_q, batch, kept)
+        audit = _timed(run.timings, "audit", self.auditor.audit, audit_q, batch, kept)
         run.audits.append(audit)
         for c, ok in zip(batch, audit.relevant):
             run.judged.add(c.id)

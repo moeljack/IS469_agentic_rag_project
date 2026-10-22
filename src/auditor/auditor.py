@@ -1,6 +1,7 @@
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
+
 import ollama
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # Pydantic Schemas for Supervisor Routing
@@ -24,7 +25,7 @@ class AuditorResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Notice we add "return as JSON" to help the smaller model lock into the format
 AUDITOR_PROMPT = """You are a Tax Auditor Agent for IRAS Corporate Income Tax.
-Evaluate if the retrieved chunks sufficiently answer the current sub-prompt. 
+Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
 
 ### Overarching User Query: {original_query}
 ### Current Sub-Prompt: {sub_prompt}
@@ -44,11 +45,12 @@ Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
 # Auditor Agent Implementation
 # ---------------------------------------------------------------------------
 class AuditorAgent:
-    def __init__(self, client=None, model: str = "phi3.5:8b", num_ctx: int = 8192):
+    def __init__(self, client=None, model: str = "phi3.5:3.8b", num_ctx: int = 8192, keep_alive: str = "30m"):
         """client: an ollama.Client (defaults to the local Ollama server)."""
         self.client = client or ollama.Client()
         self.model = model
         self.num_ctx = num_ctx
+        self.keep_alive = keep_alive   # keep phi3.5 resident between turns instead of reloading it
 
     def _format_chunks(self, chunks: list) -> str:
         """Strips vector scores and formats the chunks for the LLM."""
@@ -63,7 +65,7 @@ class AuditorAgent:
 
     def evaluate(self, original_query: str, sub_prompt: str, chunks: list) -> AuditorResponse:
         """Called by the Supervising Agent to evaluate a specific sub-prompt."""
-        
+
         if not chunks:
             return AuditorResponse(
                 is_sufficient=False,
@@ -77,30 +79,22 @@ class AuditorAgent:
             chunks_text=self._format_chunks(chunks)
         )
 
-        # Using Ollama's local OpenAI-compatible endpoint
+        # Ollama's native client: the schema constrains decoding, so the reply is always parseable JSON.
+        # (No `think` argument: phi3.5 is not a reasoning model and Ollama may reject it.)
         response = self.client.chat(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             format=AuditorResponse.model_json_schema(),
-            options={
-                "temperature": 0,           #strict logic
-                "num_ctx": self.num_ctx
-            }
+            options={"temperature": 0.0, "num_ctx": self.num_ctx},  # temperature 0 is critical for strict logic
+            keep_alive=self.keep_alive,
         )
-
         return AuditorResponse.model_validate_json(response["message"]["content"])
 
 # ---------------------------------------------------------------------------
 # Execution Example
 # ---------------------------------------------------------------------------
 # if __name__ == "__main__":
-#     # Point the OpenAI client to your local Ollama instance
-#     local_client = OpenAI(
-#         base_url="http://localhost:11434/v1",
-#         api_key="ollama", # Required by the SDK, but ignored by Ollama
-#     )
-
-#     auditor = AuditorAgent(client=local_client, model="phi3.5")
+#     auditor = AuditorAgent(model="phi3.5:8b")    # talks to the local Ollama server
 
 #     # Example Input from your Retriever
 #     sample_chunks = [
