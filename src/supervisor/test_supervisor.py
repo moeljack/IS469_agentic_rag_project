@@ -14,11 +14,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))       # supervisor
 import chromadb
 import pytest
 
-from decomposer import resolve
-from src.decomposer.decomposer_general_schemas import (
+from src.decomposer.decomposer import (                      # the very classes resolve() returns, whatever path decomposer imports them by
     CITEntities, Clarify, Decompose, IndividualTaxEntities, Intent, LLMOutput, PlannedQuery, PropertyTaxEntities,
-    Refuse, SearchFilter, SubQueryDraft, TaxDomain,
+    Refuse, SearchFilter, TaxDomain, resolve,
 )
+SubQueryDraft = sys.modules[LLMOutput.__module__].SubQueryDraft      # not re-exported by decomposer
 from supervisor import Auditor, Chunk, RetrievalAgent, RetrievalAudit, Supervisor, agent_judge
 from src.retrieval.user_store import UserStore
 
@@ -561,10 +561,10 @@ def test_pin_keep_alive_adds_default_but_respects_explicit_and_is_idempotent(fak
 
 def test_warm_models_loads_each_once_and_reports_ok_when_all_resident(fake_ollama):
     from supervisor import warm_models
-    fake_ollama.resident = ["qwen3.5:4b", "phi3.5:3.8b"]
-    notes = warm_models(["qwen3.5:4b", "qwen3.5:4b", "phi3.5:3.8b"], keep_alive="5m")
+    fake_ollama.resident = ["qwen3.5:4b", "phi3.5:8b"]
+    notes = warm_models(["qwen3.5:4b", "qwen3.5:4b", "phi3.5:8b"], keep_alive="5m")
     gens = [c[1] for c in fake_ollama.calls if isinstance(c, tuple)]
-    assert [g["model"] for g in gens] == ["qwen3.5:4b", "phi3.5:3.8b"] and all(g["keep_alive"] == "5m" for g in gens)
+    assert [g["model"] for g in gens] == ["qwen3.5:4b", "phi3.5:8b"] and all(g["keep_alive"] == "5m" for g in gens)
     assert len(notes) == 1 and notes[0].startswith("models resident")
 
 
@@ -572,7 +572,7 @@ def test_warm_models_explains_eviction_when_a_model_did_not_stay_loaded(fake_oll
     from supervisor import warm_models
     fake_ollama.resident = ["phi3.5:3.8b"]
     notes = warm_models(["qwen3.5:4b", "phi3.5:3.8b"])
-    assert len(notes) == 1 and "qwen3.5:4b" in notes[0] and "OLLAMA_MAX_LOADED_MODELS=2" in notes[0]
+    assert len(notes) == 1 and "qwen3.5:4b" in notes[0] and "OLLAMA_MAX_LOADED_MODELS=1" in notes[0]
 
 
 def test_warm_models_never_raises(fake_ollama):
@@ -595,4 +595,60 @@ def test_default_llm_and_auditor_pass_keep_alive(fake_ollama):
     client = SimpleNamespace(chat=lambda **kw: got.update(kw) or {"message": {"content": json.dumps(
         {"is_sufficient": True, "chunk_evaluations": [], "recommended_search_query": None})}})
     AuditorAgent(client=client, keep_alive="7m").evaluate("q", "q", [{"id": "a", "text": "t", "headings": ""}])
-    assert got["keep_alive"] == "7m" and got["model"] == "phi3.5:3.8b"
+    assert got["keep_alive"] == "7m" and got["model"] == "phi3.5:3.8b" and "think" not in got
+
+
+def test_auditor_sends_think_only_when_asked(fake_ollama):
+    sys.path.insert(0, str(_ROOT / "src" / "auditor"))
+    from auditor import AuditorAgent
+    got = []
+    reply = {"message": {"content": json.dumps({"is_sufficient": True, "chunk_evaluations": [], "recommended_search_query": None})}}
+    client = SimpleNamespace(chat=lambda **kw: got.append(kw) or reply)
+    chunk = [{"id": "a", "text": "t", "headings": ""}]
+    AuditorAgent(client=client).evaluate("q", "q", chunk)
+    AuditorAgent(client=client, think=False).evaluate("q", "q", chunk)
+    assert "think" not in got[0] and got[1]["think"] is False
+
+
+def test_judge_disables_thinking_for_qwen_auditors_only(monkeypatch):
+    import auditor as auditor_mod
+    created = []
+
+    class Agent:
+        def __init__(self, **kw): created.append(kw)
+        def evaluate(self, **kw): return SimpleNamespace(is_sufficient=True, recommended_search_query=None, chunk_evaluations=[])
+    monkeypatch.setattr(auditor_mod, "AuditorAgent", Agent)
+    monkeypatch.setitem(sys.modules, "src.auditor.auditor", auditor_mod)
+    for model in ("qwen3.5:4b", "phi3.5:3.8b"):
+        agent_judge(model=model)("q", [C(1)], "")
+    assert [c["think"] for c in created] == [False, None]
+
+
+def test_warm_models_uses_the_same_context_size_as_real_calls_and_lists_sizes(fake_ollama):
+    from supervisor import NUM_CTX, warm_models
+    fake_ollama.resident = ["phi3.5:3.8b"]
+    fake_ollama.ps = lambda: SimpleNamespace(models=[SimpleNamespace(model="phi3.5:3.8b", size=2_400_000_000)])
+    notes = warm_models(["qwen3.5:4b", "phi3.5:3.8b"])
+    gens = [c[1] for c in fake_ollama.calls if isinstance(c, tuple)]
+    assert all(g["options"] == {"num_ctx": NUM_CTX} for g in gens)
+    assert "phi3.5:3.8b (2.4 GB)" in notes[0] and "AUDITOR_MODEL=qwen3.5:4b" in notes[0]
+
+
+def test_supervisor_and_store_use_exactly_the_classes_decomposer_returns():
+    import decomposer, supervisor
+    import src.retrieval.user_store as user_store
+    assert supervisor.Decompose is decomposer.Decompose and supervisor.Clarify is decomposer.Clarify
+    assert supervisor.PlannedQuery is decomposer.PlannedQuery and user_store.CITEntities is decomposer.CITEntities
+
+
+def test_follow_up_queries_use_the_plans_own_classes_even_if_schemas_were_loaded_twice(store):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("schemas_copy", sys.modules[Decompose.__module__].__file__)
+    alt = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(alt)                                        # same file, new module: new, "different" classes
+    assert alt.SearchFilter is not SearchFilter
+    p = alt.Decompose(domain=alt.TaxDomain.CIT, intent=alt.Intent.LOOKUP, entities=alt.CITEntities(), tax_year=2026,
+                      queries=[alt.PlannedQuery(text="rate", filter=alt.SearchFilter(domain=alt.TaxDomain.CIT, year=2026))])
+    sup, _, ret = make(store, [D("search", queries=["more"]), D("answer")], batches=([C(1)], [C(2)]),
+                       judge=judge_script(({1}, []), ({1}, [])))
+    assert sup.supervise("u1", p, "q").status == "answered" and ret.calls[1][0] == ["more"]

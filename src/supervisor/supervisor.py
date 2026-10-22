@@ -48,13 +48,16 @@ sys.path.insert(0, str(_ROOT))
 for _d in ("inference", "decomposer"):                         # decomposer.py + decomposer_general_schemas.py import each other
     sys.path.insert(0, str(_ROOT / "src" / _d))                # as top-level modules; put the folder they live in here
 
-from src.decomposer.decomposer_general_schemas import (
+# Take the schema classes from `decomposer` itself, not straight from decomposer_general_schemas: isinstance() checks
+# and pydantic validation compare classes by identity, so they must be the very classes resolve() builds its results
+# from, however decomposer.py happens to import its schemas (a second import path gives a second, "different" class).
+from src.decomposer.decomposer import (
     CITEntities, Clarify, Decompose, DomainEntities, Intent, PlannedQuery, Refuse, SearchFilter,
 )
 from src.retrieval.user_store import PERSISTENT_FIELDS
 
 MODEL = os.environ.get("SUPERVISOR_MODEL", os.environ.get("INTAKE_MODEL", "qwen3.5:4b"))
-AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "phi3.5:3.8b")   # the auditor runs its own local model, not the supervisor's
+AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "phi3.5:3.8b")   # the auditor runs its own local model by default (set it equal to SUPERVISOR_MODEL to keep one model loaded)
 NUM_CTX = 8192
 KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE_CLIENT", "30m")   # how long Ollama keeps our models in memory after a call
 
@@ -181,7 +184,9 @@ def agent_judge(agent=None, model: str = AUDITOR_MODEL) -> Callable:
     def judge(question: str, chunks: list, kept_context: str) -> dict:
         if holder["agent"] is None:
             from src.auditor.auditor import AuditorAgent
-            holder["agent"] = AuditorAgent(model=model, keep_alive=KEEP_ALIVE)
+            # qwen3.x are thinking models and would be slow here; other models (phi, gemma) don't take the flag
+            holder["agent"] = AuditorAgent(model=model, keep_alive=KEEP_ALIVE,
+                                           think=False if model.startswith("qwen3") else None)
         sub_prompt = question
         if kept_context.strip():
             sub_prompt += f"\n(Topics already covered by approved chunks:\n{kept_context})"
@@ -302,7 +307,8 @@ def warm_models(models: list[str], keep_alive: str = KEEP_ALIVE) -> list[str]:
     notes = []
     for m in models:
         try:
-            ollama.generate(model=m, prompt="", keep_alive=keep_alive)
+            # same num_ctx as the real calls: Ollama treats a different context size as a different load
+            ollama.generate(model=m, prompt="", keep_alive=keep_alive, options={"num_ctx": NUM_CTX})
         except Exception as e:
             notes.append(f"could not load {m}: {e}")
     try:
@@ -310,20 +316,23 @@ def warm_models(models: list[str], keep_alive: str = KEEP_ALIVE) -> list[str]:
         items = getattr(resp, "models", None)
         if items is None:
             items = resp.get("models", [])
-        loaded = set()
+        loaded = {}
         for it in items:
             name = getattr(it, "model", None) or (it.get("model") if hasattr(it, "get") else None)
+            size = getattr(it, "size", None) or (it.get("size") if hasattr(it, "get") else None)
             if name:
-                loaded.add(name)
+                loaded[name] = f"{name} ({size / 1e9:.1f} GB)" if size else name
     except Exception as e:
         return notes + [f"could not check which models are loaded: {e}"]
     missing = [m for m in models if m not in loaded and not any(n.startswith(m) for n in loaded)]
     if missing:
-        notes.append(f"{missing} not resident after loading ({sorted(loaded) or 'nothing loaded'}). Ollama is evicting "
-                     "models to fit memory, so each turn will reload them. Start the Ollama server with "
-                     "OLLAMA_MAX_LOADED_MODELS=2 (or use smaller models) and rerun.")
+        notes.append(
+            f"{missing} did not stay loaded; resident now: {list(loaded.values()) or 'nothing'}. Ollama evicted it "
+            "when the next model loaded: either both don't fit in memory together, or the server runs with "
+            "OLLAMA_MAX_LOADED_MODELS=1. Check the SIZE column of `ollama ps`. The simplest fix is one shared model "
+            "for every part, e.g. AUDITOR_MODEL=qwen3.5:4b (same as SUPERVISOR_MODEL / INTAKE_MODEL).")
     elif not notes:
-        notes.append(f"models resident: {models}")
+        notes.append(f"models resident: {list(loaded.values())}")
     return notes
 
 
@@ -363,7 +372,7 @@ class Supervisor:
         self.max_queries = max(1, max_queries)
         if intake is None:
             def intake(messages, today, prior):          # imported on first use: pulls in ollama
-                from decomposer import intake_and_plan
+                from src.decomposer.decomposer import intake_and_plan
                 return intake_and_plan(messages, today=today, prior=prior)
         self.intake = intake
 
@@ -459,8 +468,10 @@ class Supervisor:
                         trace.append(f"  using {len(queries)} of {len(plan.queries)} planned queries (max_queries)")
                 else:
                     wanted = d.get("queries") or run.suggestions
-                    flt = plan.queries[0].filter if plan.queries else SearchFilter(domain=plan.domain, year=plan.tax_year)
-                    queries = [PlannedQuery(text=q, filter=flt) for q in _new_queries(wanted, run.tried)[: self.max_queries]]
+                    base = plan.queries[0] if plan.queries else None
+                    flt = base.filter if base else SearchFilter(domain=plan.domain.value, year=plan.tax_year)
+                    make = type(base) if base else PlannedQuery           # build with the plan's own classes
+                    queries = [make(text=q, filter=flt) for q in _new_queries(wanted, run.tried)[: self.max_queries]]
                     if not queries:
                         run.log.append("search skipped: no new queries")
                         return "no_new_queries", None

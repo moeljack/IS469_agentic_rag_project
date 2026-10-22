@@ -23,11 +23,11 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-for _d in ("inference", "decomposer"):      # decomposer_general_schemas.py: put the folder it lives in here
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))               # repo root, for `src.` imports
+for _d in ("inference", "decomposer"):      # the folder decomposer.py lives in
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / _d))
-from src.decomposer.decomposer_general_schemas import (
-    CITEntities, GSTEntities, IndividualTaxEntities, PropertyTaxEntities, StampDutyEntities,
-)
+# From `decomposer`, not decomposer_general_schemas: these must be the exact classes resolve() returns (see supervisor.py)
+from src.decomposer.decomposer import CITEntities, GSTEntities, IndividualTaxEntities, PropertyTaxEntities, StampDutyEntities
 
 _ENTITY_CLASSES = {c.__name__: c for c in (CITEntities, PropertyTaxEntities, GSTEntities, StampDutyEntities,
                                            IndividualTaxEntities)}

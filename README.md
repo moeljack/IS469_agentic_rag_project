@@ -11,6 +11,10 @@ python --version                     # should say 3.12.x
 pip install -r requirements.txt
 ```
 
+```
+
+```
+
 ## Ingest documents
 
 1. Put PDFs in `data/manual/`.
