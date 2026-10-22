@@ -1,7 +1,6 @@
-import json
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
-from openai import OpenAI
+import ollama
 
 # ---------------------------------------------------------------------------
 # Pydantic Schemas for Supervisor Routing
@@ -45,9 +44,11 @@ Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
 # Auditor Agent Implementation
 # ---------------------------------------------------------------------------
 class AuditorAgent:
-    def __init__(self, client, model: str = "phi3.5"):
-        self.client = client
+    def __init__(self, client=None, model: str = "phi3.5:8b", num_ctx: int = 8192):
+        """client: an ollama.Client (defaults to the local Ollama server)."""
+        self.client = client or ollama.Client()
         self.model = model
+        self.num_ctx = num_ctx
 
     def _format_chunks(self, chunks: list) -> str:
         """Strips vector scores and formats the chunks for the LLM."""
@@ -77,14 +78,17 @@ class AuditorAgent:
         )
 
         # Using Ollama's local OpenAI-compatible endpoint
-        response = self.client.beta.chat.completions.parse(
+        response = self.client.chat(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
-            response_format=AuditorResponse,
-            temperature=0.0, # Temperature 0 is critical for strict logic
+            format=AuditorResponse.model_json_schema(),
+            options={
+                "temperature": 0,           #strict logic
+                "num_ctx": self.num_ctx
+            }
         )
 
-        return response.choices[0].message.parsed
+        return AuditorResponse.model_validate_json(response["message"]["content"])
 
 # ---------------------------------------------------------------------------
 # Execution Example

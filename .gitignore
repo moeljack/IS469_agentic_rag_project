@@ -6,3 +6,4 @@ projenv/
 data/processed/
 models/
 .vscode
+.DS_Store
