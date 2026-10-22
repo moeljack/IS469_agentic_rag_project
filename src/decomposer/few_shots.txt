@@ -1,0 +1,39 @@
+=== EXAMPLE 1: Computation with Implicit PTE and CIT Rebate ===
+<|user|>
+How much tax does a company with S$300,000 chargeable income pay for YA 2026?
+<|assistant|>
+{"domain":"cit","intent":"computation","cit":{"ya":2026,"chargeable_income":300000.0,"topics":["Partial Tax Exemption","CIT Rebate"]},"sub_queries":[{"query":"corporate income tax rate partial tax exemption","doc_type":"rate_table"},{"query":"CIT rebate YA 2026","doc_type":"announcement"}]}
+
+=== EXAMPLE 2: Deadline with Full Date Extraction ===
+<|user|>
+When do I need to file Form C-S if my financial year ended on 30 June 2025?
+<|assistant|>
+{"domain":"cit","intent":"deadline","cit":{"fye":"2025-06-30","topics":["Form C-S","ECI"]},"sub_queries":[{"query":"Form C-S filing due date","doc_type":"iras_page"},{"query":"estimated chargeable income ECI filing deadline","doc_type":"iras_page"}]}
+
+=== EXAMPLE 3: Start-Up Tax Exemption (SUTE) Eligibility ===
+<|user|>
+We are a newly incorporated company with FYE 31 March 2025 and S$50,000 chargeable income. Do we qualify for the Start-Up Tax Exemption for YA 2026?
+<|assistant|>
+{"domain":"cit","intent":"eligibility","cit":{"ya":2026,"fye":"2025-03-31","is_new_company":true,"chargeable_income":50000.0,"topics":["Start-Up Tax Exemption"]},"sub_queries":[{"query":"start-up tax exemption qualifying conditions","doc_type":"act"},{"query":"start-up tax exemption first three years of assessment","doc_type":"iras_page"}]}
+
+=== EXAMPLE 4: Out of Scope Guardrail ===
+<|user|>
+Do I need to register for GST if my turnover exceeds $1M, and what is my personal tax rate?
+<|assistant|>
+{"domain":"out_of_scope","intent":"out_of_scope","cit":null,"sub_queries":[]}
+
+=== EXAMPLE 5: Numeric Shorthand (k/m) Normalization ===
+<|user|>
+What is the corporate tax payable for FYE 31 Dec 2025 with chargeable income of 250k?
+<|assistant|>
+{"domain":"cit","intent":"computation","cit":{"fye":"2025-12-31","chargeable_income":250000.0,"topics":["Partial Tax Exemption","CIT Rebate"]},"sub_queries":[{"query":"partial tax exemption computation 250000 chargeable income","doc_type":"rate_table"},{"query":"CIT rebate corporate tax payable","doc_type":"announcement"}]}
+
+=== EXAMPLE 6: Multi-Turn Clarification Follow-Up ===
+<|user|>
+Can you calculate our corporate tax payable?
+<|assistant|>
+What is the company's estimated or actual chargeable income (in SGD)?
+<|user|>
+120,000
+<|assistant|>
+{"domain":"cit","intent":"computation","cit":{"chargeable_income":120000.0,"topics":["tax computation"]},"sub_queries":[{"query":"partial tax exemption 120000 chargeable income","doc_type":"rate_table"}]}

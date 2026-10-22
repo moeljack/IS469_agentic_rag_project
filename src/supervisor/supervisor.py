@@ -1,6 +1,6 @@
 """Supervisor agent: a model (local qwen3.5:4b via Ollama) decides each next action and writes the final answer.
 
-    messages -> intake_planner -> Plan | Clarify | Refuse
+    messages -> decomposer -> Decompose | Clarify | Refuse
                                       |
         user store (ChromaDB) <-------+  profile in as `prior`; new facts out; pending state across clarifications
                                       v
@@ -30,7 +30,7 @@ Guard rails in code (a 4B model is not trusted with the loop itself):
 All model calls go through one injectable `llm(messages, schema=None) -> str`, and the auditor takes an injectable
 `judge`, so tests need no Ollama. Two entry points:
   handle_turn(user_id, messages)  full harness: loads the profile, runs intake, supervises the result
-  supervise(user_id, result, question)  takes an already-computed intake_planner Result
+  supervise(user_id, result, question)  takes an already-computed decomposer Result
 """
 import json
 import os
@@ -43,9 +43,12 @@ from typing import Callable, Optional
 
 _ROOT = Path(__file__).resolve().parents[2]                    # repo root, so `src.<package>.<module>` imports work
 sys.path.insert(0, str(_ROOT))
-sys.path.insert(0, str(_ROOT / "src" / "inference"))           # schemas.py / intake_planner.py import each other as top-level modules
+for _d in ("inference", "decomposer"):                         # decomposer.py + decomposer_general_schemas.py import each other
+    sys.path.insert(0, str(_ROOT / "src" / _d))                # as top-level modules; put the folder they live in here
 
-from schemas import Clarify, Entities, Plan, PlannedQuery, Refuse, SearchFilter
+from src.decomposer.decomposer_general_schemas import (
+    CITEntities, Clarify, Decompose, DomainEntities, Intent, PlannedQuery, Refuse, SearchFilter,
+)
 from src.retrieval.user_store import PERSISTENT_FIELDS
 
 MODEL = os.environ.get("SUPERVISOR_MODEL", os.environ.get("INTAKE_MODEL", "qwen3.5:4b"))
@@ -127,7 +130,7 @@ class RetrievalAgent:
         self.retriever, self.k, self.min_score, self.max_chunks = retriever, k, min_score, max_chunks
         self.last_notes: list[str] = []
 
-    def run(self, plan: Plan, queries=None, exclude=()) -> list[Chunk]:
+    def run(self, plan: Decompose, queries=None, exclude=()) -> list[Chunk]:
         self.last_notes = []
         chosen = queries if queries is not None else plan.queries
         seen, found = set(exclude), {}
@@ -208,7 +211,7 @@ class Auditor:
 class SupervisorResult:
     status: str                         # answered | clarify | refused | no_answer
     message: str                        # what to show the user
-    plan: Optional[Plan] = None
+    plan: Optional[Decompose] = None
     draft: str = ""                     # raw answer from the model
     audits: list[RetrievalAudit] = field(default_factory=list)   # one per search action
     stop_reason: str = ""               # agent_answered | agent_gave_up | max_steps | no_new_queries | no_context | ...
@@ -251,8 +254,8 @@ class Supervisor:
         retrieval:  RetrievalAgent (anything with .run(plan, queries=None, exclude=()) -> list[Chunk])
         auditor:    Auditor        (anything with .audit(question, chunks, kept_context) -> RetrievalAudit)
         llm:        callable(messages, schema=None) -> str; defaults to local Ollama (SUPERVISOR_MODEL, qwen3.5:4b)
-        intake:     callable(messages, today, prior) -> Result; defaults to intake_planner.intake_and_plan
-        tools:      {"compute_tax": fn(plan) -> str, ...}; the model may run those that are also in Plan.tools
+        intake:     callable(messages, today, prior) -> Result; defaults to decomposer.intake_and_plan
+        tools:      {"compute_tax": fn(plan) -> str, ...}; offered to the model only for COMPUTATION questions (Decompose has no tools field)
         max_steps:  action budget before the supervisor must answer with what it has
         """
         self.store, self.retrieval, self.auditor = store, retrieval, auditor
@@ -261,7 +264,7 @@ class Supervisor:
         self.max_steps = max_steps
         if intake is None:
             def intake(messages, today, prior):          # imported on first use: pulls in ollama
-                from src.inference.intake_planner import intake_and_plan
+                from decomposer import intake_and_plan
                 return intake_and_plan(messages, today=today, prior=prior)
         self.intake = intake
 
@@ -289,14 +292,14 @@ class Supervisor:
             self.store.save_pending(user_id, result.entities)   # survive the round trip even if the process restarts
             return SupervisorResult("clarify", result.question, trace=[f"clarify: missing {result.missing}"])
 
-        plan: Plan = result
+        plan: Decompose = result
         trace: list[str] = []
         changes = self.store.remember(user_id, plan.entities, question)
         trace.append(f"profile updates: {changes or 'none'}")
 
         # facts taken from storage rather than from this message are disclosed, like the planner's own assumptions
         assumptions = list(plan.assumptions)
-        used = {f: v for f, v in (reused or {}).items() if getattr(plan.entities, f) == v
+        used = {f: v for f, v in (reused or {}).items() if getattr(plan.entities, f, None) == v
                 and f not in {c[0] for c in changes}}
         if used:
             assumptions.append("Used your saved company details: "
@@ -332,12 +335,9 @@ class Supervisor:
         return out("answered", draft + _footer(assumptions, sources), draft=draft, sources=sources)
 
     # ------------------------------------------------------------ the agent loop
-    def _agent_loop(self, plan: Plan, question: str, audit_q: str, run: _Run, trace: list[str]):
+    def _agent_loop(self, plan: Decompose, question: str, audit_q: str, run: _Run, trace: list[str]):
         """Returns (stop_reason, ask_user_question or None). Fills `run`."""
-        available = [t for t in plan.tools if t in self.tools]
-        for t in plan.tools:
-            if t not in self.tools:
-                trace.append(f"tool {t!r} not registered, not offered")
+        available = list(self.tools) if plan.intent == Intent.COMPUTATION else []   # calculators only for computations
 
         for step in range(1, self.max_steps + 1):
             if step == 1:
@@ -352,7 +352,7 @@ class Supervisor:
                     queries = None                                            # the plan's own queries
                 else:
                     wanted = d.get("queries") or run.suggestions
-                    flt = plan.queries[0].filter if plan.queries else SearchFilter(ya=plan.ya)
+                    flt = plan.queries[0].filter if plan.queries else SearchFilter(domain=plan.domain, year=plan.tax_year)
                     queries = [PlannedQuery(text=q, filter=flt) for q in _new_queries(wanted, run.tried)]
                     if not queries:
                         run.log.append("search skipped: no new queries")
@@ -382,7 +382,7 @@ class Supervisor:
                 return "agent_gave_up", None
         return "max_steps", None
 
-    def _search(self, plan: Plan, audit_q: str, queries, run: _Run, trace: list[str]) -> None:
+    def _search(self, plan: Decompose, audit_q: str, queries, run: _Run, trace: list[str]) -> None:
         batch = (self.retrieval.run(plan, queries=queries, exclude=run.judged) if queries is not None
                  else self.retrieval.run(plan))
         trace += [f"  {n}" for n in getattr(self.retrieval, "last_notes", [])]
@@ -408,7 +408,7 @@ class Supervisor:
                        f"auditor suggests: {audit.suggested_queries or 'nothing'}")
         trace.append(f"  {run.log[-1]}")
 
-    def _decide(self, question: str, plan: Plan, run: _Run, available: list[str], trace: list[str]) -> dict:
+    def _decide(self, question: str, plan: Decompose, run: _Run, available: list[str], trace: list[str]) -> dict:
         topics = [str(c.metadata.get("headings") or c.metadata.get("source", ""))[:90] for c in run.vetted.values()]
         state = (f"QUESTION: {_audit_question(plan, question)}\n"
                  f"AVAILABLE TOOLS: {[t for t in available if t not in run.tool_out] or 'none'}\n"
@@ -434,7 +434,7 @@ class Supervisor:
         return docs
 
     @staticmethod
-    def _answer_messages(question: str, plan: Plan, docs: list[Chunk], assumptions: list[str], partial: bool):
+    def _answer_messages(question: str, plan: Decompose, docs: list[Chunk], assumptions: list[str], partial: bool):
         def head(i, d):
             where = d.metadata.get("headings")
             return f"[Doc {i}] (source: {d.metadata.get('source', '')}" + (f" | {where}" if where else "") + ")"
@@ -474,40 +474,47 @@ def _new_queries(wanted: list, tried: list) -> list[str]:
     return out[:3]
 
 
-def _user_facts(plan: Plan) -> str:
-    e = plan.entities
-    facts = {"year of assessment": plan.ya, "financial year end": e.fye, "chargeable income (SGD)": e.chargeable_income,
-             "newly incorporated": e.is_new_company, "incorporation year": e.incorporation_year,
-             "tax resident": e.tax_resident}
+def _entity_facts(e) -> dict:
+    """The non-empty facts of any domain's entities (topics and the 'active' default are shown separately/not at all)."""
+    return {f: v for f, v in e.model_dump().items()
+            if v not in (None, "", []) and f not in ("topics", "company_status")}
+
+
+def _user_facts(plan: Decompose) -> str:
+    facts = {"domain": plan.domain.value, "year": plan.tax_year,
+             **{_label(f): v for f, v in _entity_facts(plan.entities).items()}}
     lines = [f"- {k}: {v}" for k, v in facts.items() if v not in (None, "")]
     return "\n".join(lines) or "- none"
 
 
-def _audit_question(plan: Plan, question: str) -> str:
+def _audit_question(plan: Decompose, question: str) -> str:
     """The prompt relevance is judged against: the question plus what we know about the user."""
-    e = plan.entities
-    facts = [f"year of assessment {plan.ya}"] + [f"{_label(f)}: {getattr(e, f)}" for f in PERSISTENT_FIELDS
-                                                if getattr(e, f) is not None]
-    if e.chargeable_income is not None:
-        facts.append(f"chargeable income: {e.chargeable_income}")
-    if e.topics:
-        facts.append("topics: " + ", ".join(e.topics))
+    facts = [f"domain {plan.domain.value}", f"year {plan.tax_year}"] + [
+        f"{_label(f)}: {v}" for f, v in _entity_facts(plan.entities).items()]
+    topics = getattr(plan.entities, "topics", [])
+    if topics:
+        facts.append("topics: " + ", ".join(topics))
     return f"{question}\n(Known: {'; '.join(facts)})"
 
 
 def _label(field_name: str) -> str:
-    return {"fye": "financial year end", "is_new_company": "newly incorporated",
-            "incorporation_year": "incorporation year", "tax_resident": "tax resident"}.get(field_name, field_name)
+    return {"fye": "financial year end", "fy": "financial year", "ya": "year of assessment",
+            "is_new_company": "newly incorporated", "incorporation_year": "incorporation year",
+            "tax_resident": "tax resident", "chargeable_income": "chargeable income (SGD)",
+            "annual_revenue": "annual revenue (SGD)"}.get(field_name, field_name.replace("_", " "))
 
 
-def _set_fields(e: Entities) -> dict:
-    return {f: getattr(e, f) for f in PERSISTENT_FIELDS if getattr(e, f) is not None}
+def _set_fields(e) -> dict:
+    return {f: getattr(e, f) for f in PERSISTENT_FIELDS if getattr(e, f, None) is not None}
 
 
-def _merge(stored: Entities, pending: Optional[Entities]) -> Entities:
+def _merge(stored: DomainEntities, pending: Optional[DomainEntities]) -> DomainEntities:
+    """The planner's `prior`: saved company facts (CIT), overridden by what a clarification turn already collected."""
     if pending is None:
         return stored
-    merged = stored.model_copy(deep=True)           # facts from the clarification turn win over stored ones
+    if type(pending) is not type(stored):               # e.g. a property-tax clarification: saved CIT facts don't apply
+        return pending
+    merged = stored.model_copy(deep=True)               # facts from the clarification turn win over stored ones
     for f, v in pending.model_dump().items():
         if f == "topics":
             merged.topics = list(dict.fromkeys([*merged.topics, *v]))

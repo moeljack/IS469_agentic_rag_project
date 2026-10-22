@@ -7,14 +7,18 @@ from types import SimpleNamespace
 
 _ROOT = Path(__file__).resolve().parents[2]                    # repo root
 sys.path.insert(0, str(_ROOT))
-sys.path.insert(0, str(_ROOT / "src" / "inference"))           # schemas, intake_planner
+for _d in ("inference", "decomposer"):                         # decomposer, decomposer_general_schemas
+    sys.path.insert(0, str(_ROOT / "src" / _d))
 sys.path.insert(0, str(Path(__file__).resolve().parent))       # supervisor
 
 import chromadb
 import pytest
 
-from src.inference.intake_planner import resolve
-from schemas import Clarify, Entities, Intent, LLMOutput, Plan, PlannedQuery, Refuse, SearchFilter, SubQuery
+from src.decomposer.decomposer import resolve
+from src.decomposer.decomposer_general_schemas import (
+    CITEntities, Clarify, Decompose, IndividualTaxEntities, Intent, LLMOutput, PlannedQuery, PropertyTaxEntities,
+    Refuse, SearchFilter, SubQueryDraft, TaxDomain,
+)
 from supervisor import Auditor, Chunk, RetrievalAgent, RetrievalAudit, Supervisor, agent_judge
 from src.retrieval.user_store import UserStore
 
@@ -23,10 +27,9 @@ DOC = Chunk(id="web:1:0", content="Your company is taxed at a flat rate of 17% o
             metadata={"source": "https://www.iras.gov.sg/rate"})
 
 
-def plan(**ent):
-    e = Entities(**ent)
-    return Plan(intent=Intent.LOOKUP, entities=e, ya=2026,
-                queries=[PlannedQuery(text="rate", filter=SearchFilter(ya=2026))], tools=[])
+def plan(intent=Intent.LOOKUP, **ent):
+    return Decompose(domain=TaxDomain.CIT, intent=intent, entities=CITEntities(**ent), tax_year=2026,
+                     queries=[PlannedQuery(text="rate", filter=SearchFilter(domain=TaxDomain.CIT, year=2026))])
 
 
 class FakeRetrieval:
@@ -103,7 +106,7 @@ def H(id_, score, text="t", headings="Page > Section"):
 
 
 def planned(*texts):
-    return [PlannedQuery(text=t, filter=SearchFilter(ya=2026)) for t in texts]
+    return [PlannedQuery(text=t, filter=SearchFilter(domain=TaxDomain.CIT, year=2026)) for t in texts]
 
 
 def test_retrieval_agent_runs_each_planned_query_dedupes_and_orders_by_score():
@@ -182,7 +185,7 @@ def test_profile_created_once(store):
 
 
 def test_remember_persists_company_facts_only_and_logs_history(store):
-    changes = store.remember("u1", Entities(fye="2025-12-31", chargeable_income=300000, ya=2026), "q1")
+    changes = store.remember("u1", CITEntities(fye="2025-12-31", chargeable_income=300000, ya=2026), "q1")
     assert changes == [("fye", None, "2025-12-31")]
     assert store.profile_entities("u1").fye == "2025-12-31"
     assert store.profile_entities("u1").chargeable_income is None        # per-question fact is not a default
@@ -190,14 +193,14 @@ def test_remember_persists_company_facts_only_and_logs_history(store):
 
 
 def test_changed_value_overwrites_but_history_keeps_old(store):
-    store.remember("u1", Entities(fye="2025-12-31"), "a")
-    changes = store.remember("u1", Entities(fye="2025-06-30"), "b")
+    store.remember("u1", CITEntities(fye="2025-12-31"), "a")
+    changes = store.remember("u1", CITEntities(fye="2025-06-30"), "b")
     assert changes == [("fye", "2025-12-31", "2025-06-30")]
     assert [h["value"] for h in store.history("u1", "fye")] == ["2025-12-31", "2025-06-30"]
 
 
 def test_users_are_isolated_and_forget_deletes(store):
-    store.remember("u1", Entities(fye="2025-12-31"), "a")
+    store.remember("u1", CITEntities(fye="2025-12-31"), "a")
     assert store.profile_entities("u2").fye is None
     store.forget("u1")
     assert store.get_profile("u1") is None and store.history("u1") == []
@@ -304,14 +307,21 @@ def test_ask_user_returns_clarify_and_saves_pending(store):
     assert store.pop_pending("u1").chargeable_income == 5
 
 
-def test_tool_runs_only_if_planned_and_registered_and_output_is_a_document(store):
-    p = plan(); p.tools = ["compute_tax", "missing_tool"]
+def test_tool_runs_for_computation_only_if_registered_and_output_is_a_document(store):
+    p = plan(intent=Intent.COMPUTATION, chargeable_income=300000)
     sup, llm, _ = make(store, [D("run_tool", tool="compute_tax"), D("run_tool", tool="missing_tool"),
                                D("run_tool", tool="compute_tax"), D("answer")],
                        tools={"compute_tax": lambda plan: "Tax payable: 25,200"}, max_steps=5)
     out = sup.supervise("u1", p, "tax?")
     assert out.status == "answered" and "Tax payable: 25,200" in llm.answered_docs
-    assert any("missing_tool" in t for t in out.trace)
+
+
+def test_tools_are_not_offered_for_non_computation_questions(store):
+    ran = []
+    sup, llm, _ = make(store, [D("run_tool", tool="compute_tax"), D("answer")],
+                       tools={"compute_tax": lambda plan: ran.append(1) or "x"})
+    sup.supervise("u1", plan(intent=Intent.LOOKUP), "rate?")
+    assert ran == [] and "AVAILABLE TOOLS: none" in llm.decide_calls[0][1]["content"]
 
 
 def test_answer_prompt_carries_user_facts_and_assumptions(store):
@@ -353,10 +363,10 @@ def test_answer_model_error_is_reported_not_raised(store):
 
 def test_clarify_saves_pending_and_refuse_clears_it(store):
     sup, _, _ = make(store)
-    out = sup.supervise("u1", Clarify(question="FYE?", missing=["fye"], entities=Entities(chargeable_income=5)), "q")
+    out = sup.supervise("u1", Clarify(question="FYE?", missing=["fye"], domain=TaxDomain.CIT, entities=CITEntities(chargeable_income=5)), "q")
     assert out.status == "clarify"
     assert store.pop_pending("u1").chargeable_income == 5
-    store.save_pending("u1", Entities(ya=2026))
+    store.save_pending("u1", CITEntities(ya=2026))
     sup.supervise("u1", Refuse(reason="out of scope"), "gst?")
     assert store.pop_pending("u1") is None
 
@@ -367,17 +377,22 @@ def test_user_facts_are_citable_so_answer_may_use_them(store):
     assert out.status == "answered"
 
 
-def test_tool_output_is_context_and_unregistered_tools_are_skipped(store):
-    p = plan(); p.tools = ["compute_tax", "missing_tool"]
-    sup, _, _ = make(store, answer="Tax payable is 25,200 [Doc 1].")
-    sup.tools = {"compute_tax": lambda plan: "Tax payable: 25,200"}
-    out = sup.supervise("u1", p, "tax?")
-    assert out.status == "answered" and any("missing_tool" in t for t in out.trace)
+def test_non_cit_answers_do_not_touch_the_company_profile_and_pending_keeps_its_domain(store):
+    p = Decompose(domain=TaxDomain.INDIVIDUAL_TAX, intent=Intent.LOOKUP, tax_year=2026,
+                  entities=IndividualTaxEntities(tax_resident=True, employment_income=90000),
+                  queries=[PlannedQuery(text="reliefs", filter=SearchFilter(domain=TaxDomain.INDIVIDUAL_TAX, year=2026))])
+    sup, llm, _ = make(store, [D("answer")])
+    out = sup.supervise("u1", p, "my reliefs?")
+    assert out.status == "answered" and store.profile_entities("u1").tax_resident is None
+    assert "domain: individual_tax" in llm.answer_calls[0][1]["content"] and "employment income: 90000" in llm.answer_calls[0][1]["content"]
+    store.save_pending("u1", PropertyTaxEntities(annual_value=40000, is_owner_occupied=True))
+    got = store.pop_pending("u1")
+    assert isinstance(got, PropertyTaxEntities) and got.annual_value == 40000
 
 
 # ---------------------------------------------------------------- full turn
 def test_handle_turn_reuses_saved_fye_and_discloses_it(store):
-    store.remember("u1", Entities(fye="2025-12-31"), "earlier")
+    store.remember("u1", CITEntities(fye="2025-12-31"), "earlier")
     seen = {}
 
     def intake(messages, today, prior):
@@ -395,29 +410,29 @@ def test_handle_turn_clarify_then_answer_round_trip(store):
     def intake(messages, today, prior):
         calls.append(prior)
         if prior.fye is None:
-            return Clarify(question="FYE?", missing=["fye"], entities=Entities(chargeable_income=300000))
+            return Clarify(question="FYE?", missing=["fye"], domain=TaxDomain.CIT,
+                           entities=CITEntities(chargeable_income=300000))
         return plan(fye=prior.fye, chargeable_income=prior.chargeable_income)
     sup, _, _ = make(store, [D("answer")], intake=intake)
     first = sup.handle_turn("u1", [{"role": "user", "content": "tax on 300k?"}], TODAY)
     assert first.status == "clarify"
     # simulate the user answering; the pending income must come back as prior, with no fye yet
-    store.remember("u1", Entities(fye="2025-12-31"), "31 Dec")
+    store.remember("u1", CITEntities(fye="2025-12-31"), "31 Dec")
     second = sup.handle_turn("u1", [{"role": "user", "content": "31 Dec"}], TODAY)
     assert calls[1].chargeable_income == 300000 and second.status == "answered"
 
 
 # ---------------------------------------------------------------- the real pieces wired together
-def test_real_planner_feeds_retriever_adapter_and_auditor_adapter(store):
-    """intake_planner.resolve -> Supervisor -> RetrievalAgent(Retriever stand-in) -> Auditor(AuditorAgent stand-in)."""
-    raw = LLMOutput(intent=Intent.LOOKUP, entities=Entities(ya=2026),
-                    sub_queries=[SubQuery(query="corporate income tax rate")])
+def test_real_decomposer_feeds_retriever_adapter_and_auditor_adapter(store):
+    """decomposer.resolve -> Supervisor -> RetrievalAgent(Retriever stand-in) -> Auditor(AuditorAgent stand-in)."""
+    raw = LLMOutput(domain=TaxDomain.CIT, intent=Intent.LOOKUP, cit=CITEntities(ya=2026),
+                    sub_queries=[SubQueryDraft(query="corporate income tax rate")])
 
-    def intake(messages, today, prior):                                   # the deterministic half of intake_planner
+    def intake(messages, today, prior):                                   # the deterministic half of decomposer
         return resolve(raw, messages[-1]["content"], today, prior)
 
     retriever = FakeRetriever({
-        "corporate income tax rate": [H("web:1:0", .9, "Taxed at a flat rate of 17%.")],
-        "what is the rate?": [H("web:1:0", .8, "Taxed at a flat rate of 17%."), H("web:2:0", .4, "Unrelated GST text")],
+        "corporate income tax rate": [H("web:1:0", .9, "Taxed at a flat rate of 17%."), H("web:2:0", .4, "Unrelated GST text")],
     })
     agent = fake_agent([("web:1:0", "approved", "gives the rate"), ("web:2:0", "rejected", "GST")], sufficient=True)
     llm = ScriptedLLM([D("answer")], "The rate is 17% [Doc 1].")
@@ -426,8 +441,18 @@ def test_real_planner_feeds_retriever_adapter_and_auditor_adapter(store):
     out = sup.handle_turn("u1", [{"role": "user", "content": "what is the rate?"}], TODAY)
 
     assert out.status == "answered" and out.stop_reason == "agent_answered"
-    assert [c[0] for c in retriever.calls] == ["corporate income tax rate", "what is the rate?"]
-    assert all(q.filter.ya == 2026 for q in out.plan.queries)
+    assert [c[0] for c in retriever.calls] == ["corporate income tax rate"]
+    assert all(q.filter.year == 2026 and q.filter.domain == TaxDomain.CIT for q in out.plan.queries)
     assert "17%" in llm.answered_docs and "Unrelated GST" not in llm.answered_docs
     assert out.sources == ["https://iras/web:1:0"]
-    assert agent.calls[0][0].startswith("what is the rate?") and "year of assessment 2026" in agent.calls[0][0]
+    assert agent.calls[0][0].startswith("what is the rate?") and "year 2026" in agent.calls[0][0]
+
+
+def test_real_decomposer_refuses_and_clarifies_through_the_supervisor(store):
+    sup, llm, _ = make(store)
+    refuse = resolve(LLMOutput(domain=TaxDomain.OUT_OF_SCOPE, intent=Intent.OUT_OF_SCOPE), "q", TODAY)
+    assert sup.supervise("u1", refuse, "q").status == "refused"
+    clar = resolve(LLMOutput(domain=TaxDomain.CIT, intent=Intent.COMPUTATION, cit=CITEntities(ya=2026)), "q", TODAY)
+    out = sup.supervise("u1", clar, "q")
+    assert out.status == "clarify" and "chargeable income" in out.message and llm.answer_calls == []
+    assert store.pop_pending("u1").ya == 2026

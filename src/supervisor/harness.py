@@ -6,7 +6,7 @@
 
 Company details can be set once:  --company-name "Acme Pte Ltd" --uen 201912345A
 
-Pipeline:  intake_planner (qwen3.5:4b)  ->  Supervisor (qwen3.5:4b)
+Pipeline:  decomposer (qwen3.5:4b)     ->  Supervisor (qwen3.5:4b)
                                               |-- RetrievalAgent -> retriever.Retriever (ChromaDB + BM25 + reranker)
                                               |-- Auditor        -> auditor.AuditorAgent (phi3.5:8b, ollama client)
                                               '-- UserStore (ChromaDB profile + pending clarifications)
@@ -28,7 +28,7 @@ from src.retrieval.user_store import UserStore
 
 def build_supervisor(max_steps: int = 4, tools: dict = None, store: UserStore = None) -> Supervisor:
     """The real stack. Retriever and AuditorAgent are wrapped by the adapters in supervisor.py, which give them the
-    .run() / .audit() interface the supervisor loop uses. The intake planner is the Supervisor's default."""
+    .run() / .audit() interface the supervisor loop uses. The decomposer is the Supervisor's default planner."""
     return Supervisor(store=store or UserStore(),
                       retrieval=RetrievalAgent(Retriever()),     # loads embedder + BM25 index once
                       auditor=Auditor(),                         # AuditorAgent is created on first audit

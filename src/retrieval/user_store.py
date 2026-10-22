@@ -10,7 +10,8 @@ kinds of record, told apart by the `kind` metadata field:
 
 What is a "default" (PERSISTENT_FIELDS) is a deliberate choice: facts about the *company* (year end, new or not,
 tax residency) carry over to the next question; facts about *one question* (chargeable income, the YA asked about)
-do not. They are still written to the history log.
+do not. They are still written to the history log. Entities are per tax domain (decomposer_general_schemas); only
+CIT answers can update the company profile, because e.g. IndividualTaxEntities.tax_resident is about a person.
 
 Used by supervisor.py:  ensure_profile, profile_entities, remember, save_pending, pop_pending
 Used by harness.py:     set_company_info, forget
@@ -22,12 +23,18 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "inference"))   # schemas.py lives in src/inference
-from schemas import Entities
+for _d in ("inference", "decomposer"):      # decomposer_general_schemas.py: put the folder it lives in here
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / _d))
+from src.decomposer.decomposer_general_schemas import (
+    CITEntities, GSTEntities, IndividualTaxEntities, PropertyTaxEntities, StampDutyEntities,
+)
+
+_ENTITY_CLASSES = {c.__name__: c for c in (CITEntities, PropertyTaxEntities, GSTEntities, StampDutyEntities,
+                                           IndividualTaxEntities)}
 
 COLLECTION = "user_store"
 PERSISTENT_FIELDS = ("fye", "is_new_company", "incorporation_year", "tax_resident")   # reused as defaults
-HISTORY_ONLY_FIELDS = ("ya", "fy", "chargeable_income")                                # logged, never reused
+NOT_LOGGED = ("topics", "company_status")                                              # everything else non-empty is logged
 COMPANY_FIELDS = ("company_name", "uen")
 _DUMMY_VECTOR = [1.0]          # Chroma wants an embedding per record; we never query by similarity
 
@@ -76,18 +83,18 @@ class UserStore:
         self._put(f"profile:{user_id}", user_id, "profile", profile)
         return profile
 
-    def profile_entities(self, user_id: str) -> Entities:
-        """The saved company facts as Entities, ready to be the planner's `prior`."""
+    def profile_entities(self, user_id: str) -> CITEntities:
+        """The saved company facts as CITEntities, ready to be the planner's `prior`."""
         profile = self.get_profile(user_id)
-        return Entities(**(profile["facts"] if profile else {}))
+        return CITEntities(**(profile["facts"] if profile else {}))
 
     # ------------------------------------------------------------ learning from the chat
-    def remember(self, user_id: str, entities: Entities, question: str = "") -> list[tuple]:
+    def remember(self, user_id: str, entities, question: str = "") -> list[tuple]:
         """Save what this turn taught us. Returns [(field, old, new)] for company facts that changed
         (the supervisor uses this to avoid claiming it 'reused' a value the user just gave)."""
         profile, _ = self.ensure_profile(user_id)
         changes = []
-        for f in PERSISTENT_FIELDS:
+        for f in (PERSISTENT_FIELDS if isinstance(entities, CITEntities) else ()):   # company facts: CIT answers only
             new = getattr(entities, f)
             old = profile["facts"].get(f)
             if new is not None and new != old:
@@ -99,9 +106,8 @@ class UserStore:
         last = {}                                           # newest logged value per field, to skip exact repeats
         for h in self.history(user_id):
             last[h["field"]] = h["value"]
-        for f in PERSISTENT_FIELDS + HISTORY_ONLY_FIELDS:
-            v = getattr(entities, f)
-            if v is None or (f in last and last[f] == v):
+        for f, v in entities.model_dump().items():
+            if v in (None, "", []) or f in NOT_LOGGED or (f in last and last[f] == v):
                 continue
             ts = time.time_ns()
             self._put(f"hist:{user_id}:{ts}:{uuid.uuid4().hex[:6]}", user_id, "history",
@@ -116,16 +122,18 @@ class UserStore:
         return sorted((json.loads(d) for d in res["documents"]), key=lambda h: h["ts"])
 
     # ------------------------------------------------------------ clarification round trip
-    def save_pending(self, user_id: str, entities: Entities) -> None:
-        self._put(f"pending:{user_id}", user_id, "pending", entities.model_dump())
+    def save_pending(self, user_id: str, entities) -> None:
+        """entities: whichever domain's Entities the planner produced; its class name is stored to rebuild it."""
+        self._put(f"pending:{user_id}", user_id, "pending",
+                  {"cls": type(entities).__name__, "data": entities.model_dump()})
 
-    def pop_pending(self, user_id: str) -> Optional[Entities]:
+    def pop_pending(self, user_id: str):
         """Entities saved when we asked a clarifying question; returned once, then deleted."""
         doc = self._get(f"pending:{user_id}")
         if doc is None:
             return None
         self.col.delete(ids=[f"pending:{user_id}"])
-        return Entities(**doc)
+        return _ENTITY_CLASSES[doc["cls"]](**doc["data"])
 
     # ------------------------------------------------------------ privacy
     def forget(self, user_id: str) -> None:

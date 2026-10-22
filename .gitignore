@@ -6,4 +6,5 @@ projenv/
 data/processed/
 models/
 .vscode
+__init.py__
 .DS_Store

@@ -5,7 +5,6 @@ Everything that needs to be *right* is then decided in plain Python:
   - deriving the Year of Assessment from a financial year end
   - deciding which fields are missing for each intent
   - wording clarifying questions (templates, not model-written)
-  - attaching metadata filters to each retrieval query
 
 Requires: pip install ollama pydantic     (and a pulled model: see `ollama list`)
 Model: defaults to qwen3.5:4b; override without editing code:  INTAKE_MODEL=<tag> python intake_planner.py
@@ -13,12 +12,15 @@ Model: defaults to qwen3.5:4b; override without editing code:  INTAKE_MODEL=<tag
 import json
 import os
 import re
+import sys
 from datetime import date
 from typing import Optional
+from pathlib import Path
 
 from pydantic import ValidationError
 
-from schemas import (Clarify, Entities, Intent, LLMOutput, Plan, PlannedQuery,
+
+from group_proj.IS469_agentic_rag_project.src.decomposer.zignore_decomposer_schemas import (Clarify, Entities, Intent, LLMOutput, Decompose, PlannedQuery,
                      Refuse, Result, SearchFilter)
 
 MODEL = os.environ.get("INTAKE_MODEL", "qwen3.5:4b")
@@ -26,28 +28,15 @@ NUM_CTX = 8192
 
 # ------------------------------------------------------------------ 1. the LLM call
 
-FEW_SHOT = [
-    ("How much tax does a company with S$300,000 chargeable income pay for YA 2026?",
-     {"intent": "computation",
-      "entities": {"ya": 2026, "chargeable_income": 300000, "topics": ["Partial Tax Exemption", "CIT Rebate"]},
-      "sub_queries": [
-          {"query": "corporate income tax rate partial tax exemption", "doc_types": ["iras_page"]},
-          {"query": "CIT rebate YA 2026", "doc_types": ["iras_page", "announcement"]}]}),
-    ("When do I need to file Form C-S if my year end is 30 June?",
-     {"intent": "deadline",
-      "entities": {"topics": ["Form C-S", "ECI"]},
-      "sub_queries": [
-          {"query": "Form C-S filing due date", "doc_types": ["iras_page"]},
-          {"query": "estimated chargeable income ECI filing deadline", "doc_types": ["iras_page"]}]}),
-    ("We are a newly incorporated company with FYE 31 March 2025 and S$50,000 chargeable income. "
-     "Do we qualify for the Start-Up Tax Exemption for YA 2026?",
-     {"intent": "eligibility",
-      "entities": {"ya": 2026, "fye": "2025-03-31", "is_new_company": True, "chargeable_income": 50000,
-                   "topics": ["Start-Up Tax Exemption"]},
-      "sub_queries": [
-          {"query": "start-up tax exemption qualifying conditions", "doc_types": ["iras_page", "act"]},
-          {"query": "start-up tax exemption first three years of assessment", "doc_types": ["iras_page"]}]}),
-]
+# load the few_shots.json file
+FEW_SHOT_PATH = Path(__file__).parent / "few_shots.json"
+try:
+    with open(FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+        raw_few_shots = json.load(f)
+        # Convert JSON objects back to the (user_prompt, output_dict) tuple format expected by build_system_prompt
+        FEW_SHOT = [(item["user_prompt"], item["output"]) for item in raw_few_shots]
+except FileNotFoundError:
+    FEW_SHOT = []  # Fallback if file isn't found
 
 
 def build_system_prompt(today: date) -> str:
@@ -65,9 +54,6 @@ Rules:
   Set "ya" only if the user says YA / Year of Assessment. Set "fy" only if they say FY / financial year.
   Dates as YYYY-MM-DD.
 - topics: official scheme or form names mentioned or clearly implied.
-- sub_queries: 1 to 3 retrieval queries, one per distinct information need. Keyword style, official
-  IRAS terminology. Do NOT answer the question and do NOT put any rates, caps or numbers from memory
-  into the queries.
 
 Examples:
 {shots}"""
@@ -198,15 +184,16 @@ CLARIFY_TEMPLATES = {
     "chargeable_income": "What is the company's chargeable income (in SGD) for the year you're asking about?",
     "fye": "What is the company's financial year end date (e.g. 31 December)?",
     "incorporation": "When was the company incorporated (or is it newly incorporated)?",
+    "business_nature": ""
 }
 
-TOOLS_BY_INTENT = {
-    Intent.LOOKUP: ["get_parameter"],
-    Intent.COMPUTATION: ["get_parameter", "compute_tax"],
-    Intent.DEADLINE: ["compute_deadline"],
-    Intent.ELIGIBILITY: ["check_eligibility"],
-    Intent.PROCEDURE: [],
-}
+# TOOLS_BY_INTENT = {
+#     Intent.LOOKUP: ["get_parameter"],
+#     Intent.COMPUTATION: ["get_parameter", "compute_tax"],
+#     Intent.DEADLINE: ["compute_deadline"],
+#     Intent.ELIGIBILITY: ["check_eligibility"],
+#     Intent.PROCEDURE: [],
+# }
 
 
 def resolve(raw: LLMOutput, question: str, today: date,
@@ -229,19 +216,20 @@ def resolve(raw: LLMOutput, question: str, today: date,
         assumptions.append(f"Assumed Year of Assessment {ya} (the current YA). Tell me if you meant another year.")
 
     # Draft sub-queries from the model + the user's own wording as a safety net.
-    drafts = [(sq.query.strip(), sq.doc_types) for sq in raw.sub_queries if sq.query.strip()]
-    drafts.append((question.strip(), []))
-    seen, queries = set(), []
-    for text, doc_types in drafts:
-        key = text.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        queries.append(PlannedQuery(text=text, filter=SearchFilter(ya=ya, doc_types=doc_types)))
-    queries = queries[:max_queries]
+    # drafts = [(sq.query.strip(), sq.doc_types) for sq in raw.sub_queries if sq.query.strip()]
+    # drafts.append((question.strip(), []))
+    # seen, queries = set(), []
+    # for text, doc_types in drafts:
+    #     key = text.lower()
+    #     if key in seen:
+    #         continue
+    #     seen.add(key)
+    #     queries.append(PlannedQuery(text=text, filter=SearchFilter(ya=ya, doc_types=doc_types)))
+    # queries = queries[:max_queries]
 
-    return Plan(intent=raw.intent, entities=e, ya=ya, assumptions=assumptions,
-                queries=queries, tools=TOOLS_BY_INTENT.get(raw.intent, []))
+    return Decompose(intent=raw.intent, entities=e, ya=ya, assumptions=assumptions,
+                # queries=queries, tools=TOOLS_BY_INTENT.get(raw.intent, [])
+                )
 
 
 def intake_and_plan(messages: list[dict], today: Optional[date] = None,
@@ -269,5 +257,5 @@ if __name__ == "__main__":
             messages.append({"role": "assistant", "content": result.question})
             prior = result.entities
         else:
-            print(result.model_dump_json(indent=2) if isinstance(result, Plan) else f"bot> {result.reason}")
+            print(result.model_dump_json(indent=2) if isinstance(result, Decompose) else f"bot> {result.reason}")
             messages, prior = [], None
