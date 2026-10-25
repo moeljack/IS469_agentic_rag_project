@@ -11,8 +11,10 @@ python --version                     # should say 3.12.x
 pip install -r requirements.txt
 ```
 
+Models needed
 ```
-
+ollama pull qwen3.5:4b
+ollama pull phi3.5:3.8b
 ```
 
 ## Ingest documents
@@ -90,12 +92,9 @@ Each agent is described by what to call, what goes in and what comes out, so the
 mock data. Only the Retrieval agent is filled in; owners complete the others in the same format.
 
 ### Harness
-- **Call:** python3 src/supervisor/harness.py --user <id> --trace
-
-### Supervisor agent
-- **Call:** TODO
-- **Input:** TODO
-- **Output:** TODO
+- **Call:** ```python3 src/supervisor/harness.py --user <id> --trace```
+- **To call with only one model:** `AUDITOR_MODEL=qwen3.5:4b python3 src/supervisor/harness.py --user <id> --trace`
+- remove `--trace` for a cleaner output
 
 ### Decomposer agent
 - **Call:** TODO (file, function)

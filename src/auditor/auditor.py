@@ -45,11 +45,13 @@ Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
 # Auditor Agent Implementation
 # ---------------------------------------------------------------------------
 class AuditorAgent:
-    def __init__(self, client=None, model: str = "phi3.5:3.8b", num_ctx: int = 8192, keep_alive: str = "30m"):
+    def __init__(self, client=None, model: str = "phi3.5:3.8b", num_ctx: int = 8192, keep_alive: str = "30m",
+                 think=None):
         """client: an ollama.Client (defaults to the local Ollama server)."""
         self.client = client or ollama.Client()
         self.model = model
         self.num_ctx = num_ctx
+        self.think = think             # False for thinking models like qwen3.5; None = don't send the flag
         self.keep_alive = keep_alive   # keep phi3.5 resident between turns instead of reloading it
 
     def _format_chunks(self, chunks: list) -> str:
@@ -80,21 +82,24 @@ class AuditorAgent:
         )
 
         # Ollama's native client: the schema constrains decoding, so the reply is always parseable JSON.
-        # (No `think` argument: phi3.5 is not a reasoning model and Ollama may reject it.)
-        response = self.client.chat(
+        # (`think` is sent only if set: phi3.5 is not a reasoning model and Ollama may reject the flag; qwen3.5 needs think=False.)
+        kwargs = dict(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             format=AuditorResponse.model_json_schema(),
             options={"temperature": 0.0, "num_ctx": self.num_ctx},  # temperature 0 is critical for strict logic
             keep_alive=self.keep_alive,
         )
+        if self.think is not None:
+            kwargs["think"] = self.think
+        response = self.client.chat(**kwargs)
         return AuditorResponse.model_validate_json(response["message"]["content"])
 
 # ---------------------------------------------------------------------------
 # Execution Example
 # ---------------------------------------------------------------------------
 # if __name__ == "__main__":
-#     auditor = AuditorAgent(model="phi3.5:8b")    # talks to the local Ollama server
+#     auditor = AuditorAgent(model="phi3.5:3.8b")    # talks to the local Ollama server
 
 #     # Example Input from your Retriever
 #     sample_chunks = [

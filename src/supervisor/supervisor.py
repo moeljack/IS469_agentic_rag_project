@@ -51,7 +51,7 @@ for _d in ("inference", "decomposer"):                         # decomposer.py +
 # Take the schema classes from `decomposer` itself, not straight from decomposer_general_schemas: isinstance() checks
 # and pydantic validation compare classes by identity, so they must be the very classes resolve() builds its results
 # from, however decomposer.py happens to import its schemas (a second import path gives a second, "different" class).
-from src.decomposer.decomposer import (
+from decomposer import (
     CITEntities, Clarify, Decompose, DomainEntities, Intent, PlannedQuery, Refuse, SearchFilter,
 )
 from src.retrieval.user_store import PERSISTENT_FIELDS
@@ -372,7 +372,7 @@ class Supervisor:
         self.max_queries = max(1, max_queries)
         if intake is None:
             def intake(messages, today, prior):          # imported on first use: pulls in ollama
-                from src.decomposer.decomposer import intake_and_plan
+                from decomposer import intake_and_plan
                 return intake_and_plan(messages, today=today, prior=prior)
         self.intake = intake
 
@@ -520,7 +520,8 @@ class Supervisor:
                 run.vetted[c.id] = c
         run.suggestions = list(audit.suggested_queries)
         n_ok = sum(audit.relevant)
-        note = " (auditor unavailable: kept unjudged)" if audit.unavailable else ""
+        why = (audit.reasons[0] if audit.reasons else "").replace("auditor unavailable: ", "")[:300]
+        note = f" (auditor unavailable, kept unjudged: {why})" if audit.unavailable else ""
         run.log.append(f"search {used}: {n_ok}/{len(batch)} chunks related{note}; "
                        f"auditor suggests: {audit.suggested_queries or 'nothing'}")
         trace.append(f"  {run.log[-1]}")
