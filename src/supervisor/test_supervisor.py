@@ -652,3 +652,56 @@ def test_follow_up_queries_use_the_plans_own_classes_even_if_schemas_were_loaded
     sup, _, ret = make(store, [D("search", queries=["more"]), D("answer")], batches=([C(1)], [C(2)]),
                        judge=judge_script(({1}, []), ({1}, [])))
     assert sup.supervise("u1", p, "q").status == "answered" and ret.calls[1][0] == ["more"]
+
+
+def test_trace_shows_why_the_auditor_was_unavailable(store):
+    def broken(*a): raise RuntimeError("model 'phi3.5:3.8b' not found")
+    sup, _, _ = make(store, [D("answer")], judge=broken)
+    out = sup.supervise("u1", plan(), "q")
+    assert any("auditor unavailable, kept unjudged: model 'phi3.5:3.8b' not found" in t for t in out.trace)
+
+
+def test_trace_lists_each_chunk_verdict_with_score_and_reason(store):
+    good = Chunk(id="web:1:0", content="a", metadata={"source": "https://iras/1", "headings": "PTE > Rates", "score": 0.91})
+    bad = Chunk(id="web:2:0", content="b", metadata={"source": "https://iras/2", "headings": "GST", "score": 0.12})
+    judge = lambda q, chunks, kept: {"chunks": [{"index": 1, "relevant": True, "reason": "gives the PTE tiers"},
+                                                {"index": 2, "relevant": False, "reason": "about GST, not CIT"}],
+                                     "suggested_queries": []}
+    sup, _, _ = make(store, [D("answer")], batches=([good, bad],), judge=judge)
+    out = sup.supervise("u1", plan(), "q")
+    assert "    approved [0.91] PTE > Rates: gives the PTE tiers" in out.trace
+    assert "    REJECTED [0.12] GST: about GST, not CIT" in out.trace
+
+
+def test_trace_skips_per_chunk_lines_when_auditor_unavailable(store):
+    def broken(*a): raise RuntimeError("down")
+    sup, _, _ = make(store, [D("answer")], judge=broken)
+    out = sup.supervise("u1", plan(), "q")
+    assert not any("REJECTED" in t or t.lstrip().startswith("approved") for t in out.trace)
+
+
+def test_loop_stops_after_two_searches_in_a_row_that_approve_nothing(store):
+    sup, llm, ret = make(store, [D("search", queries=["x"]), D("search", queries=["y"]), D("search", queries=["z"])],
+                         batches=([C(1)], [C(2)], [C(3)]),
+                         judge=judge_script((set(), []), (set(), []), (set(), [])), max_steps=6)
+    out = sup.supervise("u1", plan(), "q")
+    assert out.stop_reason == "no_progress" and out.status == "no_answer" and len(ret.calls) == 2
+
+
+def test_a_dry_round_does_not_stop_the_loop_once_something_is_vetted(store):
+    sup, _, ret = make(store, [D("search", queries=["x"]), D("search", queries=["y"]), D("answer")],
+                       batches=([C(1)], [C(2)], [C(3)]),
+                       judge=judge_script(({1}, []), (set(), []), (set(), [])), max_steps=6)
+    out = sup.supervise("u1", plan(), "q")
+    assert out.status == "answered" and len(ret.calls) == 3
+
+
+def test_auditor_schema_puts_verdicts_before_sufficiency_and_caps_reason_length():
+    sys.path.insert(0, str(_ROOT / "src" / "auditor"))
+    from auditor import AUDITOR_PROMPT, AuditorResponse, ChunkEvaluation
+    props = list(AuditorResponse.model_json_schema()["properties"])
+    assert props.index("chunk_evaluations") < props.index("is_sufficient") < props.index("recommended_search_query")
+    assert AuditorResponse.model_json_schema()["$defs"]["ChunkEvaluation"]["properties"]["reason"]["maxLength"] == 120
+    assert ChunkEvaluation(chunk_id="a", status="approved", reason="x" * 500).reason      # an overrun must not fail validation
+    assert "insufficient" not in ChunkEvaluation.model_json_schema()["properties"]["status"]["description"]
+    assert "does NOT have to answer the whole question" in AUDITOR_PROMPT and "recommended_search_query" in AUDITOR_PROMPT

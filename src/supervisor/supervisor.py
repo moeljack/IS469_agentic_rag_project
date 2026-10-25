@@ -71,6 +71,7 @@ DEFAULT_MAX_QUERIES = 2             # planned / follow-up queries per search (th
 DOC_CHARS = 1200                    # per-chunk text shown to the model when answering
 AUDIT_CHARS = 800                   # per-chunk text shown to the auditor
 MAX_DOCS = 6                        # vetted chunks put in the answer prompt
+MAX_DRY_ROUNDS = 2                  # stop after this many searches in a row that approve nothing new (and nothing is vetted)
 
 NO_CONTEXT = "The IRAS sources I have don't cover this. Please check iras.gov.sg or rephrase your question."
 
@@ -274,6 +275,7 @@ class _Run:
     audits: list = field(default_factory=list)
     tool_out: dict = field(default_factory=dict)        # tool name -> text
     timings: list = field(default_factory=list)         # [(stage, seconds)]
+    dry: int = 0                                        # consecutive searches that approved nothing
     tried: list = field(default_factory=list)           # queries already searched
     log: list = field(default_factory=list)             # one line per action, shown back to the model
     suggestions: list = field(default_factory=list)     # auditor's latest suggested queries
@@ -476,7 +478,12 @@ class Supervisor:
                     if not queries:
                         run.log.append("search skipped: no new queries")
                         return "no_new_queries", None
+                approved_before = len(run.vetted)
                 self._search(plan, audit_q, queries, run, trace)
+                run.dry = 0 if len(run.vetted) > approved_before else run.dry + 1
+                if run.dry >= MAX_DRY_ROUNDS and not run.vetted and not run.tool_out:
+                    trace.append(f"  {run.dry} searches in a row found nothing usable: stopping early")
+                    return "no_progress", None
             elif action == "run_tool":
                 name = d.get("tool", "")
                 if name not in available or name in run.tool_out:
@@ -526,6 +533,14 @@ class Supervisor:
         run.log.append(f"search {used}: {n_ok}/{len(batch)} chunks related{note}; "
                        f"auditor suggests: {audit.suggested_queries or 'nothing'}")
         trace.append(f"  {run.log[-1]}")
+        if not audit.unavailable:                                   # why each chunk was kept or dropped
+            reasons = list(audit.reasons) + [""] * len(batch)
+            for c, ok, why in zip(batch, audit.relevant, reasons):
+                score = c.metadata.get("score")
+                where = str(c.metadata.get("headings") or c.metadata.get("source", ""))[:70]
+                trace.append(f"    {'approved' if ok else 'REJECTED'} [{score:.2f}] {where}: {why[:200]}"
+                             if isinstance(score, (int, float)) else
+                             f"    {'approved' if ok else 'REJECTED'} {where}: {why[:200]}")
 
     def _decide(self, question: str, plan: Decompose, run: _Run, available: list[str], trace: list[str]) -> dict:
         topics = [str(c.metadata.get("headings") or c.metadata.get("source", ""))[:90] for c in run.vetted.values()]

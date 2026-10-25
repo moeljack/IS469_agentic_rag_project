@@ -9,36 +9,44 @@ from pydantic import BaseModel, Field
 class ChunkEvaluation(BaseModel):
     chunk_id: str = Field(description="The exact 'id' of the chunk being evaluated (e.g., web:a5627a3f6e:1)")
     status: Literal["approved", "rejected"] = Field(
-        description="'approved' if it contains relevant facts to answer the prompt, 'rejected' if irrelevant or insufficient."
+        description="'approved' if the chunk contains information that helps answer ANY PART of the question. "
+                    "'rejected' only if it is off-topic, a title/metadata page, or its rules are for a different year."
     )
-    reason: str = Field(
-        description="Brief explanation of why it was approved or rejected (e.g., 'Missing late penalty information')."
-    )
+    # json_schema_extra goes into the schema Ollama decodes against (a length cap at generation time) without making
+    # pydantic fail validation if a model overruns it: a long reason must never make the whole audit "unavailable".
+    reason: str = Field(description="At most 12 words.", json_schema_extra={"maxLength": 120})
 
 class AuditorResponse(BaseModel):
-    is_sufficient: bool = Field(description="True if the approved chunks combined fully answer the prompt.")
+    # Order matters: the model writes fields in this order, so the verdicts come first and the overall judgement after.
     chunk_evaluations: List[ChunkEvaluation] = Field(description="Evaluation of each individual chunk.")
-    recommended_search_query: Optional[str] = Field(default=None)
+    is_sufficient: bool = Field(description="True only if the approved chunks together answer ALL parts of the question.")
+    recommended_search_query: Optional[str] = Field(
+        default=None,
+        description="If is_sufficient is false: a short keyword query (max 8 words, no years) for the missing part. Otherwise null.",
+    )
 
 # ---------------------------------------------------------------------------
 # Auditor Prompt
 # ---------------------------------------------------------------------------
-# Notice we add "return as JSON" to help the smaller model lock into the format
-AUDITOR_PROMPT = """You are a Tax Auditor Agent for IRAS Corporate Income Tax.
-Evaluate if the retrieved chunks sufficiently answer the current sub-prompt.
+AUDITOR_PROMPT = """You are a Tax Auditor Agent for Singapore IRAS Corporate Income Tax.
+Decide which retrieved chunks are useful for answering the user's question, and whether together they are enough.
 
-### Overarching User Query: {original_query}
-### Current Sub-Prompt: {sub_prompt}
+### User question: {original_query}
+### Context: {sub_prompt}
 
-### Retrieved Chunks:
+### Retrieved chunks:
 {chunks_text}
 
-### Instructions:
-1. Review EACH chunk individually.
-2. Determine if the chunk is useful for answering the current sub-prompt.
-3. Assign a status of "approved" or "rejected" to each chunk_id.
-4. Provide a precise reason for your decision.
-5. Return your response strictly as JSON matching the requested schema.
+### Rules for each chunk
+- approved: the chunk contains information that helps answer ANY PART of the question (conditions, rates, caps, definitions, how a scheme works). A chunk does NOT have to answer the whole question, and it does NOT have to mention the exact year or the user's figures. A general description of a scheme counts.
+- rejected: ONLY if the chunk is about a different topic (e.g. GST, insurance, advance rulings), is just a title / navigation / metadata page, or its rates or rules are explicitly for a different year than asked and would give a wrong answer.
+- Never reject a chunk just because it is incomplete or lacks the user's year or numbers.
+- reason: at most 12 words.
+
+### Then
+- is_sufficient: true only if the approved chunks together answer ALL parts of the question.
+- recommended_search_query: if is_sufficient is false, a short keyword query (max 8 words, no years) for the missing part; otherwise null.
+Return JSON matching the schema.
 """
 
 # ---------------------------------------------------------------------------
