@@ -459,24 +459,43 @@ class Supervisor:
                 d = {"action": "search", "queries": [], "reason": "opening search with the planned queries"}
             else:
                 d = _timed(run.timings, "decide", self._decide, question, plan, run, available, trace)
+            
             action = d["action"]
             trace.append(f"step {step}: {action} - {d.get('reason', '')[:120]}")
 
             if action == "search":
+                # 1. Prepare queries first
                 if step == 1:
-                    queries = plan.queries[: self.max_queries]                # the planned queries, capped
+                    # capping queries limits total database round-trips
+                    queries = plan.queries[: self.max_queries] 
                     if len(plan.queries) > len(queries):
                         trace.append(f"  using {len(queries)} of {len(plan.queries)} planned queries (max_queries)")
                 else:
                     wanted = d.get("queries") or run.suggestions
                     base = plan.queries[0] if plan.queries else None
                     flt = base.filter if base else SearchFilter(domain=plan.domain.value, year=plan.tax_year)
-                    make = type(base) if base else PlannedQuery           # build with the plan's own classes
+                    make = type(base) if base else PlannedQuery  # build with the plan's own classes
+                    # prevent duplicate query execution, skipping retrieval call if the query is being repeated.
                     queries = [make(text=q, filter=flt) for q in _new_queries(wanted, run.tried)[: self.max_queries]]
                     if not queries:
                         run.log.append("search skipped: no new queries")
+                        # If we have vetted chunks or tool output, answer; otherwise give up
+                        if run.vetted or run.tool_out:
+                            return "agent_answered", None
                         return "no_new_queries", None
+
+                # 2. Execute search ONCE
                 self._search(plan, audit_q, queries, run, trace)
+
+                # 3. Early termination on zero-delta
+                # Only trigger on step > 1 (step 1 is the initial cold search)
+                # eliminates redundant multi-hop loops. speeding up time for retrieval 
+                if step > 1 and getattr(run, "last_new_chunks_count", None) == 0:
+                    trace.append("  guard: zero new chunks retrieved; stopping search loop.")
+                    if run.vetted or run.tool_out:
+                        return "agent_answered", None
+                    return "agent_gave_up", None
+
             elif action == "run_tool":
                 name = d.get("tool", "")
                 if name not in available or name in run.tool_out:
@@ -487,22 +506,36 @@ class Supervisor:
                     run.log.append(f"run_tool {name}: done")
                 except Exception as e:
                     run.log.append(f"run_tool {name}: failed ({e})")
+                    
             elif action == "ask_user":
                 q = (d.get("question") or "").strip()
                 if q:
                     return "agent_asked_user", q
                 run.log.append("ask_user without a question ignored")
+                
             elif action == "answer":
                 if not run.vetted and not run.tool_out:
                     trace.append("answer requested with nothing vetted -> give_up")
                     return "agent_gave_up", None
                 return "agent_answered", None
-            else:                                                             # give_up
+                
+            else:  # give_up
                 return "agent_gave_up", None
+                
         return "max_steps", None
 
     def _search(self, plan: Decompose, audit_q: str, queries, run: _Run, trace: list[str]) -> None:
         batch = _timed(run.timings, "retrieval", self.retrieval.run, plan, queries=queries, exclude=run.judged)
+        # Count how many chunks in the batch have not been seen in run.judged or run.collected
+        new_chunks = [chunk for chunk in batch if chunk.id not in getattr(run, "seen_chunk_ids", set())]
+        
+        if not hasattr(run, "seen_chunk_ids"):
+            run.seen_chunk_ids = set()
+        run.seen_chunk_ids.update(chunk.id for chunk in batch)
+        
+        # Record the count of new chunks on the run object
+        run.last_new_chunks_count = len(new_chunks)
+        
         trace += [f"  {n}" for n in getattr(self.retrieval, "last_notes", [])]
         used = [q.text for q in queries]
         run.tried += used
