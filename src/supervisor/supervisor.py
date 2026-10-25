@@ -57,7 +57,8 @@ from decomposer import (
 from src.retrieval.user_store import PERSISTENT_FIELDS
 
 MODEL = os.environ.get("SUPERVISOR_MODEL", os.environ.get("INTAKE_MODEL", "qwen3.5:4b"))
-AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "phi3.5:3.8b")   # the auditor runs its own local model by default (set it equal to SUPERVISOR_MODEL to keep one model loaded)
+# AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "phi3.5:3.8b")   # the auditor runs its own local model by default (set it equal to SUPERVISOR_MODEL to keep one model loaded)
+AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "qwen3.5:4b")   # the auditor runs its own local model by default (set it equal to SUPERVISOR_MODEL to keep one model loaded)
 NUM_CTX = 8192
 KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE_CLIENT", "30m")   # how long Ollama keeps our models in memory after a call
 
