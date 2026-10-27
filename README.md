@@ -93,7 +93,7 @@ mock data. Only the Retrieval agent is filled in; owners complete the others in 
 
 ### Harness
 - **Call:** ```python3 src/supervisor/harness.py --user <id> --trace```
-- **To call with only one model:** `AUDITOR_MODEL=qwen3.5:4b python3 src/supervisor/harness.py --user <id> --trace`
+- **To call with only one model:** `AUDITOR_MODEL=qwen3.5:4b python3 src/supervisor/harness.py  --user <id> --trace`
 - remove `--trace` for a cleaner output
 
 ### Decomposer agent
@@ -160,3 +160,9 @@ items; an empty list if nothing passes `min_score`. Each dict:
 - **Call:** TODO (file, function)
 - **Input:** TODO
 - **Output:** TODO
+
+
+## Pytest
+```
+python3 -m pytest src/supervisor/test_supervisor.py -q
+```

@@ -134,18 +134,21 @@ def test_retrieval_agent_caps_batch_and_passes_min_score():
 
 
 # ---------------------------------------------------------------- adapter: AuditorAgent -> Auditor
-def fake_agent(evals, sufficient=False, recommended=None):
-    calls = []
-    def evaluate(original_query, sub_prompt, chunks):
+def fake_agent(evals, sufficient=False, recommended=None, missing=None):
+    """evals: (key, status, reason); an int key is the chunk number (current auditor), a str key a chunk id (older)."""
+    calls, kwargs = [], []
+    def evaluate(original_query, sub_prompt, chunks, **kw):
         calls.append((original_query, sub_prompt, chunks))
-        return SimpleNamespace(is_sufficient=sufficient, recommended_search_query=recommended,
-                               chunk_evaluations=[SimpleNamespace(chunk_id=i, status=s, reason=r)
-                                                  for i, s, r in evals])
-    return SimpleNamespace(evaluate=evaluate, calls=calls)
+        kwargs.append(kw)
+        return SimpleNamespace(is_sufficient=sufficient, recommended_search_query=recommended, missing=missing,
+                               chunk_evaluations=[SimpleNamespace(chunk=k, status=s, reason=r) if isinstance(k, int)
+                                                  else SimpleNamespace(chunk_id=k, status=s, reason=r)
+                                                  for k, s, r in evals])
+    return SimpleNamespace(evaluate=evaluate, calls=calls, kwargs=kwargs)
 
 
-def test_agent_judge_maps_chunk_ids_to_verdicts_and_passes_chunk_fields():
-    agent = fake_agent([("web:1:0", "approved", "has rate"), ("web:2:0", "rejected", "off topic")],
+def test_agent_judge_maps_chunk_numbers_to_verdicts_and_passes_chunk_fields():
+    agent = fake_agent([(1, "approved", "has rate"), (2, "rejected", "off topic")],
                        recommended="late payment penalty")
     a, b = C(1, "alpha"), C(2, "bravo")
     a.metadata["headings"] = "Rates"
@@ -158,10 +161,34 @@ def test_agent_judge_maps_chunk_ids_to_verdicts_and_passes_chunk_fields():
                        {"id": "web:2:0", "headings": "", "text": "bravo"}]
 
 
-def test_agent_judge_keeps_chunks_the_model_skipped():
-    agent = fake_agent([("web:1:0", "rejected", "no")])
+def test_agent_judge_keeps_chunks_the_model_skipped_or_numbered_out_of_range():
+    agent = fake_agent([(1, "rejected", "no"), (7, "rejected", "no such chunk")])
     audit = Auditor(judge=agent_judge(agent)).audit("q", [C(1), C(2)])
-    assert audit.relevant == [False, True]
+    assert audit.relevant == [False, True] and audit.reasons == ["no", "not evaluated by auditor"]
+
+
+def test_agent_judge_still_understands_an_auditor_that_returns_chunk_ids():
+    agent = fake_agent([("web:2:0", "approved", None), ("web:1:0", "rejected", "GST")])
+    audit = Auditor(judge=agent_judge(agent)).audit("q", [C(1), C(2)])
+    assert audit.relevant == [False, True] and audit.reasons == ["GST", ""]
+
+
+def test_agent_judge_first_verdict_wins_when_the_model_repeats_a_number():
+    agent = fake_agent([(1, "approved", None), (1, "rejected", "changed its mind")])
+    assert Auditor(judge=agent_judge(agent)).audit("q", [C(1)]).relevant == [True]
+
+
+def test_auditor_passes_tried_queries_and_year_and_reports_what_is_missing():
+    agent = fake_agent([(1, "approved", None)], missing="shareholder count limit", recommended="SUTE 20 shareholders")
+    audit = Auditor(judge=agent_judge(agent)).audit("q", [C(1)], tried=["sute conditions"], year=2026)
+    assert agent.kwargs == [{"tried_queries": ["sute conditions"], "year": 2026}]
+    assert audit.missing == "shareholder count limit" and audit.reasons == [""]
+
+
+def test_three_argument_judges_still_work_without_tried_or_year():
+    seen = []
+    judge = lambda q, chunks, kept: seen.append(kept) or {"chunks": [], "suggested_queries": []}
+    assert Auditor(judge=judge).audit("q", [C(1)], "k", tried=["x"], year=2026).relevant == [True] and seen == ["k"]
 
 
 def test_audit_not_all_relevant_when_auditor_says_insufficient():
@@ -440,12 +467,14 @@ def test_real_decomposer_feeds_retriever_adapter_and_auditor_adapter(store):
 
     out = sup.handle_turn("u1", [{"role": "user", "content": "what is the rate?"}], TODAY)
 
-    assert out.status == "answered" and out.stop_reason == "agent_answered"
+    # the auditor said the approved chunk is sufficient, so no decide call was needed
+    assert out.status == "answered" and out.stop_reason == "auditor_sufficient" and llm.decide_calls == []
     assert [c[0] for c in retriever.calls] == ["corporate income tax rate"]
     assert all(q.filter.year == 2026 and q.filter.domain == TaxDomain.CIT for q in out.plan.queries)
     assert "17%" in llm.answered_docs and "Unrelated GST" not in llm.answered_docs
     assert out.sources == ["https://iras/web:1:0"]
     assert agent.calls[0][0].startswith("what is the rate?") and "year 2026" in agent.calls[0][0]
+    assert [c["id"] for c in agent.calls[0][2]] == ["web:1:0"]       # the 0.4 chunk never reached the auditor
 
 
 def test_real_decomposer_refuses_and_clarifies_through_the_supervisor(store):
@@ -481,8 +510,9 @@ def test_follow_up_searches_are_capped_too(store):
 
 
 def test_default_caps_are_small():
-    from supervisor import DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES
-    assert (DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES) == (3, 6, 2)
+    from supervisor import AUDIT_MIN_SCORE, DEFAULT_CANDIDATES, DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES
+    assert (DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES, DEFAULT_CANDIDATES) == (3, 6, 2, 6)
+    assert AUDIT_MIN_SCORE == 0.5 and Supervisor(None, None, None, llm=lambda m, s=None: "").audit_min_score == 0.5
     assert RetrievalAgent(FakeRetriever({})).k == 3
 
 
@@ -668,6 +698,7 @@ def test_trace_lists_each_chunk_verdict_with_score_and_reason(store):
                                                 {"index": 2, "relevant": False, "reason": "about GST, not CIT"}],
                                      "suggested_queries": []}
     sup, _, _ = make(store, [D("answer")], batches=([good, bad],), judge=judge)
+    sup.audit_min_score = 0                                          # audit everything, even the 0.12 chunk
     out = sup.supervise("u1", plan(), "q")
     assert "    approved [0.91] PTE > Rates: gives the PTE tiers" in out.trace
     assert "    REJECTED [0.12] GST: about GST, not CIT" in out.trace
@@ -700,8 +731,290 @@ def test_auditor_schema_puts_verdicts_before_sufficiency_and_caps_reason_length(
     sys.path.insert(0, str(_ROOT / "src" / "auditor"))
     from auditor import AUDITOR_PROMPT, AuditorResponse, ChunkEvaluation
     props = list(AuditorResponse.model_json_schema()["properties"])
-    assert props.index("chunk_evaluations") < props.index("is_sufficient") < props.index("recommended_search_query")
-    assert AuditorResponse.model_json_schema()["$defs"]["ChunkEvaluation"]["properties"]["reason"]["maxLength"] == 120
-    assert ChunkEvaluation(chunk_id="a", status="approved", reason="x" * 500).reason      # an overrun must not fail validation
+    assert (props.index("chunk_evaluations") < props.index("is_sufficient") < props.index("missing")
+            < props.index("recommended_search_query"))
+    evaluation = AuditorResponse.model_json_schema()["$defs"]["ChunkEvaluation"]["properties"]
+    assert list(evaluation) == ["chunk", "status", "reason"] and evaluation["chunk"]["type"] == "integer"
+    assert evaluation["reason"]["anyOf"][0]["maxLength"] == 60
+    assert ChunkEvaluation(chunk=1, status="approved", reason="x" * 500).reason      # an overrun must not fail validation
+    assert ChunkEvaluation(chunk=1, status="approved").reason is None              # approved chunks need no reason
     assert "insufficient" not in ChunkEvaluation.model_json_schema()["properties"]["status"]["description"]
     assert "does NOT have to answer the whole question" in AUDITOR_PROMPT and "recommended_search_query" in AUDITOR_PROMPT
+
+
+# ---------------------------------------------------------------- speed guards: near-duplicate queries
+def test_new_queries_drops_repeats_plurals_synonyms_and_bare_numbers_but_keeps_new_topics():
+    from supervisor import _new_queries
+    tried = ["start-up tax exemption shareholder requirements"]
+    skipped = []
+    out = _new_queries(["start-up tax exemption shareholder requirements 50%",     # only adds a number
+                        "Start-Up Tax Exemption shareholder conditions",           # requirements ~ conditions
+                        "start-up tax exemption shareholder requirement",          # singular
+                        "start-up tax exemption investment holding company",       # a different facet
+                        "late payment penalty"], tried, skipped)
+    assert out == ["start-up tax exemption investment holding company", "late payment penalty"]
+    assert skipped == ["start-up tax exemption shareholder requirements 50%",
+                       "Start-Up Tax Exemption shareholder conditions", "start-up tax exemption shareholder requirement"]
+
+
+def test_one_swapped_keyword_in_a_short_query_is_a_new_query():
+    from supervisor import _new_queries
+    assert _new_queries(["corporate income tax rebate"], ["corporate income tax rate"]) == ["corporate income tax rebate"]
+    assert _new_queries(["tax rate"], ["corporate income tax rate"]) == []          # adds no keyword
+    assert _new_queries(["a", "b", "a"], []) == ["a", "b"]                         # repeats within one request too
+
+
+def test_near_duplicate_follow_ups_are_not_retrieved_and_the_loop_answers(store):
+    sup, llm, ret = make(store, [D("search", queries=["Rate"]), D("answer")], batches=([C(1)],),
+                         judge=judge_script(({1}, [])))
+    out = sup.supervise("u1", plan(), "q")                  # "Rate" repeats the planned "rate"
+    assert len(ret.calls) == 1 and out.stop_reason == "no_new_queries" and out.status == "answered"
+    assert any("skipped near-duplicate queries ['Rate']" in t for t in out.trace)
+
+
+def test_auditor_suggestion_is_used_when_all_model_queries_are_repeats(store):
+    sup, _, ret = make(store, [D("search", queries=["rates"]), D("answer")], batches=([C(1)], [C(2)]),
+                       judge=judge_script(({1}, ["late payment penalty"]), ({1}, [])))
+    sup.supervise("u1", plan(), "q")
+    assert ret.calls[1][0] == ["late payment penalty"]
+
+
+def test_follow_up_returning_only_seen_chunks_stops_the_loop(store):
+    sup, llm, ret = make(store, [D("search", queries=["other"]), D("search", queries=["more"])],
+                         batches=([C(1)], [C(1)]), judge=judge_script(({1}, [])))
+    out = sup.supervise("u1", plan(), "q")
+    assert len(ret.calls) == 2 and len(llm.decide_calls) == 1 and out.status == "answered"
+    assert any("zero new chunks" in t for t in out.trace)
+
+
+# ---------------------------------------------------------------- speed guards: reranker pre-filter
+def S(n, score, text="x", headings=None):
+    return Chunk(id=f"web:{n}:0", content=text,
+                 metadata={"source": f"https://iras/{n}", "headings": headings or f"H{n}", "score": score})
+
+
+def recording_judge(*steps):
+    """judge_script that also records which chunk ids each audit was given."""
+    inner, seen = judge_script(*steps), []
+    def judge(q, chunks, kept):
+        seen.append([c.id for c in chunks])
+        return inner(q, chunks, kept)
+    judge.seen = seen
+    return judge
+
+
+def test_chunks_below_the_reranker_cutoff_skip_the_auditor_and_are_traced(store):
+    judge = recording_judge(({1}, []))
+    sup, _, _ = make(store, [D("answer")], batches=([S(1, .9), S(2, .45), S(3, .1)],), judge=judge)
+    out = sup.supervise("u1", plan(), "q")
+    assert judge.seen == [["web:1:0"]]
+    assert "    skipped [0.45] H2: reranker score below 0.50, not audited" in out.trace
+    assert any("1/1 chunks related, 2 below reranker cutoff" in t for t in out.trace)
+
+
+def test_a_search_whose_new_chunks_are_all_below_the_cutoff_makes_no_auditor_call(store):
+    judge = recording_judge(({1}, []))
+    sup, _, ret = make(store, [D("search", queries=["more"]), D("answer")], batches=([S(1, .9)], [S(2, .3)]),
+                       judge=judge)
+    out = sup.supervise("u1", plan(), "q")
+    assert len(ret.calls) == 2 and judge.seen == [["web:1:0"]] and len(out.audits) == 1
+    assert any("1 chunk(s) below reranker cutoff 0.50, none audited" in t for t in out.trace)
+
+
+def test_best_low_scoring_chunk_is_still_audited_while_nothing_is_vetted(store):
+    judge = recording_judge(({1}, []))
+    sup, _, _ = make(store, [D("answer")], batches=([S(1, .2), S(2, .4)],), judge=judge)
+    out = sup.supervise("u1", plan(), "q")
+    assert judge.seen == [["web:2:0"]] and out.status == "answered"
+
+
+def test_cutoff_zero_audits_everything_and_unscored_chunks_are_always_audited(store):
+    judge = recording_judge(({1, 2}, []))
+    sup, _, _ = make(store, [D("answer")], batches=([S(1, .9), S(2, .1)],), judge=judge)
+    sup.audit_min_score = 0
+    sup.supervise("u1", plan(), "q")
+    assert judge.seen == [["web:1:0", "web:2:0"]]
+    judge = recording_judge(({1, 2}, []))
+    sup, _, _ = make(store, [D("answer")], batches=([C(1), C(2)],), judge=judge)
+    sup.supervise("u1", plan(), "q")
+    assert judge.seen == [["web:1:0", "web:2:0"]]
+
+
+# ---------------------------------------------------------------- speed guards: auditor says sufficient
+def sufficient_judge(sufficient):
+    return lambda q, chunks, kept: {"chunks": [{"index": i, "relevant": True, "reason": "r"}
+                                               for i in range(1, len(chunks) + 1)],
+                                    "suggested_queries": [], "sufficient": sufficient}
+
+
+def test_sufficient_audit_answers_without_a_decide_call(store):
+    sup, llm, _ = make(store, [D("search", queries=["more"])], judge=sufficient_judge(True))
+    out = sup.supervise("u1", plan(), "q")
+    assert out.stop_reason == "auditor_sufficient" and llm.decide_calls == [] and out.status == "answered"
+    assert "COVERAGE NOTE" not in llm.answer_calls[0][1]["content"]
+
+
+def test_insufficient_or_unreported_audit_still_asks_the_model(store):
+    for verdict in (False, None):
+        sup, llm, _ = make(store, [D("answer")], judge=sufficient_judge(verdict))
+        sup.supervise("u1", plan(), "q")
+        assert len(llm.decide_calls) == 1
+
+
+def test_sufficient_audit_does_not_skip_a_calculator_that_has_not_run(store):
+    p = plan(intent=Intent.COMPUTATION, chargeable_income=300000)
+    sup, llm, _ = make(store, [D("run_tool", tool="compute_tax"), D("answer")], judge=sufficient_judge(True),
+                       tools={"compute_tax": lambda plan: "Tax payable: 25,200"})
+    out = sup.supervise("u1", p, "tax?")
+    assert len(llm.decide_calls) == 2 and "Tax payable: 25,200" in llm.answered_docs and out.status == "answered"
+
+
+# ---------------------------------------------------------------- the trace from the SUTE question, end to end
+def sute_plan():
+    return plan_with_queries("start-up tax exemption shareholder requirements",
+                             "start-up tax exemption first three years of assessment")
+
+
+def test_sute_trace_stops_after_one_audit_instead_of_three_searches(store):
+    """Replays the first slow trace: step 1 approves the qualifying-conditions chunk; the model then asks for a
+    near-repeat and a rephrase. Before: 3 retrievals, 2 audits. Now: 2 retrievals, 1 audit. (The auditor's
+    suggestion here is new, so the decide call still happens.)"""
+    first = [S(1, .99, headings="Qualifying conditions"), S(2, .96), S(3, .93), S(4, .81), S(5, .40)]
+    judge = recording_judge(({1, 4}, ["Start-Up Tax Exemption shareholder ownership limit"]))
+    decisions = [D("search", queries=["start-up tax exemption shareholder ownership percentage",
+                                      "start-up tax exemption shareholder requirements 50%"]),
+                 D("search", queries=["Start-Up Tax Exemption shareholder conditions"])]
+    sup, llm, ret = make(store, decisions, batches=(first, [S(6, .48)]), judge=judge, max_steps=4)
+    out = sup.supervise("u1", sute_plan(), "Do we qualify for SUTE?")
+    assert ret.calls[1][0] == ["start-up tax exemption shareholder ownership percentage"]
+    assert len(ret.calls) == 2 and len(judge.seen) == 1 and judge.seen[0] == [f"web:{i}:0" for i in (1, 2, 3, 4)]
+    assert out.stop_reason == "no_new_queries" and out.status == "answered"
+    assert "Qualifying conditions" in llm.answered_docs
+
+
+def test_sute_second_trace_answers_without_a_decide_call_when_the_suggestion_repeats(store):
+    """Replays the second trace: the auditor's only suggestion ("... shareholder limit rules" ~ the planned
+    "... shareholder requirements") is a repeat, so step 2 answers without a decide call (was 3.5s)."""
+    first = [S(1, .99, headings="Qualifying conditions"), S(2, .96), S(3, .93), S(4, .81), S(5, .40)]
+    judge = recording_judge(({1}, ["Start-Up Tax Exemption shareholder limit rules"]))
+    sup, llm, ret = make(store, [D("search", queries=["should never be asked"])], batches=(first,), judge=judge)
+    out = sup.supervise("u1", sute_plan(), "Do we qualify for SUTE?")
+    assert llm.decide_calls == [] and len(ret.calls) == 1 and len(judge.seen) == 1
+    assert out.stop_reason == "suggestions_repeat" and out.status == "answered"
+    assert "decide" not in dict(out.timings)
+    assert any("auditor's suggestions ['Start-Up Tax Exemption shareholder limit rules'] repeat searched queries"
+               in t for t in out.trace)
+
+
+# ---------------------------------------------------------------- warming and the harness flags
+def test_retrieval_agent_warm_runs_one_search_and_never_raises():
+    r = FakeRetriever({})
+    assert RetrievalAgent(r).warm().startswith("retriever warm") and r.calls == [("corporate income tax rate", 1, None)]
+
+    class Broken:
+        def search(self, *a, **kw): raise RuntimeError("no model")
+    assert "could not warm the retriever: no model" in RetrievalAgent(Broken()).warm()
+
+
+def test_harness_defaults_and_build_supervisor_pass_the_speed_knobs(store):
+    import harness
+    args = harness.parse_args(["--user", "u"])
+    assert (args.candidates, args.audit_min_score, args.quantize_rerank) == (6, 0.5, False)
+    sup = harness.build_supervisor(store=store, retriever=FakeRetriever({}), candidates=4, audit_min_score=0.3)
+    assert sup.retrieval.candidates == 4 and sup.audit_min_score == 0.3
+    assert harness.build_supervisor(store=store, retriever=FakeRetriever({}), candidates=0).retrieval.candidates is None
+
+
+# ---------------------------------------------------------------- speed guards: auditor's suggestions all repeat
+def test_repeated_suggestions_skip_the_decide_call(store):
+    sup, llm, ret = make(store, [D("search", queries=["late payment penalty"])], batches=([C(1)],),
+                         judge=judge_script(({1}, ["rates"])))          # "rates" repeats the planned "rate"
+    out = sup.supervise("u1", plan(), "q")
+    assert llm.decide_calls == [] and len(ret.calls) == 1
+    assert out.stop_reason == "suggestions_repeat" and out.status == "answered"
+
+
+def test_a_new_suggestion_or_no_suggestion_still_asks_the_model(store):
+    for sugg in (["late payment penalty"], ["rates", "late payment penalty"], []):
+        sup, llm, _ = make(store, [D("answer")], batches=([C(1)],), judge=judge_script(({1}, sugg)))
+        sup.supervise("u1", plan(), "q")
+        assert len(llm.decide_calls) == 1, sugg
+
+
+def test_repeated_suggestions_do_not_skip_when_nothing_is_vetted_or_a_calculator_is_pending(store):
+    sup, llm, _ = make(store, [D("give_up")], batches=([C(1)],), judge=judge_script((set(), ["rates"])))
+    assert sup.supervise("u1", plan(), "q").stop_reason == "agent_gave_up" and len(llm.decide_calls) == 1
+    p = plan(intent=Intent.COMPUTATION, chargeable_income=300000)
+    sup, llm, _ = make(store, [D("run_tool", tool="compute_tax"), D("answer")], batches=([C(1)],),
+                       judge=judge_script(({1}, ["rates"])), tools={"compute_tax": lambda plan: "Tax payable: 25,200"})
+    out = sup.supervise("u1", p, "tax?")
+    assert "Tax payable: 25,200" in llm.answered_docs and out.status == "answered"
+
+
+# ---------------------------------------------------------------- the auditor prompt itself
+def captured_auditor_prompt(chunks, **kw):
+    sys.path.insert(0, str(_ROOT / "src" / "auditor"))
+    from auditor import AuditorAgent
+    got = {}
+    reply = {"message": {"content": json.dumps({"chunk_evaluations": [{"chunk": 1, "status": "approved"}],
+                                                "is_sufficient": True})}}
+    client = SimpleNamespace(chat=lambda **c: got.update(c) or reply)
+    resp = AuditorAgent(client=client, think=False).evaluate("Do we qualify?", "ctx", chunks, **kw)
+    return got["messages"][0]["content"], resp
+
+
+def test_auditor_prompt_numbers_chunks_and_hides_their_ids():
+    chunks = [{"id": "web:a5627a3f6e:1", "headings": "SUTE > Conditions", "text": "no more than 20 shareholders"},
+              {"id": "web:b1:2", "headings": "Table 2", "text": "YA 2019 and before"}]
+    prompt, resp = captured_auditor_prompt(chunks)
+    assert "--- Chunk 1 ---" in prompt and "--- Chunk 2 ---" in prompt and "web:a5627a3f6e" not in prompt
+    assert resp.chunk_evaluations[0].chunk == 1 and resp.chunk_evaluations[0].reason is None
+    from auditor import AuditorAgent
+    assert AuditorAgent.chunk_id_of(resp.chunk_evaluations[0], chunks) == "web:a5627a3f6e:1"
+    resp.chunk_evaluations[0].chunk = 3
+    assert AuditorAgent.chunk_id_of(resp.chunk_evaluations[0], chunks) is None
+
+
+def test_auditor_prompt_states_the_year_the_mixed_year_rule_and_the_queries_already_searched():
+    chunk = [{"id": "a", "headings": "h", "text": "t"}]
+    prompt, _ = captured_auditor_prompt(chunk, tried_queries=["sute shareholder requirements"], year=2026)
+    assert "### Year of Assessment asked: YA 2026" in prompt
+    assert "- sute shareholder requirements" in prompt and "never suggest these again" in prompt
+    assert "Mixed years" in prompt and "is APPROVED" in prompt and "EVERYTHING in it applies only to years" in prompt
+    prompt, _ = captured_auditor_prompt(chunk)
+    assert "### Year of Assessment asked: not stated" in prompt and "- none yet" in prompt
+
+
+def test_supervisor_gives_the_auditor_its_tried_queries_and_the_plan_year(store):
+    seen = []
+    def judge(q, chunks, kept, tried=(), year=None):
+        seen.append((list(tried), year))
+        return {"chunks": [{"index": 1, "relevant": True, "reason": ""}], "suggested_queries": [],
+                "sufficient": False, "missing": "the 10% individual shareholder rule"}
+    sup, llm, _ = make(store, [D("answer")], judge=judge)
+    out = sup.supervise("u1", plan(), "q")
+    assert seen == [(["rate"], 2026)]
+    assert "missing: the 10% individual shareholder rule" in llm.decide_calls[0][1]["content"]
+    assert any(t.startswith("    approved ") and not t.rstrip().endswith(":") for t in out.trace)
+
+
+def test_null_written_as_a_word_is_treated_as_no_value():
+    sys.path.insert(0, str(_ROOT / "src" / "auditor"))
+    from auditor import AuditorResponse
+    r = AuditorResponse.model_validate_json(json.dumps({
+        "chunk_evaluations": [{"chunk": 1, "status": "approved", "reason": "null"},
+                              {"chunk": 2, "status": "rejected", "reason": "about GST"}],
+        "is_sufficient": False, "missing": "None", "recommended_search_query": "null"}))
+    assert [e.reason for e in r.chunk_evaluations] == [None, "about GST"]
+    assert r.missing is None and r.recommended_search_query is None
+
+
+def test_agent_judge_drops_null_words_from_reasons_missing_and_suggestions(store):
+    agent = fake_agent([(1, "approved", "null"), (2, "rejected", "GST")], missing="null", recommended="None")
+    audit = Auditor(judge=agent_judge(agent)).audit("q", [C(1), C(2)])
+    assert audit.reasons == ["", "GST"] and audit.missing is None and audit.suggested_queries == []
+    good = Chunk(id="web:1:0", content="a", metadata={"source": "https://iras/1", "headings": "SUTE", "score": 0.99})
+    sup, _, _ = make(store, [D("answer")], batches=([good],),
+                     judge=agent_judge(fake_agent([(1, "approved", "null")])))
+    out = sup.supervise("u1", plan(), "q")
+    assert "    approved [0.99] SUTE" in out.trace

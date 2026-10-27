@@ -6,16 +6,21 @@
 
 Company details can be set once:  --company-name "Acme Pte Ltd" --uen 201912345A
 
-Speed (all optional): --k, --max-chunks, --max-queries and --candidates shrink the retrieval work per question;
---no-warm skips preloading the Ollama models at start-up. --trace ends every answer with a per-stage timing line.
+Speed (all optional):
+  --k, --max-chunks, --max-queries   shrink the retrieval work per question
+  --candidates N                     chunks the reranker scores per query (default 6; 0 = CANDIDATES in src/config.py)
+  --audit-min-score S                chunks the reranker scores below S skip the auditor (default 0.5; 0 = audit all)
+  --quantize-rerank                  int8 reranker weights: faster on CPU only (leave off when torch uses Apple MPS)
+  --no-warm                          don't preload the Ollama models and the reranker at start-up
+--trace ends every answer with a per-stage timing line.
 
 Pipeline:  decomposer (qwen3.5:4b)     ->  Supervisor (qwen3.5:4b)
                                               |-- RetrievalAgent -> retriever.Retriever (ChromaDB + BM25 + reranker)
-                                              |-- Auditor        -> auditor.AuditorAgent (phi3.5:8b, ollama client)
+                                              |-- Auditor        -> auditor.AuditorAgent (qwen3.5:4b, ollama client)
                                               '-- UserStore (ChromaDB profile + pending clarifications)
-Needs: ollama running with qwen3.5:4b and phi3.5:8b pulled (all models use the `ollama` Python client), and the
-ChromaDB collection built by the ingest scripts.
-Models: SUPERVISOR_MODEL / INTAKE_MODEL default to qwen3.5:4b; AUDITOR_MODEL defaults to phi3.5:8b.
+Needs: ollama running with qwen3.5:4b pulled (all models use the `ollama` Python client), and the ChromaDB
+collection built by the ingest scripts.
+Models: SUPERVISOR_MODEL / INTAKE_MODEL / AUDITOR_MODEL all default to qwen3.5:4b, so one model stays loaded.
 """
 import argparse
 import os
@@ -25,26 +30,33 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # make `src` importable
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src.retrieval.retriever import Retriever
 from supervisor import (
-    AUDITOR_MODEL, DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES, MODEL, Auditor, RetrievalAgent, Supervisor,
-    pin_ollama_keep_alive, warm_models,
+    AUDIT_MIN_SCORE, AUDITOR_MODEL, DEFAULT_CANDIDATES, DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES, MODEL,
+    Auditor, RetrievalAgent, Supervisor, pin_ollama_keep_alive, warm_models,
 )
 from src.retrieval.user_store import UserStore
 
 
 def build_supervisor(max_steps: int = 4, tools: dict = None, store: UserStore = None, k: int = DEFAULT_K,
                      max_chunks: int = DEFAULT_MAX_CHUNKS, max_queries: int = DEFAULT_MAX_QUERIES,
-                     candidates: int = None) -> Supervisor:
+                     candidates: int = DEFAULT_CANDIDATES, audit_min_score: float = AUDIT_MIN_SCORE,
+                     retriever=None) -> Supervisor:
     """The real stack. Retriever and AuditorAgent are wrapped by the adapters in supervisor.py, which give them the
-    .run() / .audit() interface the supervisor loop uses. The decomposer is the Supervisor's default planner."""
+    .run() / .audit() interface the supervisor loop uses. The decomposer is the Supervisor's default planner.
+    candidates <= 0 (or None) leaves the pool size to src/config.py's CANDIDATES."""
+    if retriever is None:
+        # imported here, not at the top: src.config reads RERANK_QUANTIZE when the retriever module is first
+        # imported, and main() sets it from --quantize-rerank before calling this
+        from src.retrieval.retriever import Retriever
+        retriever = Retriever()
     return Supervisor(store=store or UserStore(),
-                      retrieval=RetrievalAgent(Retriever(), k=k, max_chunks=max_chunks, candidates=candidates),
+                      retrieval=RetrievalAgent(retriever, k=k, max_chunks=max_chunks,
+                                               candidates=candidates if candidates and candidates > 0 else None),
                       auditor=Auditor(),                         # AuditorAgent is created on first audit
-                      tools=tools, max_steps=max_steps, max_queries=max_queries)
+                      tools=tools, max_steps=max_steps, max_queries=max_queries, audit_min_score=audit_min_score)
 
 
-def main():
+def parse_args(argv=None) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--user", required=True, help="user id (one profile per id)")
     ap.add_argument("--trace", action="store_true")
@@ -52,13 +64,23 @@ def main():
     ap.add_argument("--k", type=int, default=DEFAULT_K, help="chunks kept per query after reranking")
     ap.add_argument("--max-chunks", type=int, default=DEFAULT_MAX_CHUNKS, help="chunks the auditor judges per search")
     ap.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES, help="queries run per search")
-    ap.add_argument("--candidates", type=int, default=None,
-                    help="candidates the reranker scores per query (default: CANDIDATES in src/config.py); lower = faster")
-    ap.add_argument("--no-warm", action="store_true", help="don't preload the Ollama models at start-up")
+    ap.add_argument("--candidates", type=int, default=DEFAULT_CANDIDATES,
+                    help="candidates the reranker scores per query; lower = faster (0 = CANDIDATES in src/config.py)")
+    ap.add_argument("--audit-min-score", type=float, default=AUDIT_MIN_SCORE,
+                    help="reranker score below which a chunk is rejected without an auditor call (0 = audit all)")
+    ap.add_argument("--quantize-rerank", action="store_true",
+                    help="int8 reranker weights (sets RERANK_QUANTIZE=1): faster on CPU, not for Apple MPS")
+    ap.add_argument("--no-warm", action="store_true", help="don't preload the Ollama models and reranker at start-up")
     ap.add_argument("--company-name")
     ap.add_argument("--uen")
     ap.add_argument("--forget", action="store_true")
-    args = ap.parse_args()
+    return ap.parse_args(argv)
+
+
+def main():
+    args = parse_args()
+    if args.quantize_rerank:
+        os.environ["RERANK_QUANTIZE"] = "1"      # read by src.config, imported with the retriever below
 
     store = UserStore()
     if args.forget:
@@ -69,12 +91,15 @@ def main():
         store.set_company_info(args.user, company_name=args.company_name, uen=args.uen)
 
     sup = build_supervisor(args.max_steps, store=store, k=args.k, max_chunks=args.max_chunks,
-                           max_queries=args.max_queries, candidates=args.candidates)
+                           max_queries=args.max_queries, candidates=args.candidates,
+                           audit_min_score=args.audit_min_score)
     pin_ollama_keep_alive()                      # the decomposer's own ollama.chat call keeps its model loaded too
     if not args.no_warm:
         print("Loading Ollama models ...")
         for note in warm_models([os.environ.get("INTAKE_MODEL", "qwen3.5:4b"), MODEL, AUDITOR_MODEL]):
             print(f"  {note}")
+        print("Loading the reranker ...")         # otherwise it loads inside the first question's retrieval time
+        print(f"  {sup.retrieval.warm()}")
     messages = []
     while True:
         q = input("you> ").strip()
