@@ -20,6 +20,7 @@
 #################################################
 
 module purge
+export PATH="$HOME/bin:$PATH"
 
 # Set project and scratch paths
 PROJECT_DIR="/common/home/users/z/ziyi.lim.2022/IS469/IS469_agentic_rag_project"
@@ -27,7 +28,8 @@ export SCRATCH_DIR="/common/scratch/users/z/ziyi.lim.2022"
 export OLLAMA_MODELS="$SCRATCH_DIR/.ollama/models"
 export HF_HOME="$SCRATCH_DIR/.cache/huggingface"
 export TORCH_HOME="$SCRATCH_DIR/.cache/torch"
-export OLLAMA_HOST="127.0.0.1:11434"
+PORT=$(( 11434 + (${SLURM_JOB_ID:-0} % 10000) ))
+export OLLAMA_HOST="127.0.0.1:$PORT"
 
 mkdir -p "$OLLAMA_MODELS" "$HF_HOME" "$TORCH_HOME"
 
