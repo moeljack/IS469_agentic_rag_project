@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time=00-02:01:00
 #SBATCH --mail-type=END,FAIL
-#SBATCH --output=/common/home/users/z/ziyi.lim.2022/IS469/%u.%j.out
+#SBATCH --output=/common/home/users/z/ziyi.lim.2022/IS469/IS469_agentic_rag_project/%u.%j.out
 #SBATCH --requeue
 
 #SBATCH --partition=student
@@ -21,38 +21,50 @@
 
 module purge
 
-# Route model downloads and temporary caches to your scratch storage
+# Set project and scratch paths
+PROJECT_DIR="/common/home/users/z/ziyi.lim.2022/IS469/IS469_agentic_rag_project"
 export SCRATCH_DIR="/common/scratch/users/z/ziyi.lim.2022"
 export OLLAMA_MODELS="$SCRATCH_DIR/.ollama/models"
 export HF_HOME="$SCRATCH_DIR/.cache/huggingface"
-mkdir -p "$OLLAMA_MODELS" "$HF_HOME"
+export TORCH_HOME="$SCRATCH_DIR/.cache/torch"
+export OLLAMA_HOST="127.0.0.1:11434"
 
-# Activate your virtual environment
-# (Ensure this path points to the environment where your dependencies are installed)
-source /common/home/users/z/ziyi.lim.2022/IS469/.venv/bin/activate
+mkdir -p "$OLLAMA_MODELS" "$HF_HOME" "$TORCH_HOME"
+
+# Thread limits matching allocated CPUs
+export OMP_NUM_THREADS=4
+export MKL_NUM_THREADS=4
+export TOKENIZERS_PARALLELISM=false
+
+# Activate virtual environment
+source "$PROJECT_DIR/.venv/bin/activate"
+
+cd "$PROJECT_DIR"
 
 #################################################
 ##            START OLLAMA SERVICE             ##
 #################################################
 
-# Launch Ollama in the background on the allocated compute node
+# Launch Ollama in the background
 ollama serve &
 OLLAMA_PID=$!
 
-# Wait briefly for the Ollama daemon to come online
-sleep 5
+# Ensure Ollama process terminates on exit, error, or cancellation
+trap 'echo "Stopping Ollama (PID $OLLAMA_PID)..."; kill -9 $OLLAMA_PID 2>/dev/null' EXIT INT TERM
 
-# Ensure your model is available on the node
+# Wait until Ollama API responds
+echo "Waiting for Ollama to initialize on $OLLAMA_HOST..."
+if ! timeout 30 bash -c 'until curl -s "http://$OLLAMA_HOST/api/tags" > /dev/null; do sleep 1; done'; then
+    echo "ERROR: Ollama server failed to start within 30 seconds."
+    exit 1
+fi
+
+echo "Ollama is online. Pulling model..."
 ollama pull qwen3.5:4b
 
 #################################################
 ##            EXECUTE YOUR RAG PROJECT         ##
 #################################################
 
-cd /common/home/users/z/ziyi.lim.2022/IS469/IS469_agentic_rag_project
-
-# Replace main.py with the entry-point script of your project (e.g. supervisor.py or harness.py)
+echo "Running RAG harness..."
 python3 src/supervisor/harness.py --user tester --trace
-
-# Terminate the background Ollama service once the Python job finishes
-kill $OLLAMA_PID
