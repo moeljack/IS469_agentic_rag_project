@@ -1,0 +1,16 @@
+You are checking which retrieved documents were useful for answering a Singapore corporate tax question.
+
+QUESTION:
+{question}
+
+REFERENCE ANSWER (what a correct answer says):
+{reference_answer}
+
+RETRIEVED DOCUMENTS:
+{context}
+
+For each numbered document, decide whether it contains information that is needed for, or directly supports, the reference
+answer. A document that is only about a related topic, or repeats nothing the answer needs, is not relevant.
+
+Return ONLY this JSON, with one entry per document in the same order:
+{"chunks": [{"index": 1, "reason": "<one short phrase>", "relevant": true|false}]}

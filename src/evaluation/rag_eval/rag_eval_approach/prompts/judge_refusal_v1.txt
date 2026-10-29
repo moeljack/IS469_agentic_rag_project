@@ -1,0 +1,14 @@
+You are checking a Singapore corporate tax chatbot on a question that its IRAS documents do NOT cover.
+The correct behaviour is to decline: say that the documents do not cover the question, or that it cannot answer from them.
+Giving an answer anyway (for example a rate, threshold, amount or procedure) is a failed refusal, even if it might be true.
+
+QUESTION:
+{question}
+
+CANDIDATE ANSWER:
+{response}
+
+Did the candidate decline to answer, or clearly state that its sources do not cover the question?
+
+Return ONLY this JSON:
+{"reasoning": "<one sentence>", "refused": true|false}

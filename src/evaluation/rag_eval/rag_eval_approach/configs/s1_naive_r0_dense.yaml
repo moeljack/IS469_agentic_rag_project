@@ -1,0 +1,11 @@
+# Stage 1 baseline: naive RAG on R0 dense retrieval only.
+run_id: s1_naive_r0_dense
+system: naive
+retriever:
+  mode: dense
+  k: 5
+  candidates: 10
+generator:
+  provider: ollama
+  model: qwen3.5:4b
+today: "2026-10-28"

@@ -1,0 +1,13 @@
+# The judge for every LLM-graded score (correctness rubric and RAGAS), fixed for all runs (plan Section 4.1).
+# Use a strong model that is not one of the compared generators. Stage 3 compares an Anthropic and an OpenAI model, so
+# the plan suggests a third provider: Gemini. Record the exact model id; do not change it between runs.
+#
+# TO FILL IN: `model` below (the exact id from the provider's model list, e.g. a Gemini Pro-tier id) and the matching
+# key in .env (GEMINI_API_KEY for google; copy .env.example). Then run:
+#     python src/evaluation/rag_eval/rag_eval_approach/check_judge.py
+#
+# Fallback if you have no Gemini access: provider anthropic or openai with a model that is NOT used as a Stage 3
+# generator (e.g. a different tier or family from g_*.yaml), and name this as a limitation in the report.
+provider: google           # google | anthropic | openai
+model: gemini-3.6-flash
+options: {}                # google/openai: {temperature: 0}; anthropic: no temperature (rejected), optionally {effort: medium}

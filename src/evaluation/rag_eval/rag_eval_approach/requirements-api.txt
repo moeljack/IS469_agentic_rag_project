@@ -1,0 +1,6 @@
+# Extra packages for the project environment, only needed for API models
+# (Stage 3 generators in configs/g_*.yaml, and the judge in score_judge.py).
+# Install the one(s) you use, then pin the installed versions here (pip freeze | grep -i -E "anthropic|openai|genai").
+anthropic==2.3.0
+openai==3.40.0
+google-genai==2.33.0

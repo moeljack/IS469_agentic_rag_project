@@ -1,0 +1,1170 @@
+[
+ {
+  "qid": "Q01",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "number",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "question": "What is the corporate tax rate in Singapore?",
+  "reference_answer": "Companies are taxed at a flat rate of 17% of their chargeable income, for both local and foreign companies.",
+  "key_facts": [
+   "17%"
+  ],
+  "facts": [
+   [
+    "taxed at a flat rate of 17% of its chargeable income",
+    "Singapore's Corporate Income Tax rate is 17%"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:1a08219be7:0",
+    "web:1a08219be7:1",
+    "web:a566c48cbe:0"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q03",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "procedure",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "question": "When is the deadline to file my company's tax return this year?",
+  "reference_answer": "The deadline to file the YA 2026 Corporate Income Tax Return is 30 Nov 2026 at mytax.iras.gov.sg. This includes companies that did not carry on business or incurred a loss in the financial year 2025.",
+  "key_facts": [
+   "30 Nov 2026"
+  ],
+  "facts": [
+   [
+    "deadline of 30 Nov 2026"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:6c658c1ab3:0"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q04",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "edge-case",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Do I still need to file ECI if my company has no profit?",
+  "reference_answer": "A company does not need to file the ECI if its ECI is nil and its annual revenue is $5 million or below. If the ECI is nil but annual revenue is more than $5 million, it must still file (the ECI to be taxed can be entered as 0).",
+  "key_facts": [
+   "nil ECI",
+   "$5 million"
+  ],
+  "facts": [
+   [
+    "You do not need to file the ECI for your company if it is nil",
+    "$5 million | Nil | No"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:b20dcc6490:2",
+    "web:b20dcc6490:3"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q07",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "definition",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "What is a Certificate of Residence and what is it used for?",
+  "reference_answer": "The Certificate of Residence (COR) is a letter issued by IRAS certifying that the company is a Singapore tax resident. It is used to claim tax benefits under Singapore's double tax agreements (DTAs), and the foreign tax authority generally requires it as proof of residence.",
+  "key_facts": [
+   "letter issued by IRAS",
+   "tax resident of Singapore",
+   "DTAs"
+  ],
+  "facts": [
+   [
+    "The Certificate of Residence (COR) is a letter issued by IRAS to certify that the company is a tax resident of Singapore"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:2af05df2da:4"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q08",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "definition",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "question": "What is the difference between Form C-S and Form C-S (Lite)?",
+  "reference_answer": "The only difference in the qualifying conditions is the annual revenue condition: $5 million or below for Form C-S and $200,000 or below for Form C-S (Lite). Form C-S (Lite) is a simplified version for smaller companies with straightforward tax matters.",
+  "key_facts": [
+   "annual revenue condition",
+   "$5 million",
+   "$200,000"
+  ],
+  "facts": [
+   [
+    "The only difference is in the annual revenue condition"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:d6577e57a2:4"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q09",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "procedure",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "How do I change my company's financial year end?",
+  "reference_answer": "The change must be filed with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+. IRAS then updates its records based on the information filed with ACRA.",
+  "key_facts": [
+   "ACRA",
+   "BizFile+"
+  ],
+  "facts": [
+   [
+    "must be filed with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:1a08219be7:1",
+    "web:ceef23334f:0"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q10",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "number",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "What is the maximum fine for failing to file a company tax return?",
+  "reference_answer": "If a company is convicted in court of failing to file, it may face a fine of up to $5,000 for each offence. IRAS may instead offer a composition amount of up to $5,000 per offence.",
+  "key_facts": [
+   "$5,000 per offence"
+  ],
+  "facts": [
+   [
+    "up to $5,000 per offence",
+    "A fine of up to $5,000"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a4b15f6365:1",
+    "web:a4b15f6365:4"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q12",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "edge-case",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "Is income earned overseas taxable in Singapore for a company?",
+  "reference_answer": "Foreign income is generally taxable in Singapore when it is remitted to and received in Singapore. If it arises from a trade or business carried on in Singapore, it is taxable on accrual, whether or not it is received in Singapore.",
+  "key_facts": [
+   "taxable when received in Singapore",
+   "taxable on accrual if from a Singapore business"
+  ],
+  "facts": [
+   [
+    "such income is taxable in Singapore when remitted to and received in Singapore",
+    "income accrued in or derived from Singapore or received in Singapore",
+    "income accrued in or derived from Singapore or received from outside Singapore is taxable"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:51b21365f6:0",
+    "web:c7cf7bd73b:0"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q13",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "procedure",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Can I pay my company tax with a credit card?",
+  "reference_answer": "IRAS does not offer credit cards as a payment mode because of the high transaction costs. A credit card can be used to pay at AXS e-Station or AXS m-Station, subject to a payment limit of $20,000.",
+  "key_facts": [
+   "not offered directly",
+   "AXS",
+   "$20,000"
+  ],
+  "facts": [
+   [
+    "We do not offer credit cards as a payment mode"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a5627a3f6e:1"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q15",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "number",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "question": "How much CIT rebate will my company get for YA 2026?",
+  "reference_answer": "For YA 2026 the enhanced CIT Rebate is 50% of the corporate tax payable, together with an enhanced CIT Rebate Cash Grant of $2,000. The total maximum benefit is $40,000.",
+  "key_facts": [
+   "50%",
+   "$2,000",
+   "$40,000"
+  ],
+  "facts": [
+   [
+    "the enhanced CIT Rebate will be 50% of the corporate tax payable"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a566c48cbe:1"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q16",
+  "type": "simple",
+  "tier": "pdf",
+  "qtype": "definition",
+  "source": "reit_etf_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "What conditions must our REIT ETF meet to get tax transparency treatment?",
+  "reference_answer": "The trustee must distribute all distributions from S-REITs (net of expenses) derived by the REIT ETF in each relevant period to the unit holders by the next available distribution period, and the trustee and manager must jointly undertake to comply with section 45G of the ITA and the conditions in Annex 2.",
+  "key_facts": [
+   "distribute all S-REIT distributions",
+   "section 45G",
+   "joint undertaking"
+  ],
+  "facts": [
+   [
+    "The tax transparency treatment is subject to the following conditions"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:19"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q19",
+  "type": "simple",
+  "tier": "pdf",
+  "qtype": "number",
+  "source": "insurer_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "question": "As a general insurer, what is the maximum IBNR percentage of net written premium for motor insurance?",
+  "reference_answer": "The maximum IBNR factor for motor insurance is 20% of net written premium.",
+  "key_facts": [
+   "20%"
+  ],
+  "facts": [
+   [
+    "Motor | 20"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q20",
+  "type": "simple",
+  "tier": "pdf",
+  "qtype": "definition",
+  "source": "insurer_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "Which method of estimating IBNR claims does IRAS accept for a tax deduction?",
+  "reference_answer": "IRAS has agreed to accept the loss triangulation method, which derives loss development patterns from historical loss development triangles.",
+  "key_facts": [
+   "loss triangulation method"
+  ],
+  "facts": [
+   [
+    "IRAS has agreed to accept this method"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:6"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q42",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "edge-case",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "Can my company deduct the foreign worker levy?",
+  "reference_answer": "Yes, but only the reduced foreign worker levy is allowed a tax deduction: the FWL incurred after deducting the FWL rebate for the corresponding period.",
+  "key_facts": [
+   "only the reduced FWL after the rebate"
+  ],
+  "facts": [
+   [
+    "only the reduced FWL incurred by your company, after deducting the FWL rebate for the corresponding period, is allowed tax deduction"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:9d61624687:3"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q43",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "number",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "How much tax deduction can my company get for donations to approved charities?",
+  "reference_answer": "Qualifying donations receive a 250% tax deduction, which is granted based on information IRAS obtains from the Institutions of a Public Character (IPCs).",
+  "key_facts": [
+   "250%",
+   "IPC"
+  ],
+  "facts": [
+   [
+    "The 250% deduction for donations is granted based on information obtained from the Institutions of a Public Character (IPCs)"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:6e286dc681:9"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q44",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "edge-case",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "We accept Bitcoin from customers. How is that taxed and what value do we record the sale at?",
+  "reference_answer": "Businesses that accept digital tokens such as Bitcoin are subject to normal income tax rules and are taxed on income derived from or received in Singapore. The sale should generally be recorded at the open market value of the goods or services in Singapore dollars.",
+  "key_facts": [
+   "normal income tax rules",
+   "open market value in Singapore dollars"
+  ],
+  "facts": [
+   [
+    "Businesses that choose to accept digital tokens such as Bitcoins for their remuneration or revenue are subject to normal income tax rules"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:c7cf7bd73b:15"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q21",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "My company underpaid tax because of an honest mistake. What's the worst penalty we could face, and what must we do for a voluntary disclosure to count as timely?",
+  "reference_answer": "Without intention to evade tax, the penalty can be up to 200% of the tax undercharged (plus a possible fine of up to $5,000 and/or imprisonment). A voluntary disclosure is timely and self-initiated only if made before IRAS sends a query on the tax matter, or before IRAS notifies you of an audit or investigation.",
+  "key_facts": [
+   "200%",
+   "before a query from IRAS"
+  ],
+  "facts": [
+   [
+    "Penalty of up to 200% of the amount of tax undercharged"
+   ],
+   [
+    "Before you receive a query from IRAS relating to your tax"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:e7241cedc5:0"
+   ],
+   [
+    "web:aa46945787:0"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q22",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "If my company pays its tax late, what penalty applies? And if we spread payment over GIRO instalments, what is the minimum monthly amount?",
+  "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax if full payment is not received by the due date. Under a GIRO instalment plan the minimum monthly deduction is $50.",
+  "key_facts": [
+   "5%",
+   "$50"
+  ],
+  "facts": [
+   [
+    "A 5% late payment penalty will be imposed on the unpaid tax"
+   ],
+   [
+    "minimum monthly GIRO deduction amount of $50"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:054b24831c:0"
+   ],
+   [
+    "web:b20dcc6490:6"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q23",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "We're closing down our company by applying for strike-off. Do we need to settle our taxes first, and how long must we keep our records afterwards?",
+  "reference_answer": "Companies must settle all outstanding tax liabilities and obligations with IRAS before applying to ACRA for strike-off, otherwise IRAS will object to the application. After the company has been struck off and dissolved, its books and papers must be retained for at least 5 years from the date of dissolution.",
+  "key_facts": [
+   "settle outstanding tax before strike-off",
+   "5 years"
+  ],
+  "facts": [
+   [
+    "settle all outstanding tax liabilities and obligations with IRAS before applying for strike off"
+   ],
+   [
+    "must ensure that all books and papers of the company are retained for at least 5 years after the date on which the company was dissolved"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:584d6034e5:0"
+   ],
+   [
+    "web:50424a296b:6"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q24",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "We just incorporated and haven't received an ECI notification. Do we still have to file, and are there cases where we can skip it?",
+  "reference_answer": "If the company closes its first set of accounts in its year of incorporation, it must still file the ECI within 3 months from its first financial year end, even without an ECI filing notification, unless it qualifies for the ECI filing waiver. The waiver applies when annual revenue is $5 million or below and the ECI is nil.",
+  "key_facts": [
+   "3 months from first financial year end",
+   "ECI filing waiver",
+   "$5 million",
+   "nil ECI"
+  ],
+  "facts": [
+   [
+    "you are still required to file the ECI within 3 months from your company's first financial year end"
+   ],
+   [
+    "Your company does not need to file ECI in any Year of Assessment (YA) when both criteria are met"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:1a08219be7:4"
+   ],
+   [
+    "web:b20dcc6490:1"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q26",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "We're an investment holding company. On what basis is our investment income taxed, and which expenses can we deduct against it?",
+  "reference_answer": "All investment income of an investment holding company is assessed on a financial year basis. Expenses directly incurred to earn the investment income (for example interest on loans to acquire investments, and property tax and repairs for rental properties) are deductible against the respective source of investment income.",
+  "key_facts": [
+   "financial year basis",
+   "directly incurred expenses are deductible"
+  ],
+  "facts": [
+   [
+    "All investment income of your investment holding company is assessed on a financial year basis"
+   ],
+   [
+    "These are expenses directly incurred to earn investment income and are deductible against the respective source of investment income",
+    "Expenses that are attributed to the investment income may be deductible",
+    "your investment holding company may incur the following expenses: - Administrative and management fees"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:ce1754d1b3:0"
+   ],
+   [
+    "web:ce1754d1b3:1",
+    "web:ce1754d1b3:2",
+    "web:ce1754d1b3:4"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q28",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "My company made a trade loss. How much can we carry back to last year, and can we still carry losses forward if our shareholders changed?",
+  "reference_answer": "Unutilised trade losses (and capital allowances) can be carried back to set off the immediately preceding YA's income, subject to a cap of $100,000. A company that fails the shareholding test may apply for a waiver under Section 37(16) of the Income Tax Act, for example where the change in shareholders is for genuine commercial reasons.",
+  "key_facts": [
+   "$100,000",
+   "waiver of the shareholding test",
+   "Section 37(16)"
+  ],
+  "facts": [
+   [
+    "subject to a cap of $100,000"
+   ],
+   [
+    "Your company may apply for a waiver of the shareholding test under Section 37(16)"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:94932834d0:19"
+   ],
+   [
+    "web:94932834d0:17"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q29",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "When will my company get its Notice of Assessment, and does the timing depend on how complex our tax affairs are?",
+  "reference_answer": "For companies with straightforward tax affairs, Notices of Assessment (Type 4) are issued by 31 May of the following year. For companies with more complex tax affairs under review, Notices of Estimated Assessment (Type 3) are issued by 28 Feb of the following year, with Type 4 issued after IRAS completes its review.",
+  "key_facts": [
+   "31 May",
+   "28 Feb"
+  ],
+  "facts": [
+   [
+    "Notices of Assessment (Type 4) are issued to the companies by 31 May of the following year"
+   ],
+   [
+    "Notices of Estimated Assessment (Type 3) by 28 Feb of the following year"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:5cf4da84a8:1"
+   ],
+   [
+    "web:5cf4da84a8:2"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q30",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "How much does it cost to apply for an income tax advance ruling, and can I appeal if I disagree with the ruling?",
+  "reference_answer": "The application fee is S$660 and is non-refundable, with a further time-based fee of S$165 per hour (inclusive of GST) after the first 4 hours. An advance ruling is final and cannot be appealed under the Income Tax Act; if you disagree, you declare in your tax return that you chose not to rely on it.",
+  "key_facts": [
+   "S$660",
+   "no appeal process"
+  ],
+  "facts": [
+   [
+    "Application fee of S$660"
+   ],
+   [
+    "there is no appeal process provided for in the Income Tax Act 1947"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:fd672f69ca:10",
+    "web:fd672f69ca:12",
+    "web:fd672f69ca:9"
+   ],
+   [
+    "web:fd672f69ca:13"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q32",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "We only provide services to related companies. Which pricing principle must we follow, and what documents must we keep?",
+  "reference_answer": "IRAS endorses the arm's length principle, so the prices charged to related parties should reflect arm's length prices determined through a proper transfer pricing analysis. The company should prepare and keep contemporaneous transfer pricing documentation showing its related party transactions are at arm's length.",
+  "key_facts": [
+   "arm's length principle",
+   "contemporaneous transfer pricing documentation"
+  ],
+  "facts": [
+   [
+    "IRAS endorses the arm's length principle as it ensures that prices on transactions with related parties",
+    "your company should perform a proper transfer pricing analysis to determine the arm's length price"
+   ],
+   [
+    "prepare and keep contemporaneous transfer pricing documentation"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:e92b52ac32:0",
+    "web:e92b52ac32:1"
+   ],
+   [
+    "web:e045f8905e:1",
+    "web:e045f8905e:2"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q34",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "My company is dormant. Do I have to apply for the filing waiver again each year, and can the Singapore branch of a foreign company apply too?",
+  "reference_answer": "No. Once the waiver is granted from a specific date, the company is not issued Form C-S/C-S (Lite)/C from that date onwards, so it need not apply every year. The waiver is not applicable to a foreign company or its Singapore branch registered with ACRA.",
+  "key_facts": [
+   "no yearly application",
+   "not applicable to a foreign company's Singapore branch"
+  ],
+  "facts": [
+   [
+    "your company does not need to submit the waiver application on a yearly basis"
+   ],
+   [
+    "foreign company's Singapore branch apply for a waiver"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:53d53a4398:13"
+   ],
+   [
+    "web:53d53a4398:14"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q35",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "What do we need to set up once before filing Form C-S from our accounting software, and which Corppass role must the person filing have?",
+  "reference_answer": "The company must do a one-time mapping of its chart of accounts to the prescribed data elements (PDEs) in the accounting software (or use the software's default mapping). The person authorised to file should be granted the Corppass-Approver role for Corporate Income Tax filing.",
+  "key_facts": [
+   "one-time mapping of the chart of accounts",
+   "Corppass-Approver"
+  ],
+  "facts": [
+   [
+    "Companies must perform a one-time mapping of the chart of accounts"
+   ],
+   [
+    "should be granted the Corppass-Approver role"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:2dcad97311:2"
+   ],
+   [
+    "web:2dcad97311:3"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q36",
+  "type": "multi",
+  "tier": "pdf",
+  "qtype": "multi-part",
+  "source": "reit_etf_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "How early before earning the income must our REIT ETF apply for tax transparency, and what documents must go with the application?",
+  "reference_answer": "The application should be made to IRAS at least three months before the REIT ETF derives the income for which tax transparency is sought. It is submitted with supporting documents, including a joint undertaking by the trustee and manager, a copy of the trust deed and a sample of the declaration forms used by the trustee.",
+  "key_facts": [
+   "at least three months",
+   "joint undertaking",
+   "trust deed"
+  ],
+  "facts": [
+   [
+    "at least three months before the REIT ETF derives the income"
+   ],
+   [
+    "Checklist of documents to be submitted",
+    "submit it together with supporting documents to the Corporate Tax Division of IRAS"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:36"
+   ],
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:35",
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:56"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q38",
+  "type": "multi",
+  "tier": "pdf",
+  "qtype": "multi-part",
+  "source": "reit_etf_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "As a REIT ETF trustee, how often can we claim a refund of wrongly deducted withholding tax, and by when must we file the annual Form UT?",
+  "reference_answer": "The claim for refund of wrongly deducted withholding tax is made on a quarterly basis. The Form UT must be filed annually with the audited financial statements and tax computation by 15 April each year.",
+  "key_facts": [
+   "quarterly",
+   "15 April"
+  ],
+  "facts": [
+   [
+    "The claim for refund should be made on a quarterly basis"
+   ],
+   [
+    "by 15 April each year"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:45"
+   ],
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:46"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q40",
+  "type": "multi",
+  "tier": "pdf",
+  "qtype": "multi-part",
+  "source": "insurer_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "We're a foreign insurer without Singapore claims statistics. What can we use instead, and what certification is needed if we use other statistical methods?",
+  "reference_answer": "A foreign insurer lacking Singapore claims statistics may, with proper justification, use Head Office statistics or methodologies. Any other statistical method is accepted only if IRAS is satisfied it is based on historical statistical evidence and the company furnishes an external auditors' certification of claim liabilities.",
+  "key_facts": [
+   "Head Office statistics",
+   "external auditors' certification"
+  ],
+  "facts": [
+   [
+    "use Head Office statistics or methodologies"
+   ],
+   [
+    "furnish an external auditors' certification of claim liabilities"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:12"
+   ],
+   [
+    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:13"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q41",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "I converted my sole proprietorship into a company. Can it claim the tax exemption for new start-up companies, and how much is the exemption?",
+  "reference_answer": "Yes. A company formed by converting a sole proprietorship or partnership is eligible for the exemption for new start-up companies for its first 3 consecutive YAs if it meets all the qualifying conditions. The maximum exemption is $125,000 per YA (75% of the first $100,000 and 50% of the next $100,000, for YA 2020 onwards).",
+  "key_facts": [
+   "first 3 consecutive YAs",
+   "$125,000"
+  ],
+  "facts": [
+   [
+    "Your company is eligible for the tax exemption scheme for new companies for its first 3 consecutive YAs if it meets all the qualifying conditions"
+   ],
+   [
+    "The maximum exemption for each YA is $125,000"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a566c48cbe:21"
+   ],
+   [
+    "web:a566c48cbe:9"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q50",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "Does my company have to register for GST once our turnover passes $1 million?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": false
+ },
+ {
+  "qid": "Q51",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "Our group's revenue is above EUR 750 million. Do we have to pay Pillar Two top-up tax in Singapore?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": false
+ },
+ {
+  "qid": "Q52",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "I run a sole proprietorship. What tax rate applies to my profit, and which personal reliefs can I claim?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": false
+ },
+ {
+  "qid": "Q53",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "How much CIT rebate will my company get for YA 2027?",
+  "reference_answer": "The sources only give the CIT Rebate for YA 2026 and earlier years; nothing is stated for YA 2027, so the system should say it cannot answer rather than reuse the YA 2026 figures.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": false
+ },
+ {
+  "qid": "Q55",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "procedure",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "paraphrase_of": "Q03",
+  "question": "when do i need to submit my company's tax return by this yr?",
+  "reference_answer": "The deadline to file the YA 2026 Corporate Income Tax Return is 30 Nov 2026 at mytax.iras.gov.sg. This includes companies that did not carry on business or incurred a loss in the financial year 2025.",
+  "key_facts": [
+   "30 Nov 2026"
+  ],
+  "facts": [
+   [
+    "deadline of 30 Nov 2026"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:6c658c1ab3:0"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q56",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "edge-case",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "paraphrase_of": "Q04",
+  "question": "my company made no profit this year, still need to do the ECI thing?",
+  "reference_answer": "A company does not need to file the ECI if its ECI is nil and its annual revenue is $5 million or below. If the ECI is nil but annual revenue is more than $5 million, it must still file (the ECI to be taxed can be entered as 0).",
+  "key_facts": [
+   "nil ECI",
+   "$5 million"
+  ],
+  "facts": [
+   [
+    "You do not need to file the ECI for your company if it is nil",
+    "$5 million | Nil | No"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:b20dcc6490:2",
+    "web:b20dcc6490:3"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q57",
+  "type": "simple",
+  "tier": "pdf",
+  "qtype": "number",
+  "source": "insurer_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "paraphrase_of": "Q19",
+  "question": "max IBNR % for motor policies?",
+  "reference_answer": "The maximum IBNR factor for motor insurance is 20% of net written premium.",
+  "key_facts": [
+   "20%"
+  ],
+  "facts": [
+   [
+    "Motor | 20"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q58",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "paraphrase_of": "Q22",
+  "question": "we paid our corporate tax late, whats the penalty? and if we go on a GIRO plan whats the smallest monthly amount?",
+  "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax if full payment is not received by the due date. Under a GIRO instalment plan the minimum monthly deduction is $50.",
+  "key_facts": [
+   "5%",
+   "$50"
+  ],
+  "facts": [
+   [
+    "A 5% late payment penalty will be imposed on the unpaid tax"
+   ],
+   [
+    "minimum monthly GIRO deduction amount of $50"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:054b24831c:0"
+   ],
+   [
+    "web:b20dcc6490:6"
+   ]
+  ],
+  "needs_review": false
+ },
+ {
+  "qid": "Q59",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "paraphrase_of": "Q23",
+  "question": "we're shutting the company down, do we have to clear our tax first before striking off? and how many yrs do we keep the books after?",
+  "reference_answer": "Companies must settle all outstanding tax liabilities and obligations with IRAS before applying to ACRA for strike-off, otherwise IRAS will object to the application. After the company has been struck off and dissolved, its books and papers must be retained for at least 5 years from the date of dissolution.",
+  "key_facts": [
+   "settle outstanding tax before strike-off",
+   "5 years"
+  ],
+  "facts": [
+   [
+    "settle all outstanding tax liabilities and obligations with IRAS before applying for strike off"
+   ],
+   [
+    "must ensure that all books and papers of the company are retained for at least 5 years after the date on which the company was dissolved"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:584d6034e5:0"
+   ],
+   [
+    "web:50424a296b:6"
+   ]
+  ],
+  "needs_review": false
+ }
+]

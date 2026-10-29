@@ -1,0 +1,12 @@
+# Separate environment for score_ragas.py (RAGAS pulls in LangChain and pins its own versions, which can clash with
+# the project's torch / transformers pins). It only reads results/*.jsonl, so it never needs the agent stack.
+#   py -3.12 -m venv scoringenv && scoringenv\Scripts\activate && pip install -r requirements-scoring.txt
+# RAGAS class names change between releases: after installing, pin the exact versions (pip freeze > this file).
+ragas>=0.2
+langchain-huggingface
+sentence-transformers
+langchain-google-genai
+langchain-anthropic
+langchain-openai
+pandas
+pyyaml

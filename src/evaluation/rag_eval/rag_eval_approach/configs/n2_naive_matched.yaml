@@ -1,0 +1,13 @@
+# N2 (Stage 2): naive RAG given as much context as the agent.
+# Set k AFTER the first A1 run: A1's mean number of chunks in the answer prompt (context_used), rounded up.
+# score_retrieval.py prints it for each run ("used (mean)").
+run_id: n2_naive_matched
+system: naive
+retriever:
+  mode: hybrid_rerank
+  k: 6
+  candidates: 10
+generator:
+  provider: ollama
+  model: qwen3.5:4b
+today: "2026-10-28"

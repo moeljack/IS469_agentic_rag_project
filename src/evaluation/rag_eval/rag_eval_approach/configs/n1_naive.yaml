@@ -1,0 +1,12 @@
+# N1 (Stage 2) and the best-config run of Stage 1: naive RAG on R4 hybrid + rerank.
+# If the Stage 1 selection rule picks another mode, change retriever.mode here and give the file a new run_id.
+run_id: n1_naive
+system: naive
+retriever:
+  mode: hybrid_rerank      # dense | bm25 | hybrid | dense_rerank | hybrid_rerank (R0-R4)
+  k: 5                     # chunks given to the answer step
+  candidates: 10           # reranker / fusion pool (config.py CANDIDATES)
+generator:
+  provider: ollama
+  model: qwen3.5:4b
+today: "2026-10-28"        # fixed date for every run (questions such as "this year" depend on it)

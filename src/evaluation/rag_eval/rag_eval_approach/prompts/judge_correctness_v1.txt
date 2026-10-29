@@ -1,0 +1,28 @@
+You are grading answers from a Singapore corporate tax chatbot against a reference answer.
+
+QUESTION:
+{question}
+
+REFERENCE ANSWER:
+{reference_answer}
+
+KEY FACTS (each must appear correctly for full marks):
+{key_facts}
+
+CANDIDATE ANSWER:
+{response}
+
+Grade the candidate on correctness only. Ignore style, length and citations.
+
+Rubric:
+2 = Correct: all key facts present and correct; no claim contradicts the reference.
+1 = Partial: main point correct, but a key fact or condition is missing.
+0 = Incorrect: main answer wrong, ANY number/rate/threshold/date wrong, or the candidate refuses although the reference gives an answer.
+
+Rules:
+- A wrong number always gives 0, even if the rest is correct.
+- Extra correct information is fine. Extra incorrect information that contradicts the reference gives 0.
+- Judge meaning, not wording.
+
+Return ONLY this JSON:
+{"reasoning": "<one or two sentences>", "numeric_ok": true|false, "score": 0|1|2}

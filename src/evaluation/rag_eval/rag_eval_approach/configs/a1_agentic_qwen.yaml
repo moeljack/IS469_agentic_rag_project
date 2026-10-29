@@ -1,0 +1,17 @@
+# A1 (Stage 2): the supervisor stack (decomposer -> supervisor loop -> auditor -> answer), all on Qwen 3.5 4B.
+# Run 3 times: run.py a1_agentic_qwen.yaml --repeat 1 / 2 / 3
+run_id: a1_agentic_qwen
+system: agentic
+retriever:
+  mode: hybrid_rerank      # the agent's retrieval tool; must be a reranked mode unless audit_min_score is 0
+  k: 5                     # chunks kept per query
+  candidates: 10
+agent:
+  max_steps: 4
+  max_queries: 2
+  max_chunks: 6
+  audit_min_score: 0.5
+generator:                 # the supervisor's decide + answer calls
+  provider: ollama
+  model: qwen3.5:4b
+today: "2026-10-28"

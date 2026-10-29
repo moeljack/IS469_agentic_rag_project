@@ -1,0 +1,20 @@
+# Stage 3: agentic RAG with an API model as the supervisor (pip install openai; OPENAI_API_KEY).
+# Only the supervisor's decide + answer calls use this model; the decomposer and auditor stay on Qwen 3.5 4B via
+# Ollama (INTAKE_MODEL / AUDITOR_MODEL), so report this as "supervisor LLM swapped".
+run_id: g_agentic_openai
+system: agentic
+retriever:
+  mode: hybrid_rerank
+  k: 5
+  candidates: 10
+agent:
+  max_steps: 4
+  max_queries: 2
+  max_chunks: 6
+  audit_min_score: 0.5
+generator:
+  provider: groq       # or groq (OpenAI-compatible endpoint, key GROQ_API_KEY) with model: openai/gpt-oss-120b
+  model: openai/gpt-oss-120b
+  options:
+    temperature: 0         # set to null if the model rejects temperature
+today: "2026-10-28"

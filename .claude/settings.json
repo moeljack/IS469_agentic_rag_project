@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(cd /c/Users/joelm/IS469_agentic_rag_project/src/evaluation/rag_eval && grep -n \"score_grounding\\\\|grounding\" run_all.py analyze.py | head; echo ---; cat results/scores/zz_grounding_test_grounding.jsonl | head -c 600; echo; rm -f results/outputs/zz_grounding_test.jsonl results/scores/zz_grounding_test_grounding.jsonl; ls results/outputs results/scores)",
+      "Bash(git check-ignore *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\joelm\\IS469_agentic_rag_project\\results\\outputs"
+    ]
+  }
+}

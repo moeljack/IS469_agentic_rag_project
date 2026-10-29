@@ -1,0 +1,20 @@
+# Stage 3: agentic RAG with an API model as the supervisor (pip install anthropic; ANTHROPIC_API_KEY).
+# Only the supervisor's decide + answer calls use this model; the decomposer and auditor stay on Qwen 3.5 4B via
+# Ollama (INTAKE_MODEL / AUDITOR_MODEL), so report this as "supervisor LLM swapped".
+run_id: g_agentic_anthropic
+system: agentic
+retriever:
+  mode: hybrid_rerank
+  k: 5
+  candidates: 10
+agent:
+  max_steps: 4
+  max_queries: 2
+  max_chunks: 6
+  audit_min_score: 0.5
+generator:
+  provider: anthropic
+  model: claude-sonnet-5-5
+  options:
+    effort: medium         # Claude has no temperature; effort is the depth control (optional)
+today: "2026-10-28"

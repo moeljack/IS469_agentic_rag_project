@@ -1,0 +1,13 @@
+# Stage 3: naive RAG with an API generator (pip install anthropic; ANTHROPIC_API_KEY).
+run_id: g_naive_anthropic
+system: naive
+retriever:
+  mode: hybrid_rerank
+  k: 5
+  candidates: 10
+generator:
+  provider: anthropic
+  model: claude-sonnet-5-5
+  options:
+    effort: medium         # Claude has no temperature; effort is the depth control (optional)
+today: "2026-10-28"
