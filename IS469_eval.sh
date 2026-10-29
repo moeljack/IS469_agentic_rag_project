@@ -3,6 +3,7 @@
 #     sbatch IS469_eval.sh                                                        Stages 1 and 2
 #     sbatch --export=ALL,EVAL_ARGS="--stages 2" IS469_eval.sh                    Stage 2 only
 #     sbatch --export=ALL,EVAL_ARGS="--stages 1 2 3" IS469_eval.sh                 add the API generators (see below)
+#     sbatch --export=ALL,EVAL_CMD="python3 <any command>" IS469_eval.sh          a trial slice of questions
 # run_all.py is resumable: if the job hits the time limit, submit the same command again and it continues.
 # Edit PROJECT_DIR / SCRATCH_DIR below (or export them) if your cluster paths differ from the harness script's.
 
@@ -71,7 +72,14 @@ ollama pull qwen3.5:4b
 
 # Scoring (Stage 4) is not run here: the judge needs an API key and internet, and compute nodes may not have either.
 # Download results/ afterwards and run it on your own machine.
+# EVAL_CMD overrides everything with one command line (for a trial slice of questions, see the header). Note that
+# sbatch --export splits on commas, so keep commas out of EVAL_CMD.
 EVAL_ARGS="${EVAL_ARGS:---stages 1 2 --skip-api}"
-echo "Running: python3 src/evaluation/rag_eval/run_all.py $EVAL_ARGS"
-python3 src/evaluation/rag_eval/run_all.py $EVAL_ARGS
+if [ -n "$EVAL_CMD" ]; then
+    echo "Running: $EVAL_CMD"
+    bash -c "$EVAL_CMD"
+else
+    echo "Running: python3 src/evaluation/rag_eval/run_all.py $EVAL_ARGS"
+    python3 src/evaluation/rag_eval/run_all.py $EVAL_ARGS
+fi
 echo "Finished. Results are in src/evaluation/rag_eval/results/"
