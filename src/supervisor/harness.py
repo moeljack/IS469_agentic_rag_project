@@ -14,13 +14,21 @@ Speed (all optional):
   --no-warm                          don't preload the Ollama models and the reranker at start-up
 --trace ends every answer with a per-stage timing line.
 
-Pipeline:  decomposer (qwen3.5:4b)     ->  Supervisor (qwen3.5:4b)
+Decomposition:
+  default                            intake gate only extracts + refuses/clarifies; the supervisor's route step
+                                     decides whether to search the question as written or decompose it first
+  --intake-plans                     the original pipeline: the intake call also writes the sub-queries and step 1
+                                     searches them (no route step). Use it to compare the two on the eval set.
+
+Pipeline:  intake gate (qwen3.5:4b)  ->  Supervisor (qwen3.5:4b)
+                                              |-- route: search as written | decompose (query planner, qwen3.5:4b)
                                               |-- RetrievalAgent -> retriever.Retriever (ChromaDB + BM25 + reranker)
                                               |-- Auditor        -> auditor.AuditorAgent (qwen3.5:4b, ollama client)
                                               '-- UserStore (ChromaDB profile + pending clarifications)
 Needs: ollama running with qwen3.5:4b pulled (all models use the `ollama` Python client), and the ChromaDB
 collection built by the ingest scripts.
-Models: SUPERVISOR_MODEL / INTAKE_MODEL / AUDITOR_MODEL all default to qwen3.5:4b, so one model stays loaded.
+Models: SUPERVISOR_MODEL / INTAKE_MODEL / PLANNER_MODEL / AUDITOR_MODEL all default to qwen3.5:4b, so one model
+stays loaded.
 """
 import argparse
 import os
@@ -40,9 +48,10 @@ from src.retrieval.user_store import UserStore
 def build_supervisor(max_steps: int = 4, tools: dict = None, store: UserStore = None, k: int = DEFAULT_K,
                      max_chunks: int = DEFAULT_MAX_CHUNKS, max_queries: int = DEFAULT_MAX_QUERIES,
                      candidates: int = DEFAULT_CANDIDATES, audit_min_score: float = AUDIT_MIN_SCORE,
-                     retriever=None) -> Supervisor:
+                     retriever=None, intake_plans: bool = False) -> Supervisor:
     """The real stack. Retriever and AuditorAgent are wrapped by the adapters in supervisor.py, which give them the
-    .run() / .audit() interface the supervisor loop uses. The decomposer is the Supervisor's default planner.
+    .run() / .audit() interface the supervisor loop uses. The decomposer's intake gate is the Supervisor's default
+    intake and its query planner the default planner.
     candidates <= 0 (or None) leaves the pool size to src/config.py's CANDIDATES."""
     if retriever is None:
         # imported here, not at the top: src.config reads RERANK_QUANTIZE when the retriever module is first
@@ -53,7 +62,8 @@ def build_supervisor(max_steps: int = 4, tools: dict = None, store: UserStore = 
                       retrieval=RetrievalAgent(retriever, k=k, max_chunks=max_chunks,
                                                candidates=candidates if candidates and candidates > 0 else None),
                       auditor=Auditor(),                         # AuditorAgent is created on first audit
-                      tools=tools, max_steps=max_steps, max_queries=max_queries, audit_min_score=audit_min_score)
+                      tools=tools, max_steps=max_steps, max_queries=max_queries, audit_min_score=audit_min_score,
+                      intake_plans=intake_plans)
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -70,6 +80,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                     help="reranker score below which a chunk is rejected without an auditor call (0 = audit all)")
     ap.add_argument("--quantize-rerank", action="store_true",
                     help="int8 reranker weights (sets RERANK_QUANTIZE=1): faster on CPU, not for Apple MPS")
+    ap.add_argument("--intake-plans", action="store_true",
+                    help="original pipeline: the intake call writes the sub-queries (no supervisor route step)")
     ap.add_argument("--no-warm", action="store_true", help="don't preload the Ollama models and reranker at start-up")
     ap.add_argument("--company-name")
     ap.add_argument("--uen")
@@ -92,11 +104,13 @@ def main():
 
     sup = build_supervisor(args.max_steps, store=store, k=args.k, max_chunks=args.max_chunks,
                            max_queries=args.max_queries, candidates=args.candidates,
-                           audit_min_score=args.audit_min_score)
-    pin_ollama_keep_alive()                      # the decomposer's own ollama.chat call keeps its model loaded too
+                           audit_min_score=args.audit_min_score, intake_plans=args.intake_plans)
+    pin_ollama_keep_alive()                      # the decomposer's own ollama.chat calls keep their model loaded too
     if not args.no_warm:
         print("Loading Ollama models ...")
-        for note in warm_models([os.environ.get("INTAKE_MODEL", "qwen3.5:4b"), MODEL, AUDITOR_MODEL]):
+        for note in warm_models([os.environ.get("INTAKE_MODEL", "qwen3.5:4b"),
+                                 os.environ.get("PLANNER_MODEL", os.environ.get("INTAKE_MODEL", "qwen3.5:4b")),
+                                 MODEL, AUDITOR_MODEL]):
             print(f"  {note}")
         print("Loading the reranker ...")         # otherwise it loads inside the first question's retrieval time
         print(f"  {sup.retrieval.warm()}")
@@ -109,7 +123,8 @@ def main():
         out = sup.handle_turn(args.user, messages)
         print(f"\nbot> {out.message}\n")
         if args.trace:
-            print("    [" + out.status + "] " + "\n    ".join(out.trace) + "\n")
+            route = f" route={out.route}" if out.route else ""
+            print("    [" + out.status + route + "] " + "\n    ".join(out.trace) + "\n")
         messages.append({"role": "assistant", "content": out.message})
         if out.status != "clarify":
             messages = []          # a finished question starts a fresh conversation; the profile persists

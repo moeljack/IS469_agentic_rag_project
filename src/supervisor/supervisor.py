@@ -1,18 +1,28 @@
 """Supervisor agent: a model (local qwen3.5:4b via Ollama) decides each next action and writes the final answer.
 
-    messages -> decomposer -> Decompose | Clarify | Refuse
+    messages -> intake gate (decomposer.intake_and_plan: extraction + deterministic gates) -> Decompose | Clarify | Refuse
                                       |
         user store (ChromaDB) <-------+  profile in as `prior`; new facts out; pending state across clarifications
                                       v
       +--------------------- supervisor model picks one action per step ----------------------+
+      |  step 1: route    -> "search" the question as written, or "decompose" it first         |
       |  search(queries)  -> RetrievalAgent (wraps retriever.Retriever: hybrid + rerank)       |
       |                      -> Auditor (wraps auditor.AuditorAgent) judges each chunk          |
       |                      -> approved chunks are kept; auditor's suggested query is reported |
+      |  decompose        -> query planner (decomposer.plan_queries) writes one query per fact |
+      |                      (after step 1: only for the fact the auditor says is missing),     |
+      |                      then those queries are searched as above, in the same step        |
       |  run_tool(name)   -> e.g. compute_tax, output becomes a citable document               |
       |  ask_user(q)      -> status "clarify" (entities saved so the next turn resumes)        |
       |  answer           -> supervisor writes the final answer from vetted chunks             |
       |  give_up          -> status "no_answer"                                                |
       +-----------------------------------------------------------------------------------------+
+
+The intake gate only classifies and extracts (domain, intent, entities) so out-of-scope requests are refused and
+missing mandatory facts are asked for before any retrieval or supervisor call. It writes no sub-queries: whether a
+question is complex enough to break down is the supervisor's decision (the route step). With
+Supervisor(intake_plans=True) the intake writes sub-queries in the same call as before (Decompose.planned=True), the
+route step is skipped and step 1 searches those queries: the original pipeline, kept for comparison runs.
 
 Integration layer (this file): the real components have different shapes from what the loop needs, so two small
 adapters live here instead of changing them:
@@ -21,7 +31,8 @@ adapters live here instead of changing them:
                       (via agent_judge). Any failure fails open: chunks are kept unjudged and the trace says so.
 
 Guard rails in code (a 4B model is not trusted with the loop itself):
-  * step 1 is always `search` with the planner's queries
+  * step 1 is always a search: of the planned queries, or (route step) of the question or its decomposition
+  * a route or planner failure falls back to searching the question as written
   * a budget of `max_steps` actions, after which the supervisor must answer with what it has
   * `answer` with no vetted chunks and no tool output becomes give_up (never an answer from nothing)
   * invalid actions (unknown tool, repeated queries, empty ask_user) are logged and cost a step
@@ -32,10 +43,11 @@ Guard rails in code (a 4B model is not trusted with the loop itself):
   * when the auditor reports the approved chunks are sufficient, the loop answers without another decide call
   * when every query the auditor suggests repeats one already searched, the loop answers without a decide call
 
-All model calls go through one injectable `llm(messages, schema=None) -> str`, and the auditor takes an injectable
-`judge`, so tests need no Ollama. Two entry points:
+All model calls go through one injectable `llm(messages, schema=None) -> str`, the planner is an injectable
+`planner(question, known, missing, tried, max_queries) -> list[str]`, and the auditor takes an injectable `judge`,
+so tests need no Ollama. Two entry points:
   handle_turn(user_id, messages)  full harness: loads the profile, runs intake, supervises the result
-  supervise(user_id, result, question)  takes an already-computed decomposer Result
+  supervise(user_id, result, question)  takes an already-computed intake Result
 """
 import functools
 import inspect
@@ -73,7 +85,7 @@ KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE_CLIENT", "30m")   # how long Olla
 # harness.py exposes them as flags (--k, --max-chunks, --max-queries, --candidates, --audit-min-score).
 DEFAULT_K = 3                       # chunks kept per query after reranking
 DEFAULT_MAX_CHUNKS = 6              # chunks handed to the auditor per search
-DEFAULT_MAX_QUERIES = 2             # planned / follow-up queries per search (the decomposer may plan up to 4)
+DEFAULT_MAX_QUERIES = 2             # planned / follow-up queries per search (the planner may write up to 3)
 DEFAULT_CANDIDATES = 6              # chunks the reranker scores per query (config.py's CANDIDATES is 10); reranking
                                     # is the slowest part of retrieval, and k=3 rarely comes from below rank 6
 AUDIT_MIN_SCORE = 0.5               # chunks the reranker scores below this are rejected without asking the auditor
@@ -88,10 +100,28 @@ MAX_DRY_ROUNDS = 2                  # stop after this many searches in a row tha
 
 NO_CONTEXT = "The IRAS sources I have don't cover this. Please check iras.gov.sg or rephrase your question."
 
+ROUTE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action": {"type": "string", "enum": ["search", "decompose"]},
+        "reason": {"type": "string"},
+    },
+    "required": ["action", "reason"],
+}
+
+ROUTE_SYSTEM = """You route questions for a Singapore corporate income tax assistant. Decide how to search the IRAS
+documents for the QUESTION before anything has been searched.
+- search: the question asks for ONE fact, rate, rule, deadline or procedure. Searching the question as written will
+  find it. Most questions are like this.
+- decompose: answering needs SEVERAL separate facts that sit in different places, e.g. several eligibility conditions,
+  a rate plus a rebate or exemption, a comparison of two schemes, a computation, or one fact that depends on another.
+  A planner will then write one search query per fact.
+Reply with JSON: {"action": "search" or "decompose", "reason": "..."}"""
+
 DECIDE_SCHEMA = {
     "type": "object",
     "properties": {
-        "action": {"type": "string", "enum": ["search", "run_tool", "ask_user", "answer", "give_up"]},
+        "action": {"type": "string", "enum": ["search", "decompose", "run_tool", "ask_user", "answer", "give_up"]},
         "queries": {"type": "array", "items": {"type": "string"}},
         "tool": {"type": "string"},
         "question": {"type": "string"},
@@ -104,6 +134,8 @@ DECIDE_SYSTEM = """You supervise a Singapore corporate income tax assistant. Eac
 Actions:
 - search: retrieve IRAS documents. Give 1-3 keyword queries in "queries" (official IRAS terms, different from queries
   already tried). An auditor then checks which retrieved chunks are related to the question and may suggest queries.
+- decompose: a planner writes one targeted query for each fact the auditor reports as missing, and they are searched.
+  Use it when part of the question is still uncovered and you cannot name a good query yourself.
 - run_tool: run one of the AVAILABLE TOOLS (give its name in "tool") when the question needs a calculation.
 - ask_user: ONLY if an essential fact is missing that no document can supply. Put the question in "question".
 - answer: you have enough related documents (or tool output) to answer the question.
@@ -291,6 +323,7 @@ class SupervisorResult:
     draft: str = ""                     # raw answer from the model
     audits: list[RetrievalAudit] = field(default_factory=list)   # one per search action
     stop_reason: str = ""               # agent_answered | auditor_sufficient | suggestions_repeat | agent_gave_up | max_steps | no_new_queries | ...
+    route: str = ""                     # step 1: "planned" (intake wrote the queries) | "search" | "decompose"
     sources: list[str] = field(default_factory=list)
     profile_changes: list[tuple] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)
@@ -335,6 +368,7 @@ class _Run:
     suggestions: list = field(default_factory=list)     # auditor's latest suggested queries
     seen_chunk_ids: set = field(default_factory=set)    # every chunk id any search returned
     last_new_chunks_count: Optional[int] = None         # chunks the latest search returned for the first time
+    route: str = ""                                     # how step 1 searched (see SupervisorResult.route)
 
 
 # ---------------------------------------------------------------- Ollama runtime: keep the models loaded
@@ -410,20 +444,31 @@ def default_llm(model: str = MODEL) -> Callable:
     return llm
 
 
+def default_planner(question: str, known: str = "", missing: Optional[str] = None, tried=(),
+                    max_queries: int = 3) -> list[str]:
+    from decomposer import plan_queries                      # imported on first use: pulls in ollama
+    return plan_queries(question, known=known, missing=missing, tried=tried, max_queries=max_queries)
+
+
 class Supervisor:
     def __init__(self, store, retrieval, auditor, llm: Optional[Callable] = None, intake: Callable = None,
                  tools: Optional[dict] = None, max_steps: int = 4,
-                 max_queries: int = DEFAULT_MAX_QUERIES, audit_min_score: float = AUDIT_MIN_SCORE):
+                 max_queries: int = DEFAULT_MAX_QUERIES, audit_min_score: float = AUDIT_MIN_SCORE,
+                 planner: Optional[Callable] = None, intake_plans: bool = False):
         """
         store:      UserStore
         retrieval:  RetrievalAgent (anything with .run(plan, queries=None, exclude=()) -> list[Chunk])
         auditor:    Auditor        (anything with .audit(question, chunks, kept_context) -> RetrievalAudit)
-        llm:        callable(messages, schema=None) -> str; defaults to local Ollama (SUPERVISOR_MODEL, qwen3.5:4b)
+        llm:        callable(messages, schema=None) -> str; defaults to local Ollama (SUPERVISOR_MODEL, qwen3.5:4b).
+                    Used for the route step, every decide step and the answer.
         intake:     callable(messages, today, prior) -> Result; defaults to decomposer.intake_and_plan
         tools:      {"compute_tax": fn(plan) -> str, ...}; offered to the model only for COMPUTATION questions (Decompose has no tools field)
         max_steps:  action budget before the supervisor must answer with what it has
         max_queries: most queries run per search (first search: the planned ones, in order; follow-ups: new ones)
         audit_min_score: chunks with a reranker score below this are rejected without an auditor call (0 = off)
+        planner:    callable(question, known, missing, tried, max_queries) -> list[str]; defaults to
+                    decomposer.plan_queries. Runs only when the supervisor chooses `decompose`.
+        intake_plans: True = the default intake also writes sub-queries (the original pipeline, no route step)
         """
         self.store, self.retrieval, self.auditor = store, retrieval, auditor
         self.llm = llm or default_llm()
@@ -431,10 +476,12 @@ class Supervisor:
         self.max_steps = max_steps
         self.max_queries = max(1, max_queries)
         self.audit_min_score = audit_min_score or 0.0
+        self.planner = planner or default_planner
+        self.intake_plans = intake_plans
         if intake is None:
             def intake(messages, today, prior):          # imported on first use: pulls in ollama
                 from decomposer import intake_and_plan
-                return intake_and_plan(messages, today=today, prior=prior)
+                return intake_and_plan(messages, today=today, prior=prior, plan_queries=self.intake_plans)
         self.intake = intake
 
     # ------------------------------------------------------------ full turn
@@ -456,11 +503,11 @@ class Supervisor:
         out.trace.append(timing_line(out.timings))
         return out
 
-    # ------------------------------------------------------------ planner output in
+    # ------------------------------------------------------------ intake output in
     def supervise(self, user_id: str, result, question: str, reused: Optional[dict] = None) -> SupervisorResult:
         if isinstance(result, Refuse):
             self.store.pop_pending(user_id)
-            return SupervisorResult("refused", result.reason, trace=["refused by planner"])
+            return SupervisorResult("refused", result.reason, trace=["refused by intake gate"])
 
         if isinstance(result, Clarify):
             self.store.save_pending(user_id, result.entities)   # survive the round trip even if the process restarts
@@ -486,7 +533,7 @@ class Supervisor:
 
         def out(status, message, **kw):
             return SupervisorResult(status, message, plan=plan, audits=run.audits, stop_reason=stop,
-                                    profile_changes=changes, trace=trace, timings=run.timings, **kw)
+                                    route=run.route, profile_changes=changes, trace=trace, timings=run.timings, **kw)
 
         if ask:
             self.store.save_pending(user_id, plan.entities)
@@ -516,7 +563,12 @@ class Supervisor:
 
         for step in range(1, self.max_steps + 1):
             if step == 1:
-                d = {"action": "search", "queries": [], "reason": "opening search with the planned queries"}
+                if plan.planned:                            # the intake already decomposed it: search that plan
+                    run.route = "planned"
+                    d = {"action": "search", "queries": [], "reason": "opening search with the planned queries"}
+                else:                                       # the supervisor decides: as written, or broken down
+                    d = _timed(run.timings, "route", self._route, plan, question, trace)
+                    run.route = d["action"]
             else:
                 # The last search's audit approved something but the auditor's only ideas for what is missing are
                 # queries already searched (or near-repeats): another search would bring back the same chunks, so
@@ -531,29 +583,13 @@ class Supervisor:
             action = d["action"]
             trace.append(f"step {step}: {action} - {d.get('reason', '')[:120]}")
 
-            if action == "search":
+            if action in ("search", "decompose"):
                 # 1. Prepare queries first
-                if step == 1:
-                    # capping queries limits total database round-trips
-                    queries = plan.queries[: self.max_queries]
-                    if len(plan.queries) > len(queries):
-                        trace.append(f"  using {len(queries)} of {len(plan.queries)} planned queries (max_queries)")
-                else:
-                    base = plan.queries[0] if plan.queries else None
-                    flt = base.filter if base else SearchFilter(domain=plan.domain.value, year=plan.tax_year)
-                    make = type(base) if base else PlannedQuery  # build with the plan's own classes
-                    # Repeats and near-repeats of searched queries retrieve the same chunks, so they are dropped
-                    # before any retrieval runs. If none of the model's queries are new, the auditor's get a chance.
-                    skipped: list[str] = []
-                    texts = (_new_queries(d.get("queries") or [], run.tried, skipped)
-                             or _new_queries(run.suggestions, run.tried, skipped))
-                    if skipped:
-                        trace.append(f"  guard: skipped near-duplicate queries {skipped}")
-                    queries = [make(text=q, filter=flt) for q in texts[: self.max_queries]]
-                    if not queries:
-                        run.log.append("search skipped: no new queries")
-                        trace.append("  guard: no new queries left to search; stopping search loop.")
-                        return "no_new_queries", None          # supervise() answers if anything is vetted
+                queries = self._next_queries(step, action, d, plan, question, run, trace)
+                if queries is None:
+                    run.log.append("search skipped: no new queries")
+                    trace.append("  guard: no new queries left to search; stopping search loop.")
+                    return "no_new_queries", None          # supervise() answers if anything is vetted
                 approved_before = len(run.vetted)
 
                 # 2. Execute search ONCE
@@ -606,6 +642,70 @@ class Supervisor:
                 return "agent_gave_up", None
 
         return "max_steps", None
+
+    def _next_queries(self, step: int, action: str, d: dict, plan: Decompose, question: str, run: _Run,
+                      trace: list[str]):
+        """The PlannedQuery list this search/decompose step runs, or None when nothing new is left to search."""
+        base = plan.queries[0] if plan.queries else None
+        flt = base.filter if base else SearchFilter(domain=plan.domain.value, year=plan.tax_year)
+        make = type(base) if base else PlannedQuery  # build with the plan's own classes
+        skipped: list[str] = []
+
+        if action == "decompose":
+            # Step 1: break the whole question down. Later: plan only for what the last audit says is missing.
+            missing = run.audits[-1].missing if step > 1 and run.audits else None
+            drafted = _timed(run.timings, "plan", self._plan, plan, question, missing, run.tried, trace)
+            texts = _new_queries(drafted, run.tried, skipped)
+            if skipped:
+                trace.append(f"  guard: skipped near-duplicate planned queries {skipped}")
+            if texts:
+                trace.append(f"  planner queries{f' for missing {missing!r}' if missing else ''}: {texts}")
+                return [make(text=q, filter=flt) for q in texts[: self.max_queries]]
+            trace.append("  planner gave no new queries; falling back to "
+                         + ("the question as written" if step == 1 else "the model's and auditor's queries"))
+            skipped = []
+
+        if step == 1:
+            # capping queries limits total database round-trips
+            queries = plan.queries[: self.max_queries]
+            if len(plan.queries) > len(queries):
+                trace.append(f"  using {len(queries)} of {len(plan.queries)} planned queries (max_queries)")
+            return queries
+
+        # Repeats and near-repeats of searched queries retrieve the same chunks, so they are dropped
+        # before any retrieval runs. If none of the model's queries are new, the auditor's get a chance.
+        texts = (_new_queries(d.get("queries") or [], run.tried, skipped)
+                 or _new_queries(run.suggestions, run.tried, skipped))
+        if skipped:
+            trace.append(f"  guard: skipped near-duplicate queries {skipped}")
+        queries = [make(text=q, filter=flt) for q in texts[: self.max_queries]]
+        return queries or None
+
+    def _route(self, plan: Decompose, question: str, trace: list[str]) -> dict:
+        """Step 1 when the intake wrote no sub-queries: search the question as written, or decompose it first.
+        Any failure falls back to searching as written (the cheaper path, and what a simple question needs)."""
+        state = (f"QUESTION: {_ask(plan, question)}\n"
+                 f"INTENT: {plan.intent.value}\n"
+                 f"KNOWN: {_known(plan)}")
+        try:
+            raw = self.llm([{"role": "system", "content": ROUTE_SYSTEM}, {"role": "user", "content": state}],
+                           ROUTE_SCHEMA)
+            d = json.loads(raw)
+            if d.get("action") not in ROUTE_SCHEMA["properties"]["action"]["enum"]:
+                raise ValueError(f"bad route {d.get('action')!r}")
+            return {"action": d["action"], "queries": [], "reason": str(d.get("reason") or "")}
+        except Exception as e:
+            trace.append(f"route unparseable ({e}); searching the question as written")
+            return {"action": "search", "queries": [], "reason": "fallback after unusable route output"}
+
+    def _plan(self, plan: Decompose, question: str, missing: Optional[str], tried: list, trace: list[str]) -> list:
+        """The planner's queries, or [] (and a trace line) if it fails."""
+        try:
+            return [str(q) for q in (self.planner(_ask(plan, question), _known(plan), missing, list(tried),
+                                                  self.max_queries) or [])]
+        except Exception as e:
+            trace.append(f"  planner failed: {e}")
+            return []
 
     def _search(self, plan: Decompose, audit_q: str, queries, run: _Run, trace: list[str]):
         """Retrieve, drop low-scoring chunks, audit the rest. Returns this search's RetrievalAudit, or None if no
@@ -819,14 +919,27 @@ def _user_facts(plan: Decompose) -> str:
     return "\n".join(lines) or "- none"
 
 
-def _audit_question(plan: Decompose, question: str) -> str:
-    """The prompt relevance is judged against: the question plus what we know about the user."""
+def _known(plan: Decompose) -> str:
+    """What we know about the user, on one line: 'domain cit; year 2026; financial year end: 2025-12-31; topics: ...'"""
     facts = [f"domain {plan.domain.value}", f"year {plan.tax_year}"] + [
         f"{_label(f)}: {v}" for f, v in _entity_facts(plan.entities).items()]
     topics = getattr(plan.entities, "topics", [])
     if topics:
         facts.append("topics: " + ", ".join(topics))
-    return f"{question}\n(Known: {'; '.join(facts)})"
+    return "; ".join(facts)
+
+
+def _ask(plan: Decompose, question: str) -> str:
+    """The question the route step and the planner work on. Without a planned decomposition, the intake's one query
+    is every user turn of the conversation, so a clarification answer ("120,000") still carries its question."""
+    if not plan.planned and plan.queries and plan.queries[0].text.strip():
+        return plan.queries[0].text
+    return question
+
+
+def _audit_question(plan: Decompose, question: str) -> str:
+    """The prompt relevance is judged against: the question plus what we know about the user."""
+    return f"{question}\n(Known: {_known(plan)})"
 
 
 def _label(field_name: str) -> str:

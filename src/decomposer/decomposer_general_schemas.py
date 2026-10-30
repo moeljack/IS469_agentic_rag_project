@@ -129,7 +129,9 @@ class SubQueryDraft(BaseModel):
     )
 
 
-class LLMOutput(BaseModel):
+class IntakeOutput(BaseModel):
+    """What the intake model extracts: just enough for the deterministic gates (refuse / clarify) to run.
+    Query planning is not done here; the supervisor decides whether a question needs sub-queries."""
     domain: TaxDomain
     intent: Intent
     cit: Optional[CITEntities] = None
@@ -137,6 +139,15 @@ class LLMOutput(BaseModel):
     gst: Optional[GSTEntities] = None
     stamp_duty: Optional[StampDutyEntities] = None
     individual_tax: Optional[IndividualTaxEntities] = None
+
+
+class LLMOutput(IntakeOutput):
+    """Intake extraction plus sub-queries in the same call (the original pipeline, kept for comparison runs)."""
+    sub_queries: List[SubQueryDraft] = Field(default_factory=list)
+
+
+class QueryPlan(BaseModel):
+    """What the query planner (the supervisor's decompose step) returns."""
     sub_queries: List[SubQueryDraft] = Field(default_factory=list)
 
 
@@ -171,6 +182,9 @@ class Decompose(BaseModel):
     tax_year: Optional[int] = None
     assumptions: List[str] = Field(default_factory=list)
     queries: List[PlannedQuery] = Field(default_factory=list)
+    # True: `queries` are already a decomposition (written by a planner), so the supervisor searches them as they are.
+    # False: `queries` is just the question itself (slim intake); the supervisor decides whether to decompose it.
+    planned: bool = True
 
 
 Result = Union[Clarify, Refuse, Decompose]

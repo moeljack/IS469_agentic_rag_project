@@ -1,3 +1,18 @@
+"""Intake gate and query planner.
+
+Two separate jobs, called at different points in the pipeline:
+
+  intake_and_plan(messages, today, prior)      runs BEFORE the supervisor
+      extract()  one small LLM call: domain, intent, entities (no sub-queries)
+      resolve()  deterministic gates: Refuse (out of scope), Clarify (missing mandatory slot), normalisation
+                 -> Refuse | Clarify | Decompose(planned=False, queries=[the question itself])
+
+  plan_queries(question, plan, missing, tried)  called BY the supervisor, only when it decides the question needs it
+      one LLM call that breaks the question (or the fact the auditor says is missing) into keyword sub-queries
+
+`intake_and_plan(..., plan_queries=True)` restores the original single-call behaviour (extraction and sub-queries
+together, Decompose(planned=True)), so the two pipelines can be compared on the same eval set.
+"""
 import json
 import os
 import re
@@ -17,7 +32,10 @@ from decomposer_general_schemas import (
     StampDutyEntities,
     IndividualTaxEntities,
     DomainEntities,
+    IntakeOutput,
     LLMOutput,
+    QueryPlan,
+    SubQueryDraft,
     Clarify,
     Refuse,
     Decompose,
@@ -27,13 +45,14 @@ from decomposer_general_schemas import (
 )
 
 MODEL = os.environ.get("INTAKE_MODEL", "qwen3.5:4b")
+PLANNER_MODEL = os.environ.get("PLANNER_MODEL", MODEL)
 NUM_CTX = 8192
 
 FEW_SHOT_PATH = Path(__file__).parent / "few_shots.txt"
 
-# ------------------------------------------------------------------ 1. System Prompt & Extraction
-def load_few_shots_from_txt(filepath: Path | str = FEW_SHOT_PATH) -> list[dict]:
-    """Parses few_shots.txt into role-based messages for Ollama."""
+# ------------------------------------------------------------------ 1. Few-shots
+def load_few_shot_examples(filepath: Path | str = FEW_SHOT_PATH) -> list[list[dict]]:
+    """Parses few_shots.txt into one list of role-based messages per example."""
     path = Path(filepath)
     if not path.exists():
         return []
@@ -42,50 +61,85 @@ def load_few_shots_from_txt(filepath: Path | str = FEW_SHOT_PATH) -> list[dict]:
     if not content:
         return []
 
-    blocks = content.split("=== EXAMPLE ")
-    messages: list[dict] = []
-
-    for block in blocks:
+    examples: list[list[dict]] = []
+    for block in content.split("=== EXAMPLE "):
         if not block.strip():
             continue
-        lines = block.strip().splitlines()
+        messages: list[dict] = []
         current_role = None
         current_content: list[str] = []
 
-        for line in lines:
+        def flush():
+            if current_role and current_content:
+                messages.append({"role": current_role, "content": "\n".join(current_content).strip()})
+
+        for line in block.strip().splitlines():
             if line.startswith("==="):
                 continue
-            if line.strip() == "<|user|>":
-                if current_role and current_content:
-                    messages.append({
-                        "role": current_role,
-                        "content": "\n".join(current_content).strip(),
-                    })
-                    current_content = []
-                current_role = "user"
-            elif line.strip() == "<|assistant|>":
-                if current_role and current_content:
-                    messages.append({
-                        "role": current_role,
-                        "content": "\n".join(current_content).strip(),
-                    })
-                    current_content = []
-                current_role = "assistant"
-            else:
+            if line.strip() in ("<|user|>", "<|assistant|>"):
+                flush()
+                current_content = []
+                current_role = "user" if line.strip() == "<|user|>" else "assistant"
+            elif current_role:
                 current_content.append(line)
+        flush()
+        if messages:
+            examples.append(messages)
+    return examples
 
-        if current_role and current_content:
-            messages.append({
-                "role": current_role,
-                "content": "\n".join(current_content).strip(),
-            })
 
-    return messages
+def load_few_shots_from_txt(filepath: Path | str = FEW_SHOT_PATH) -> list[dict]:
+    """All examples as one flat message list (the original format, with sub-queries)."""
+    return [m for ex in load_few_shot_examples(filepath) for m in ex]
 
-FEW_SHOT_MESSAGES = load_few_shots_from_txt(FEW_SHOT_PATH)
 
-def build_system_prompt(today: date) -> str:
-    return f"""You are the intake and planning stage of an official Singapore IRAS Tax assistant.
+def _json_or_none(text: str) -> Optional[dict]:
+    try:
+        v = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return v if isinstance(v, dict) else None
+
+
+def _intake_shots(examples: list[list[dict]]) -> list[dict]:
+    """The examples with `sub_queries` removed from the assistant JSON: intake only extracts."""
+    out = []
+    for ex in examples:
+        for m in ex:
+            data = _json_or_none(m["content"]) if m["role"] == "assistant" else None
+            if data is not None and "sub_queries" in data:
+                data = {k: v for k, v in data.items() if k != "sub_queries"}
+                m = {"role": "assistant", "content": json.dumps(data)}
+            out.append(m)
+    return out
+
+
+def _planner_shots(examples: list[list[dict]]) -> list[dict]:
+    """Single-turn examples that have sub-queries, rewritten as question -> {"sub_queries": [...]}."""
+    out = []
+    for ex in examples:
+        if len(ex) != 2 or ex[0]["role"] != "user":
+            continue
+        data = _json_or_none(ex[1]["content"])
+        if not data or not data.get("sub_queries"):
+            continue
+        out += [{"role": "user", "content": f"QUESTION: {ex[0]['content']}"},
+                {"role": "assistant", "content": json.dumps({"sub_queries": data["sub_queries"]})}]
+    return out
+
+
+FEW_SHOT_EXAMPLES = load_few_shot_examples(FEW_SHOT_PATH)
+FEW_SHOT_MESSAGES = [m for ex in FEW_SHOT_EXAMPLES for m in ex]       # original: extraction + sub-queries
+INTAKE_SHOT_MESSAGES = _intake_shots(FEW_SHOT_EXAMPLES)               # extraction only
+PLANNER_SHOT_MESSAGES = _planner_shots(FEW_SHOT_EXAMPLES)             # sub-queries only
+
+
+# ------------------------------------------------------------------ 2. Intake extraction
+def build_system_prompt(today: date, plan_queries: bool = False) -> str:
+    planning_rule = ("   - Generate 1-3 targeted sub-queries aimed at IRAS regulations, rates, or circulars.\n"
+                     if plan_queries else
+                     "   - Do NOT write search queries; only classify the request and extract its facts.\n")
+    return f"""You are the intake stage of an official Singapore IRAS Tax assistant.
 Today's date is {today.isoformat()}.
 Ensure dates entered by users are actual dates. Dates like 33 October should not be accepted.
 Analyze the conversation and output valid JSON strictly matching the schema.
@@ -117,38 +171,33 @@ Rules:
 3. SCHEMA RESTRICTIONS:
    - Populate ONLY the entity sub-object corresponding to the selected domain. Set all other domain fields to null.
    - Extract ONLY explicit facts mentioned by the user across the conversation. Never guess unmentioned fields.
-   - Generate 1-3 targeted sub-queries aimed at IRAS regulations, rates, or circulars.
-
+{planning_rule}
 """
 
 
-def extract(messages: list[dict], today: date, model: str = MODEL) -> LLMOutput:
+def _chat(model: str, messages: list[dict], schema: dict) -> str:
     import ollama
+    kwargs = dict(model=model, format=schema, options={"temperature": 0, "num_ctx": NUM_CTX})
+    try:
+        resp = ollama.chat(messages=messages, think=False, **kwargs)
+    except TypeError:                                   # older client without `think`
+        resp = ollama.chat(messages=messages, **kwargs)
+    return resp["message"]["content"]
 
-    msgs = [
-        {"role": "system", "content": build_system_prompt(today)},
-        *FEW_SHOT_MESSAGES,
-        *messages,
-    ]
+
+def extract(messages: list[dict], today: date, model: str = MODEL, plan_queries: bool = False):
+    """IntakeOutput (default) or, with plan_queries=True, LLMOutput with sub-queries (the original single call)."""
+    schema_cls = LLMOutput if plan_queries else IntakeOutput
+    shots = FEW_SHOT_MESSAGES if plan_queries else INTAKE_SHOT_MESSAGES
+    msgs = [{"role": "system", "content": build_system_prompt(today, plan_queries)}, *shots, *messages]
     last_err: Optional[Exception] = None
-    kwargs = dict(
-        model=model,
-        format=LLMOutput.model_json_schema(),
-        options={"temperature": 0, "num_ctx": NUM_CTX},
-    )
 
     for _ in range(2):
-        try:
-            resp = ollama.chat(messages=msgs, think=False, **kwargs)
-        except TypeError:
-            resp = ollama.chat(messages=msgs, **kwargs)
-
-        content = resp["message"]["content"]
+        content = _chat(model, msgs, schema_cls.model_json_schema())
         if os.environ.get("INTAKE_DEBUG"):
             print(f"[intake raw model output]\n{content}\n", flush=True)
-
         try:
-            return LLMOutput.model_validate_json(content)
+            return schema_cls.model_validate_json(content)
         except ValidationError as err:
             last_err = err
             msgs += [
@@ -158,7 +207,7 @@ def extract(messages: list[dict], today: date, model: str = MODEL) -> LLMOutput:
     raise RuntimeError(f"Intake model failed schema validation twice: {last_err}")
 
 
-# ------------------------------------------------------------------ 2. Deterministic Verification & Requirements
+# ------------------------------------------------------------------ 3. Deterministic Verification & Requirements
 
 MANDATORY_SLOTS: Dict[Tuple[TaxDomain, Intent], List[str]] = {
     # CIT
@@ -251,7 +300,7 @@ def merge_domain_entities(old: Optional[DomainEntities], new: DomainEntities) ->
     return merged
 
 
-def get_active_entities(raw: LLMOutput) -> DomainEntities:
+def get_active_entities(raw: IntakeOutput) -> DomainEntities:
     mapping = {
         TaxDomain.CIT: (raw.cit, CITEntities),
         TaxDomain.PROPERTY_TAX: (raw.property_tax, PropertyTaxEntities),
@@ -263,16 +312,23 @@ def get_active_entities(raw: LLMOutput) -> DomainEntities:
     return obj if obj is not None else fallback_cls()
 
 
-# ------------------------------------------------------------------ 3. Planner & Entry Point
+# ------------------------------------------------------------------ 4. Gates & Entry Point
 
-    """resolve will never split the user's prompt into more than 4 queries"""
 def resolve(
-    raw: LLMOutput,
+    raw: IntakeOutput,
     question: str,
     today: date,
     prior: Optional[DomainEntities] = None,
     max_queries: int = 4,
+    search_text: Optional[str] = None,
 ) -> Result:
+    """The deterministic gates. Never splits the user's prompt into more than `max_queries` queries.
+
+    raw: IntakeOutput (no sub-queries) -> Decompose(planned=False) whose one query is `search_text` (or the question);
+         LLMOutput with sub-queries    -> Decompose(planned=True) with those queries (the original behaviour).
+    search_text: what to search when nothing was planned; intake_and_plan passes every user turn of the conversation,
+         so a clarification answer such as "120,000" is searched together with the question it answers.
+    """
     if raw.domain == TaxDomain.OUT_OF_SCOPE or raw.intent == Intent.OUT_OF_SCOPE:
         return Refuse(reason="This assistant only handles Singapore tax matters under IRAS jurisdiction (CIT, Property Tax, GST, Stamp Duty, Individual Tax).")
 
@@ -299,23 +355,13 @@ def resolve(
             entities=entities,
         )
 
-    # 2. Build Sub-Queries with Metadata Filters
-    queries: List[PlannedQuery] = []
-    seen = set()
-
-    for sq in raw.sub_queries:
-        txt = sq.query.strip()
-        if txt and txt.lower() not in seen:
-            seen.add(txt.lower())
-            queries.append(PlannedQuery(
-                text=txt,
-                filter=SearchFilter(domain=raw.domain, year=tax_year, doc_type=sq.doc_type),
-            ))
-
+    # 2. Sub-queries, only when the intake call was asked to plan them
+    queries = build_planned_queries(getattr(raw, "sub_queries", []), raw.domain, tax_year, max_queries)
+    planned = bool(queries)
     if not queries:
         queries.append(PlannedQuery(
-            text=question.strip(),
-            filter=SearchFilter(domain=raw.domain, year=tax_year, doc_type=None),
+            text=(search_text or question).strip(),
+            filter=SearchFilter(domain=raw.domain, year=tax_year),
         ))
 
     return Decompose(
@@ -325,7 +371,26 @@ def resolve(
         tax_year=tax_year,
         assumptions=assumptions,
         queries=queries[:max_queries],
+        planned=planned,
     )
+
+
+def build_planned_queries(drafts: list, domain: TaxDomain, year: Optional[int], max_queries: int = 4) -> list[PlannedQuery]:
+    """SubQueryDrafts -> PlannedQuery with the plan's filter; blanks and case-insensitive repeats dropped."""
+    queries: List[PlannedQuery] = []
+    seen = set()
+    for sq in drafts:
+        txt = re.sub(r"\s+", " ", sq.query).strip()
+        if txt and txt.lower() not in seen:
+            seen.add(txt.lower())
+            queries.append(PlannedQuery(text=txt, filter=SearchFilter(domain=domain, year=year)))
+    return queries[:max_queries]
+
+
+def _search_text(messages: list[dict]) -> str:
+    """Every user turn of the conversation, oldest first: a clarification answer alone ("120,000") searches badly."""
+    turns = [m["content"].strip() for m in messages if m["role"] == "user" and m["content"].strip()]
+    return " ".join(turns)
 
 
 def intake_and_plan(
@@ -333,14 +398,60 @@ def intake_and_plan(
     today: Optional[date] = None,
     prior: Optional[DomainEntities] = None,
     model: str = MODEL,
+    plan_queries: bool = False,
 ) -> Result:
+    """Intake gate. plan_queries=False (default): extraction only, the supervisor decides about decomposition.
+    plan_queries=True: the original pipeline, sub-queries written in the same call."""
     today = today or date.today()
     question = next(m["content"] for m in reversed(messages) if m["role"] == "user")
-    raw = extract(messages, today, model)
-    return resolve(raw, question, today, prior=prior)
+    raw = extract(messages, today, model, plan_queries=plan_queries)
+    return resolve(raw, question, today, prior=prior, search_text=_search_text(messages))
 
 
-# ------------------------------------------------------------------ 4. Quick Terminal Test
+# ------------------------------------------------------------------ 5. Query planner (the supervisor's decompose step)
+
+PLANNER_SYSTEM = """You plan searches for a Singapore IRAS tax assistant.
+Break the QUESTION into 1-{max_queries} short keyword search queries, ONE fact or rule per query, using official IRAS
+terms (e.g. "partial tax exemption", "start-up tax exemption qualifying conditions", "Form C-S filing due date").
+- If MISSING is given, the earlier searches already cover the rest: write queries ONLY for the missing fact.
+- Never repeat or rephrase a query listed under ALREADY SEARCHED.
+- Do not put the user's own figures in a query unless a rate table is keyed on them.
+Reply with JSON: {{"sub_queries": [{{"query": "...", "doc_type": "..."}}]}}"""
+
+
+def build_planner_messages(question: str, known: str = "", missing: Optional[str] = None, tried=(),
+                           max_queries: int = 3) -> list[dict]:
+    user = f"QUESTION: {question}"
+    if known:
+        user += f"\nKNOWN: {known}"
+    if missing:
+        user += f"\nMISSING: {missing}"
+    if tried:
+        user += "\nALREADY SEARCHED:\n" + "\n".join(f"- {t}" for t in tried)
+    return [{"role": "system", "content": PLANNER_SYSTEM.format(max_queries=max_queries)},
+            *PLANNER_SHOT_MESSAGES,
+            {"role": "user", "content": user}]
+
+
+def plan_queries(question: str, known: str = "", missing: Optional[str] = None, tried=(), max_queries: int = 3,
+                 model: str = PLANNER_MODEL) -> list[str]:
+    """The sub-queries for `question` (or only for the `missing` fact). Returns [] if the model output is unusable,
+    so the caller can fall back to searching the question as it is."""
+    msgs = build_planner_messages(question, known, missing, tried, max_queries)
+    try:
+        plan = QueryPlan.model_validate_json(_chat(model, msgs, QueryPlan.model_json_schema()))
+    except (ValidationError, ValueError):
+        return []
+    out, seen = [], set()
+    for sq in plan.sub_queries:
+        txt = re.sub(r"\s+", " ", sq.query).strip()
+        if txt and txt.lower() not in seen:
+            seen.add(txt.lower())
+            out.append(txt)
+    return out[:max_queries]
+
+
+# ------------------------------------------------------------------ 6. Quick Terminal Test
 
 if __name__ == "__main__":
     conversation: list[dict] = []
@@ -355,13 +466,14 @@ if __name__ == "__main__":
             break
 
         conversation.append({"role": "user", "content": q})
-        raw = extract(conversation, date.today(), MODEL)
-        res = resolve(raw, q, date.today(), prior=prior_state)
+        res = intake_and_plan(conversation, date.today(), prior=prior_state)
 
         if isinstance(res, Clarify):
             print(f"bot [Clarify]> {res.question}")
             conversation.append({"role": "assistant", "content": res.question})
             prior_state = res.entities
         else:
-            print(f"bot [Decomposed Plan]:\n{res.model_dump_json(indent=2)}")
+            print(f"bot [Intake result]:\n{res.model_dump_json(indent=2)}")
+            if isinstance(res, Decompose):
+                print("planner sub-queries:", plan_queries(res.queries[0].text))
             conversation, prior_state = [], None
