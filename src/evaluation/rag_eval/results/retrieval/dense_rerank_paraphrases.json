@@ -15,7 +15,7 @@
    "rr": 0.75,
    "hit": 0.8,
    "n": 5,
-   "ms_median": 17550.053599999956
+   "ms_median": 573.1536406092346
   },
   "simple": {
    "r": 1.0,
@@ -24,7 +24,7 @@
    "rr": 0.8333333333333334,
    "hit": 1.0,
    "n": 3,
-   "ms_median": 17550.053599999956
+   "ms_median": 573.1536406092346
   },
   "multi": {
    "r": 0.75,
@@ -33,12 +33,12 @@
    "rr": 0.625,
    "hit": 0.5,
    "n": 2,
-   "ms_median": 17463.51374999972
+   "ms_median": 604.7711523715407
   }
  },
  "questions": [
   {
-   "qid": "Q55",
+   "qid": "P01",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -104,10 +104,10 @@
     "rr": 0.5,
     "hit": 1
    },
-   "seconds": 18.47133490000033
+   "seconds": 0.5860627591609955
   },
   {
-   "qid": "Q56",
+   "qid": "P02",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -173,10 +173,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 17.550053599999956
+   "seconds": 0.5731536406092346
   },
   {
-   "qid": "Q57",
+   "qid": "P03",
    "type": "simple",
    "qtype": "number",
    "source": "insurer_guide",
@@ -242,10 +242,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 13.821202900000117
+   "seconds": 0.48079112730920315
   },
   {
-   "qid": "Q58",
+   "qid": "P04",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -312,10 +312,10 @@
     "rr": 0.25,
     "hit": 0
    },
-   "seconds": 14.776049499999772
+   "seconds": 0.5201293327845633
   },
   {
-   "qid": "Q59",
+   "qid": "P05",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -382,7 +382,7 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 20.150977999999668
+   "seconds": 0.689412971958518
   }
  ]
 }

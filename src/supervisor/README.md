@@ -59,6 +59,8 @@ On start-up the harness loads the Ollama models and the reranker, so the first q
 
 ## Environment variables
 
+The default models are set in `src/config.py`; the variables below override them.
+
 | Variable | Default | Used for |
 |---|---|---|
 | `INTAKE_MODEL` | `qwen3.5:4b` | Intake extraction |

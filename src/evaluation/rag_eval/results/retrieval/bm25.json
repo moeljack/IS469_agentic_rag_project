@@ -15,7 +15,7 @@
    "rr": 0.7913978494623657,
    "hit": 0.7419354838709677,
    "n": 31,
-   "ms_median": 3.793999999970765
+   "ms_median": 2.283500973135233
   },
   "simple": {
    "r": 0.9375,
@@ -24,7 +24,7 @@
    "rr": 0.6739583333333333,
    "hit": 0.9375,
    "n": 16,
-   "ms_median": 3.1650999999328633
+   "ms_median": 1.669279532507062
   },
   "multi": {
    "r": 0.7666666666666667,
@@ -33,12 +33,12 @@
    "rr": 0.9166666666666666,
    "hit": 0.5333333333333333,
    "n": 15,
-   "ms_median": 5.527200000187804
+   "ms_median": 2.9866541735827923
   }
  },
  "questions": [
   {
-   "qid": "Q01",
+   "qid": "S01",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -104,10 +104,10 @@
     "rr": 0.5,
     "hit": 1
    },
-   "seconds": 0.0029043000001820474
+   "seconds": 0.0021362490952014923
   },
   {
-   "qid": "Q03",
+   "qid": "S02",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -173,10 +173,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.0035361999998713145
+   "seconds": 0.0020510489121079445
   },
   {
-   "qid": "Q04",
+   "qid": "S03",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -242,10 +242,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.003369600000041828
+   "seconds": 0.001823680941015482
   },
   {
-   "qid": "Q07",
+   "qid": "S04",
    "type": "simple",
    "qtype": "definition",
    "source": "online_guide",
@@ -311,10 +311,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.0035639000000173837
+   "seconds": 0.0017568198963999748
   },
   {
-   "qid": "Q08",
+   "qid": "S05",
    "type": "simple",
    "qtype": "definition",
    "source": "online_guide",
@@ -380,10 +380,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.003295299999990675
+   "seconds": 0.00166739197447896
   },
   {
-   "qid": "Q09",
+   "qid": "S06",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -449,10 +449,10 @@
     "rr": 0.16666666666666666,
     "hit": 0
    },
-   "seconds": 0.0025873999998111685
+   "seconds": 0.001283808145672083
   },
   {
-   "qid": "Q10",
+   "qid": "S07",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -518,10 +518,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.003620100000034654
+   "seconds": 0.0017725080251693726
   },
   {
-   "qid": "Q12",
+   "qid": "S08",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -587,10 +587,10 @@
     "rr": 0.25,
     "hit": 1
    },
-   "seconds": 0.002885500000047614
+   "seconds": 0.0013732840307056904
   },
   {
-   "qid": "Q13",
+   "qid": "S09",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -656,10 +656,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.0026806000000760832
+   "seconds": 0.0013574110344052315
   },
   {
-   "qid": "Q15",
+   "qid": "S10",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -725,10 +725,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.002977100000180144
+   "seconds": 0.0015407390892505646
   },
   {
-   "qid": "Q16",
+   "qid": "S11",
    "type": "simple",
    "qtype": "definition",
    "source": "reit_etf_guide",
@@ -794,10 +794,10 @@
     "rr": 0.3333333333333333,
     "hit": 1
    },
-   "seconds": 0.0031596999999692343
+   "seconds": 0.0015596160665154457
   },
   {
-   "qid": "Q19",
+   "qid": "S12",
    "type": "simple",
    "qtype": "number",
    "source": "insurer_guide",
@@ -863,10 +863,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.004419200000029377
+   "seconds": 0.002170262858271599
   },
   {
-   "qid": "Q20",
+   "qid": "S13",
    "type": "simple",
    "qtype": "definition",
    "source": "insurer_guide",
@@ -932,10 +932,10 @@
     "rr": 0.3333333333333333,
     "hit": 1
    },
-   "seconds": 0.0032901999998102838
+   "seconds": 0.0016711670905351639
   },
   {
-   "qid": "Q42",
+   "qid": "S14",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -1001,10 +1001,10 @@
     "rr": 0.5,
     "hit": 1
    },
-   "seconds": 0.0021302999998624728
+   "seconds": 0.0010009389370679855
   },
   {
-   "qid": "Q43",
+   "qid": "S15",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -1070,10 +1070,10 @@
     "rr": 0.2,
     "hit": 1
    },
-   "seconds": 0.0024576999999226246
+   "seconds": 0.0015723598189651966
   },
   {
-   "qid": "Q44",
+   "qid": "S16",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -1139,10 +1139,10 @@
     "rr": 0.5,
     "hit": 1
    },
-   "seconds": 0.0031704999998964922
+   "seconds": 0.002283500973135233
   },
   {
-   "qid": "Q21",
+   "qid": "M01",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1209,10 +1209,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.005776300000206902
+   "seconds": 0.0034842821769416332
   },
   {
-   "qid": "Q22",
+   "qid": "M02",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1279,10 +1279,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.005261399999881178
+   "seconds": 0.0028827479109168053
   },
   {
-   "qid": "Q23",
+   "qid": "M03",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1349,10 +1349,10 @@
     "rr": 0.5,
     "hit": 0
    },
-   "seconds": 0.004859200000055353
+   "seconds": 0.003364949021488428
   },
   {
-   "qid": "Q24",
+   "qid": "M04",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1419,10 +1419,10 @@
     "rr": 0.25,
     "hit": 0
    },
-   "seconds": 0.006442699999979595
+   "seconds": 0.0030716690234839916
   },
   {
-   "qid": "Q26",
+   "qid": "M05",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1489,10 +1489,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.005101500000137094
+   "seconds": 0.002668165136128664
   },
   {
-   "qid": "Q28",
+   "qid": "M06",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1559,10 +1559,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.005527200000187804
+   "seconds": 0.003223100211471319
   },
   {
-   "qid": "Q29",
+   "qid": "M07",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1629,10 +1629,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.005413099999941551
+   "seconds": 0.0026227240450680256
   },
   {
-   "qid": "Q30",
+   "qid": "M08",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1699,10 +1699,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.006066000000146232
+   "seconds": 0.002820504829287529
   },
   {
-   "qid": "Q32",
+   "qid": "M09",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1769,10 +1769,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.005002800000056595
+   "seconds": 0.0023185396566987038
   },
   {
-   "qid": "Q34",
+   "qid": "M10",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1839,10 +1839,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.006941299999880357
+   "seconds": 0.0032972809858620167
   },
   {
-   "qid": "Q35",
+   "qid": "M11",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1909,10 +1909,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.0052706000001307984
+   "seconds": 0.0031242729164659977
   },
   {
-   "qid": "Q36",
+   "qid": "M12",
    "type": "multi",
    "qtype": "multi-part",
    "source": "reit_etf_guide",
@@ -1979,10 +1979,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.003793999999970765
+   "seconds": 0.0026559210382401943
   },
   {
-   "qid": "Q38",
+   "qid": "M13",
    "type": "multi",
    "qtype": "multi-part",
    "source": "reit_etf_guide",
@@ -2049,10 +2049,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.0057460999998966145
+   "seconds": 0.0032531293109059334
   },
   {
-   "qid": "Q40",
+   "qid": "M14",
    "type": "multi",
    "qtype": "multi-part",
    "source": "insurer_guide",
@@ -2119,10 +2119,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.006428099999993719
+   "seconds": 0.0029491670429706573
   },
   {
-   "qid": "Q41",
+   "qid": "M15",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -2189,7 +2189,7 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.006451400000059948
+   "seconds": 0.0029866541735827923
   }
  ]
 }

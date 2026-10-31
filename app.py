@@ -8,6 +8,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_DIR))
 sys.path.insert(0, str(ROOT_DIR / "src" / "supervisor"))
 
+from src.config import INTAKE_MODEL
 from src.retrieval.user_store import UserStore
 from supervisor import (
     MODEL, AUDITOR_MODEL, AUDIT_MIN_SCORE, DEFAULT_CANDIDATES, 
@@ -44,7 +45,7 @@ def init_app(user="bingbling"):
         pin_ollama_keep_alive()
         
         init_status["step"] = "Loading Ollama models (this may take a few moments)..."
-        warm_models([os.environ.get("INTAKE_MODEL", "qwen3.5:4b"), MODEL, AUDITOR_MODEL])
+        warm_models([INTAKE_MODEL, MODEL, AUDITOR_MODEL])
         
         init_status["step"] = "Loading reranker..."
         sup_instance.retrieval.warm()

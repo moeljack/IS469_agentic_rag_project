@@ -9,5 +9,5 @@ retriever:
   candidates: 10
 generator:
   provider: ollama
-  model: qwen3.5:4b
+  model: default           # default = SUPERVISOR_MODEL in src/config.py (qwen3.5:4b); name a tag to override
 today: "2026-10-28"

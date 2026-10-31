@@ -1,0 +1,37 @@
+{
+ "run_id": "s1_naive_r0_dense",
+ "config": {
+  "run_id": "s1_naive_r0_dense",
+  "system": "naive",
+  "retriever": {
+   "mode": "dense",
+   "k": 5,
+   "candidates": 10
+  },
+  "generator": {
+   "provider": "ollama",
+   "model": "qwen3.5:4b"
+  },
+  "today": "2026-10-28"
+ },
+ "config_file": "s1_naive_r0_dense.yaml",
+ "config_hash": "b2b315a1",
+ "prompt_version": "supervisor.ANSWER_SYSTEM",
+ "git_commit": "81dce7757e13c49416a28b81808b0e6155857c5e",
+ "git_dirty": true,
+ "corpus": {
+  "collection": "manuals",
+  "chunks": 546,
+  "embed_model": "Qwen/Qwen3-Embedding-0.6B",
+  "chroma_db_commit": "2268572e199f3ee7cfdb2f4e5f1203eda595a770",
+  "chroma_db_dirty": true
+ },
+ "dataset": "eval_questions.json",
+ "today": "2026-10-28",
+ "machine": {
+  "node": "Moelbook",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cuda": null
+ },
+ "started": "2026-10-28T23:07:30"
+}

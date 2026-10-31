@@ -72,11 +72,10 @@ for _d in ("inference", "decomposer"):                         # decomposer.py +
 from decomposer import (
     CITEntities, Clarify, Decompose, DomainEntities, Intent, PlannedQuery, Refuse, SearchFilter,
 )
+from src.config import AUDITOR_MODEL, SUPERVISOR_MODEL    # the models live in src/config.py
 from src.retrieval.user_store import PERSISTENT_FIELDS
 
-MODEL = os.environ.get("SUPERVISOR_MODEL", os.environ.get("INTAKE_MODEL", "qwen3.5:4b"))
-# AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "phi3.5:3.8b")   # the auditor runs its own local model by default (set it equal to SUPERVISOR_MODEL to keep one model loaded)
-AUDITOR_MODEL = os.environ.get("AUDITOR_MODEL", "qwen3.5:4b")   # the auditor runs its own local model by default (set it equal to SUPERVISOR_MODEL to keep one model loaded)
+MODEL = SUPERVISOR_MODEL   # the supervisor's own model; the auditor may run another (keeping one model loaded is faster)
 NUM_CTX = 8192
 KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE_CLIENT", "30m")   # how long Ollama keeps our models in memory after a call
 

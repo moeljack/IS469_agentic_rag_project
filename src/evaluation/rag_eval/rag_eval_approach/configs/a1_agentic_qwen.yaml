@@ -13,5 +13,5 @@ agent:
   audit_min_score: 0.5
 generator:                 # the supervisor's decide + answer calls
   provider: ollama
-  model: qwen3.5:4b
+  model: default           # default = SUPERVISOR_MODEL in src/config.py (qwen3.5:4b); name a tag to override
 today: "2026-10-28"

@@ -27,7 +27,9 @@ sys.path.insert(0, str(ROOT))
 
 import yaml
 
+from src import config
 from src.evaluation.rag_eval.rag_eval_approach.answer import PROMPT_VERSION
+from src.evaluation.rag_eval.rag_eval_approach.llm import resolve_model
 from src.evaluation.rag_eval.rag_eval_approach.systems import build_system
 
 HERE = Path(__file__).resolve().parent
@@ -65,6 +67,8 @@ def main():
     if not config_path.exists():
         config_path = HERE / "configs" / args.config
     cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    generator = cfg["generator"]   # resolve `default` before hashing, so the hash and the metadata name the real model
+    generator["model"] = resolve_model(generator["provider"], generator["model"])
     config_hash = hashlib.md5(json.dumps(cfg, sort_keys=True).encode("utf-8")).hexdigest()[:8]
     run_id = cfg["run_id"] + (f"_rep{args.repeat}" if args.repeat else "")
     today = dt.date.fromisoformat(str(cfg["today"]))
@@ -92,6 +96,9 @@ def main():
     if not meta_path.exists():
         collection = system.retriever.collection if hasattr(system, "retriever") else system.sup.retrieval.retriever.collection
         meta = {"run_id": run_id, "config": cfg, "config_file": config_path.name, "config_hash": config_hash,
+                "local_models": {"intake": config.INTAKE_MODEL, "planner": config.PLANNER_MODEL,
+                                 "supervisor": config.SUPERVISOR_MODEL, "auditor": config.AUDITOR_MODEL,
+                                 "embedding": config.EMBED_MODEL, "reranker": config.RERANK_MODEL},
                 "prompt_version": PROMPT_VERSION, "git_commit": commit, "git_dirty": bool(git("status", "--porcelain")),
                 "corpus": {"collection": collection.name, "chunks": collection.count(),
                            "embed_model": (collection.metadata or {}).get("embed_model"),

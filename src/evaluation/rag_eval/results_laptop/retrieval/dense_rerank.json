@@ -1,0 +1,2195 @@
+{
+ "mode": "dense_rerank",
+ "label": "R3 dense + rerank",
+ "k": 5,
+ "depth": 10,
+ "candidates": 10,
+ "reranker": "BAAI/bge-reranker-v2-m3",
+ "int8": false,
+ "paraphrases": false,
+ "summary": {
+  "all": {
+   "r": 0.967741935483871,
+   "p": 0.3096774193548387,
+   "f1": 0.45506912442396313,
+   "rr": 0.9354838709677419,
+   "hit": 0.9354838709677419,
+   "n": 31,
+   "ms_median": 16690.00989999995
+  },
+  "simple": {
+   "r": 1.0,
+   "p": 0.21250000000000002,
+   "f1": 0.34821428571428575,
+   "rr": 0.9375,
+   "hit": 1.0,
+   "n": 16,
+   "ms_median": 17215.651400000068
+  },
+  "multi": {
+   "r": 0.9333333333333333,
+   "p": 0.41333333333333333,
+   "f1": 0.5690476190476191,
+   "rr": 0.9333333333333333,
+   "hit": 0.8666666666666667,
+   "n": 15,
+   "ms_median": 15958.517799999981
+  }
+ },
+ "questions": [
+  {
+   "qid": "S01",
+   "type": "simple",
+   "qtype": "number",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:1a08219be7:0",
+     "score": 0.9991
+    },
+    {
+     "rank": 2,
+     "id": "web:6c658c1ab3:1",
+     "score": 0.9422
+    },
+    {
+     "rank": 3,
+     "id": "web:d6577e57a2:1",
+     "score": 0.8836
+    },
+    {
+     "rank": 4,
+     "id": "web:51b21365f6:5",
+     "score": 0.8174
+    },
+    {
+     "rank": 5,
+     "id": "web:c7cf7bd73b:0",
+     "score": 0.1968
+    },
+    {
+     "rank": 6,
+     "id": "web:a566c48cbe:0",
+     "score": 0.0515
+    },
+    {
+     "rank": 7,
+     "id": "web:b04173540d:0",
+     "score": 0.0236
+    },
+    {
+     "rank": 8,
+     "id": "web:2af05df2da:3",
+     "score": 0.0174
+    },
+    {
+     "rank": 9,
+     "id": "web:2af05df2da:2",
+     "score": 0.0042
+    },
+    {
+     "rank": 10,
+     "id": "web:fd672f69ca:16",
+     "score": 0.0012
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 18.849838999999974
+  },
+  {
+   "qid": "S02",
+   "type": "simple",
+   "qtype": "procedure",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:6c658c1ab3:0",
+     "score": 0.9699
+    },
+    {
+     "rank": 2,
+     "id": "web:173b58474f:3",
+     "score": 0.8809
+    },
+    {
+     "rank": 3,
+     "id": "web:1a08219be7:3",
+     "score": 0.7567
+    },
+    {
+     "rank": 4,
+     "id": "web:1a08219be7:5",
+     "score": 0.5139
+    },
+    {
+     "rank": 5,
+     "id": "web:6e286dc681:0",
+     "score": 0.4943
+    },
+    {
+     "rank": 6,
+     "id": "web:584d6034e5:3",
+     "score": 0.4276
+    },
+    {
+     "rank": 7,
+     "id": "web:584d6034e5:1",
+     "score": 0.4018
+    },
+    {
+     "rank": 8,
+     "id": "web:1a08219be7:7",
+     "score": 0.349
+    },
+    {
+     "rank": 9,
+     "id": "web:5cf4da84a8:4",
+     "score": 0.2609
+    },
+    {
+     "rank": 10,
+     "id": "web:6c658c1ab3:5",
+     "score": 0.1533
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 17.77887880000003
+  },
+  {
+   "qid": "S03",
+   "type": "simple",
+   "qtype": "edge-case",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:b20dcc6490:3",
+     "score": 0.9864
+    },
+    {
+     "rank": 2,
+     "id": "web:b20dcc6490:1",
+     "score": 0.9523
+    },
+    {
+     "rank": 3,
+     "id": "web:b20dcc6490:14",
+     "score": 0.9478
+    },
+    {
+     "rank": 4,
+     "id": "web:1a08219be7:9",
+     "score": 0.9045
+    },
+    {
+     "rank": 5,
+     "id": "web:b20dcc6490:16",
+     "score": 0.8865
+    },
+    {
+     "rank": 6,
+     "id": "web:1a08219be7:4",
+     "score": 0.7947
+    },
+    {
+     "rank": 7,
+     "id": "web:b20dcc6490:4",
+     "score": 0.6988
+    },
+    {
+     "rank": 8,
+     "id": "web:ce1754d1b3:13",
+     "score": 0.6741
+    },
+    {
+     "rank": 9,
+     "id": "web:b20dcc6490:2",
+     "score": 0.4348
+    },
+    {
+     "rank": 10,
+     "id": "web:b20dcc6490:13",
+     "score": 0.2979
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 18.042318799999975
+  },
+  {
+   "qid": "S04",
+   "type": "simple",
+   "qtype": "definition",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:2af05df2da:4",
+     "score": 0.9584
+    },
+    {
+     "rank": 2,
+     "id": "web:83f538fb94:0",
+     "score": 0.1145
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:9",
+     "score": 0.0005
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:10",
+     "score": 0.0003
+    },
+    {
+     "rank": 5,
+     "id": "web:6e286dc681:29",
+     "score": 0.0003
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:7",
+     "score": 0.0002
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:41",
+     "score": 0.0001
+    },
+    {
+     "rank": 8,
+     "id": "web:6e286dc681:31",
+     "score": 0.0001
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:54",
+     "score": 0.0001
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:43",
+     "score": 0.0001
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 6.59557749999999
+  },
+  {
+   "qid": "S05",
+   "type": "simple",
+   "qtype": "definition",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:d6577e57a2:4",
+     "score": 0.9995
+    },
+    {
+     "rank": 2,
+     "id": "web:d6577e57a2:0",
+     "score": 0.9951
+    },
+    {
+     "rank": 3,
+     "id": "web:d6577e57a2:3",
+     "score": 0.9882
+    },
+    {
+     "rank": 4,
+     "id": "web:6e286dc681:2",
+     "score": 0.8866
+    },
+    {
+     "rank": 5,
+     "id": "web:6e286dc681:10",
+     "score": 0.7333
+    },
+    {
+     "rank": 6,
+     "id": "web:6e286dc681:1",
+     "score": 0.6622
+    },
+    {
+     "rank": 7,
+     "id": "web:6e286dc681:3",
+     "score": 0.5167
+    },
+    {
+     "rank": 8,
+     "id": "web:6e286dc681:11",
+     "score": 0.4546
+    },
+    {
+     "rank": 9,
+     "id": "web:d6577e57a2:1",
+     "score": 0.4127
+    },
+    {
+     "rank": 10,
+     "id": "web:6e286dc681:8",
+     "score": 0.1979
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 12.217022699999916
+  },
+  {
+   "qid": "S06",
+   "type": "simple",
+   "qtype": "procedure",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:ceef23334f:3",
+     "score": 0.989
+    },
+    {
+     "rank": 2,
+     "id": "web:1a08219be7:1",
+     "score": 0.981
+    },
+    {
+     "rank": 3,
+     "id": "web:ab6eaf57fa:2",
+     "score": 0.9667
+    },
+    {
+     "rank": 4,
+     "id": "web:ceef23334f:0",
+     "score": 0.9565
+    },
+    {
+     "rank": 5,
+     "id": "web:b20dcc6490:14",
+     "score": 0.9091
+    },
+    {
+     "rank": 6,
+     "id": "web:ab6eaf57fa:4",
+     "score": 0.8701
+    },
+    {
+     "rank": 7,
+     "id": "web:53d53a4398:10",
+     "score": 0.1588
+    },
+    {
+     "rank": 8,
+     "id": "web:584d6034e5:3",
+     "score": 0.1231
+    },
+    {
+     "rank": 9,
+     "id": "web:5cf4da84a8:4",
+     "score": 0.1037
+    },
+    {
+     "rank": 10,
+     "id": "web:1a08219be7:12",
+     "score": 0.046
+    }
+   ],
+   "part_ranks": [
+    2
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 0.5,
+    "hit": 1
+   },
+   "seconds": 16.614788999999973
+  },
+  {
+   "qid": "S07",
+   "type": "simple",
+   "qtype": "number",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:a4b15f6365:4",
+     "score": 0.9403
+    },
+    {
+     "rank": 2,
+     "id": "web:6c658c1ab3:0",
+     "score": 0.7326
+    },
+    {
+     "rank": 3,
+     "id": "web:6c658c1ab3:6",
+     "score": 0.3969
+    },
+    {
+     "rank": 4,
+     "id": "web:173b58474f:3",
+     "score": 0.2938
+    },
+    {
+     "rank": 5,
+     "id": "web:a4b15f6365:0",
+     "score": 0.226
+    },
+    {
+     "rank": 6,
+     "id": "web:054b24831c:1",
+     "score": 0.0332
+    },
+    {
+     "rank": 7,
+     "id": "web:054b24831c:0",
+     "score": 0.0285
+    },
+    {
+     "rank": 8,
+     "id": "web:6c658c1ab3:4",
+     "score": 0.027
+    },
+    {
+     "rank": 9,
+     "id": "web:a4b15f6365:3",
+     "score": 0.0256
+    },
+    {
+     "rank": 10,
+     "id": "web:584d6034e5:1",
+     "score": 0.0224
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 19.824434299999893
+  },
+  {
+   "qid": "S08",
+   "type": "simple",
+   "qtype": "edge-case",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:c7cf7bd73b:0",
+     "score": 0.9993
+    },
+    {
+     "rank": 2,
+     "id": "web:c7cf7bd73b:11",
+     "score": 0.999
+    },
+    {
+     "rank": 3,
+     "id": "web:c7cf7bd73b:10",
+     "score": 0.9987
+    },
+    {
+     "rank": 4,
+     "id": "web:c7cf7bd73b:7",
+     "score": 0.995
+    },
+    {
+     "rank": 5,
+     "id": "web:c7cf7bd73b:1",
+     "score": 0.9861
+    },
+    {
+     "rank": 6,
+     "id": "web:51b21365f6:6",
+     "score": 0.9483
+    },
+    {
+     "rank": 7,
+     "id": "web:51b21365f6:11",
+     "score": 0.9363
+    },
+    {
+     "rank": 8,
+     "id": "web:1a08219be7:0",
+     "score": 0.9224
+    },
+    {
+     "rank": 9,
+     "id": "web:2af05df2da:3",
+     "score": 0.8621
+    },
+    {
+     "rank": 10,
+     "id": "web:2af05df2da:2",
+     "score": 0.2121
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 16.79820880000011
+  },
+  {
+   "qid": "S09",
+   "type": "simple",
+   "qtype": "procedure",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:a5627a3f6e:1",
+     "score": 0.9624
+    },
+    {
+     "rank": 2,
+     "id": "web:6c658c1ab3:6",
+     "score": 0.1956
+    },
+    {
+     "rank": 3,
+     "id": "web:054b24831c:2",
+     "score": 0.0108
+    },
+    {
+     "rank": 4,
+     "id": "web:87a2e70770:6",
+     "score": 0.0072
+    },
+    {
+     "rank": 5,
+     "id": "web:1a08219be7:16",
+     "score": 0.0057
+    },
+    {
+     "rank": 6,
+     "id": "web:a5627a3f6e:4",
+     "score": 0.0012
+    },
+    {
+     "rank": 7,
+     "id": "web:ceef23334f:4",
+     "score": 0.0007
+    },
+    {
+     "rank": 8,
+     "id": "web:a5627a3f6e:5",
+     "score": 0.0007
+    },
+    {
+     "rank": 9,
+     "id": "web:a5627a3f6e:0",
+     "score": 0.0006
+    },
+    {
+     "rank": 10,
+     "id": "web:1a08219be7:1",
+     "score": 0.0004
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 18.842026399999895
+  },
+  {
+   "qid": "S10",
+   "type": "simple",
+   "qtype": "number",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:a566c48cbe:1",
+     "score": 0.9996
+    },
+    {
+     "rank": 2,
+     "id": "web:b20dcc6490:0",
+     "score": 0.9995
+    },
+    {
+     "rank": 3,
+     "id": "web:a566c48cbe:5",
+     "score": 0.9929
+    },
+    {
+     "rank": 4,
+     "id": "web:a566c48cbe:7",
+     "score": 0.9899
+    },
+    {
+     "rank": 5,
+     "id": "web:a566c48cbe:6",
+     "score": 0.9898
+    },
+    {
+     "rank": 6,
+     "id": "web:a566c48cbe:8",
+     "score": 0.9885
+    },
+    {
+     "rank": 7,
+     "id": "web:a566c48cbe:4",
+     "score": 0.9512
+    },
+    {
+     "rank": 8,
+     "id": "web:a566c48cbe:3",
+     "score": 0.5287
+    },
+    {
+     "rank": 9,
+     "id": "web:6c658c1ab3:0",
+     "score": 0.2884
+    },
+    {
+     "rank": 10,
+     "id": "web:a566c48cbe:10",
+     "score": 0.2349
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 17.63309400000003
+  },
+  {
+   "qid": "S11",
+   "type": "simple",
+   "qtype": "definition",
+   "source": "reit_etf_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:19",
+     "score": 0.9936
+    },
+    {
+     "rank": 2,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:22",
+     "score": 0.9902
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:36",
+     "score": 0.9893
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:51",
+     "score": 0.9766
+    },
+    {
+     "rank": 5,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:35",
+     "score": 0.9712
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:66",
+     "score": 0.9694
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:6",
+     "score": 0.9388
+    },
+    {
+     "rank": 8,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:60",
+     "score": 0.9388
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:5",
+     "score": 0.9056
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:18",
+     "score": 0.7993
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 14.271561199999951
+  },
+  {
+   "qid": "S12",
+   "type": "simple",
+   "qtype": "number",
+   "source": "insurer_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16",
+     "score": 0.9801
+    },
+    {
+     "rank": 2,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:17",
+     "score": 0.5547
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:9",
+     "score": 0.2699
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:18",
+     "score": 0.0387
+    },
+    {
+     "rank": 5,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:4",
+     "score": 0.0375
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:5",
+     "score": 0.0237
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:10",
+     "score": 0.0211
+    },
+    {
+     "rank": 8,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:7",
+     "score": 0.0177
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:0",
+     "score": 0.0056
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:1",
+     "score": 0.0029
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 14.04352670000003
+  },
+  {
+   "qid": "S13",
+   "type": "simple",
+   "qtype": "definition",
+   "source": "insurer_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:8",
+     "score": 0.997
+    },
+    {
+     "rank": 2,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:6",
+     "score": 0.9895
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:13",
+     "score": 0.9876
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:7",
+     "score": 0.9671
+    },
+    {
+     "rank": 5,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:5",
+     "score": 0.7329
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:10",
+     "score": 0.5548
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:9",
+     "score": 0.4437
+    },
+    {
+     "rank": 8,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:1",
+     "score": 0.2158
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:4",
+     "score": 0.0674
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:0",
+     "score": 0.0395
+    }
+   ],
+   "part_ranks": [
+    2
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 0.5,
+    "hit": 1
+   },
+   "seconds": 12.362897400000065
+  },
+  {
+   "qid": "S14",
+   "type": "simple",
+   "qtype": "edge-case",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:9d61624687:3",
+     "score": 0.8848
+    },
+    {
+     "rank": 2,
+     "id": "web:c7cf7bd73b:15",
+     "score": 0.7368
+    },
+    {
+     "rank": 3,
+     "id": "web:26c485e923:0",
+     "score": 0.0464
+    },
+    {
+     "rank": 4,
+     "id": "web:51b21365f6:11",
+     "score": 0.0133
+    },
+    {
+     "rank": 5,
+     "id": "web:51b21365f6:3",
+     "score": 0.0068
+    },
+    {
+     "rank": 6,
+     "id": "web:c7cf7bd73b:7",
+     "score": 0.0056
+    },
+    {
+     "rank": 7,
+     "id": "web:51b21365f6:5",
+     "score": 0.0045
+    },
+    {
+     "rank": 8,
+     "id": "web:6e286dc681:21",
+     "score": 0.0033
+    },
+    {
+     "rank": 9,
+     "id": "web:173b58474f:2",
+     "score": 0.001
+    },
+    {
+     "rank": 10,
+     "id": "web:51b21365f6:10",
+     "score": 0.0009
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 19.113261599999987
+  },
+  {
+   "qid": "S15",
+   "type": "simple",
+   "qtype": "number",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:6e286dc681:9",
+     "score": 0.7354
+    },
+    {
+     "rank": 2,
+     "id": "web:53d53a4398:17",
+     "score": 0.3772
+    },
+    {
+     "rank": 3,
+     "id": "web:c7cf7bd73b:4",
+     "score": 0.143
+    },
+    {
+     "rank": 4,
+     "id": "web:94932834d0:0",
+     "score": 0.0247
+    },
+    {
+     "rank": 5,
+     "id": "web:a566c48cbe:20",
+     "score": 0.0096
+    },
+    {
+     "rank": 6,
+     "id": "web:9d61624687:6",
+     "score": 0.0077
+    },
+    {
+     "rank": 7,
+     "id": "web:c7cf7bd73b:12",
+     "score": 0.0053
+    },
+    {
+     "rank": 8,
+     "id": "web:94932834d0:20",
+     "score": 0.0018
+    },
+    {
+     "rank": 9,
+     "id": "web:ce1754d1b3:1",
+     "score": 0.0017
+    },
+    {
+     "rank": 10,
+     "id": "web:6e286dc681:20",
+     "score": 0.0009
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 16.765098599999874
+  },
+  {
+   "qid": "S16",
+   "type": "simple",
+   "qtype": "edge-case",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:c7cf7bd73b:15",
+     "score": 0.7718
+    },
+    {
+     "rank": 2,
+     "id": "web:27c290a309:2",
+     "score": 0.0006
+    },
+    {
+     "rank": 3,
+     "id": "web:479d415117:0",
+     "score": 0.0003
+    },
+    {
+     "rank": 4,
+     "id": "web:27c290a309:8",
+     "score": 0.0003
+    },
+    {
+     "rank": 5,
+     "id": "web:1638d2ceee:2",
+     "score": 0.0003
+    },
+    {
+     "rank": 6,
+     "id": "web:27c290a309:1",
+     "score": 0.0003
+    },
+    {
+     "rank": 7,
+     "id": "web:c7cf7bd73b:4",
+     "score": 0.0002
+    },
+    {
+     "rank": 8,
+     "id": "web:1638d2ceee:3",
+     "score": 0.0002
+    },
+    {
+     "rank": 9,
+     "id": "web:1638d2ceee:1",
+     "score": 0.0001
+    },
+    {
+     "rank": 10,
+     "id": "web:1638d2ceee:0",
+     "score": 0.0
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 18.677591900000152
+  },
+  {
+   "qid": "M01",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:aa46945787:0",
+     "score": 0.573
+    },
+    {
+     "rank": 2,
+     "id": "web:aa46945787:1",
+     "score": 0.4866
+    },
+    {
+     "rank": 3,
+     "id": "web:e7241cedc5:0",
+     "score": 0.3756
+    },
+    {
+     "rank": 4,
+     "id": "web:aa46945787:2",
+     "score": 0.2961
+    },
+    {
+     "rank": 5,
+     "id": "web:aa46945787:3",
+     "score": 0.2419
+    },
+    {
+     "rank": 6,
+     "id": "web:aa46945787:4",
+     "score": 0.1718
+    },
+    {
+     "rank": 7,
+     "id": "web:173b58474f:9",
+     "score": 0.1608
+    },
+    {
+     "rank": 8,
+     "id": "web:a4b15f6365:4",
+     "score": 0.0114
+    },
+    {
+     "rank": 9,
+     "id": "web:054b24831c:1",
+     "score": 0.0075
+    },
+    {
+     "rank": 10,
+     "id": "web:e7241cedc5:1",
+     "score": 0.0029
+    }
+   ],
+   "part_ranks": [
+    3,
+    1
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 19.217963099999906
+  },
+  {
+   "qid": "M02",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:b20dcc6490:6",
+     "score": 0.6772
+    },
+    {
+     "rank": 2,
+     "id": "web:054b24831c:1",
+     "score": 0.4625
+    },
+    {
+     "rank": 3,
+     "id": "web:054b24831c:2",
+     "score": 0.4294
+    },
+    {
+     "rank": 4,
+     "id": "web:054b24831c:3",
+     "score": 0.3954
+    },
+    {
+     "rank": 5,
+     "id": "web:054b24831c:0",
+     "score": 0.3178
+    },
+    {
+     "rank": 6,
+     "id": "web:6c658c1ab3:6",
+     "score": 0.2104
+    },
+    {
+     "rank": 7,
+     "id": "web:b20dcc6490:18",
+     "score": 0.16
+    },
+    {
+     "rank": 8,
+     "id": "web:b20dcc6490:5",
+     "score": 0.0128
+    },
+    {
+     "rank": 9,
+     "id": "web:87a2e70770:13",
+     "score": 0.0085
+    },
+    {
+     "rank": 10,
+     "id": "web:87a2e70770:7",
+     "score": 0.0051
+    }
+   ],
+   "part_ranks": [
+    5,
+    1
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 17.726295200000095
+  },
+  {
+   "qid": "M03",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:584d6034e5:0",
+     "score": 0.8854
+    },
+    {
+     "rank": 2,
+     "id": "web:50424a296b:6",
+     "score": 0.8356
+    },
+    {
+     "rank": 3,
+     "id": "web:584d6034e5:4",
+     "score": 0.3973
+    },
+    {
+     "rank": 4,
+     "id": "web:584d6034e5:1",
+     "score": 0.3186
+    },
+    {
+     "rank": 5,
+     "id": "web:584d6034e5:10",
+     "score": 0.1127
+    },
+    {
+     "rank": 6,
+     "id": "web:584d6034e5:2",
+     "score": 0.0745
+    },
+    {
+     "rank": 7,
+     "id": "web:584d6034e5:11",
+     "score": 0.0591
+    },
+    {
+     "rank": 8,
+     "id": "web:584d6034e5:12",
+     "score": 0.029
+    },
+    {
+     "rank": 9,
+     "id": "web:584d6034e5:3",
+     "score": 0.0186
+    },
+    {
+     "rank": 10,
+     "id": "web:584d6034e5:8",
+     "score": 0.0027
+    }
+   ],
+   "part_ranks": [
+    1,
+    2
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 16.69000989999995
+  },
+  {
+   "qid": "M04",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:1a08219be7:4",
+     "score": 0.9586
+    },
+    {
+     "rank": 2,
+     "id": "web:b20dcc6490:4",
+     "score": 0.8556
+    },
+    {
+     "rank": 3,
+     "id": "web:b20dcc6490:3",
+     "score": 0.795
+    },
+    {
+     "rank": 4,
+     "id": "web:1a08219be7:5",
+     "score": 0.4806
+    },
+    {
+     "rank": 5,
+     "id": "web:b20dcc6490:1",
+     "score": 0.4674
+    },
+    {
+     "rank": 6,
+     "id": "web:b20dcc6490:14",
+     "score": 0.3002
+    },
+    {
+     "rank": 7,
+     "id": "web:b20dcc6490:16",
+     "score": 0.1668
+    },
+    {
+     "rank": 8,
+     "id": "web:1a08219be7:9",
+     "score": 0.0955
+    },
+    {
+     "rank": 9,
+     "id": "web:ce1754d1b3:13",
+     "score": 0.0584
+    },
+    {
+     "rank": 10,
+     "id": "web:b20dcc6490:2",
+     "score": 0.0158
+    }
+   ],
+   "part_ranks": [
+    1,
+    5
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 16.804228200000125
+  },
+  {
+   "qid": "M05",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:ce1754d1b3:6",
+     "score": 0.9782
+    },
+    {
+     "rank": 2,
+     "id": "web:ce1754d1b3:2",
+     "score": 0.9738
+    },
+    {
+     "rank": 3,
+     "id": "web:ce1754d1b3:0",
+     "score": 0.9646
+    },
+    {
+     "rank": 4,
+     "id": "web:ce1754d1b3:15",
+     "score": 0.9601
+    },
+    {
+     "rank": 5,
+     "id": "web:ce1754d1b3:1",
+     "score": 0.9585
+    },
+    {
+     "rank": 6,
+     "id": "web:ce1754d1b3:8",
+     "score": 0.8951
+    },
+    {
+     "rank": 7,
+     "id": "web:ce1754d1b3:4",
+     "score": 0.8943
+    },
+    {
+     "rank": 8,
+     "id": "web:ce1754d1b3:14",
+     "score": 0.7431
+    },
+    {
+     "rank": 9,
+     "id": "web:ce1754d1b3:5",
+     "score": 0.7138
+    },
+    {
+     "rank": 10,
+     "id": "web:ce1754d1b3:9",
+     "score": 0.6645
+    }
+   ],
+   "part_ranks": [
+    3,
+    2
+   ],
+   "metrics": {
+    "p": 0.6,
+    "r": 1.0,
+    "f1": 0.7499999999999999,
+    "rr": 0.5,
+    "hit": 1
+   },
+   "seconds": 9.466697600000089
+  },
+  {
+   "qid": "M06",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:94932834d0:1",
+     "score": 0.9618
+    },
+    {
+     "rank": 2,
+     "id": "web:94932834d0:19",
+     "score": 0.8832
+    },
+    {
+     "rank": 3,
+     "id": "web:94932834d0:13",
+     "score": 0.7647
+    },
+    {
+     "rank": 4,
+     "id": "web:94932834d0:16",
+     "score": 0.6027
+    },
+    {
+     "rank": 5,
+     "id": "web:94932834d0:14",
+     "score": 0.5068
+    },
+    {
+     "rank": 6,
+     "id": "web:94932834d0:11",
+     "score": 0.4824
+    },
+    {
+     "rank": 7,
+     "id": "web:217b3070c9:16",
+     "score": 0.4265
+    },
+    {
+     "rank": 8,
+     "id": "web:ab6eaf57fa:15",
+     "score": 0.3545
+    },
+    {
+     "rank": 9,
+     "id": "web:ab6eaf57fa:16",
+     "score": 0.2181
+    },
+    {
+     "rank": 10,
+     "id": "web:ce1754d1b3:10",
+     "score": 0.0929
+    }
+   ],
+   "part_ranks": [
+    2,
+    null
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 0.5,
+    "f1": 0.28571428571428575,
+    "rr": 0.5,
+    "hit": 0
+   },
+   "seconds": 11.04217319999998
+  },
+  {
+   "qid": "M07",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:5cf4da84a8:2",
+     "score": 0.9734
+    },
+    {
+     "rank": 2,
+     "id": "web:5cf4da84a8:7",
+     "score": 0.8204
+    },
+    {
+     "rank": 3,
+     "id": "web:5cf4da84a8:1",
+     "score": 0.7759
+    },
+    {
+     "rank": 4,
+     "id": "web:5cf4da84a8:5",
+     "score": 0.641
+    },
+    {
+     "rank": 5,
+     "id": "web:5cf4da84a8:10",
+     "score": 0.5841
+    },
+    {
+     "rank": 6,
+     "id": "web:5cf4da84a8:6",
+     "score": 0.4543
+    },
+    {
+     "rank": 7,
+     "id": "web:5cf4da84a8:3",
+     "score": 0.4351
+    },
+    {
+     "rank": 8,
+     "id": "web:5cf4da84a8:4",
+     "score": 0.389
+    },
+    {
+     "rank": 9,
+     "id": "web:a4b15f6365:1",
+     "score": 0.3786
+    },
+    {
+     "rank": 10,
+     "id": "web:a4b15f6365:2",
+     "score": 0.0283
+    }
+   ],
+   "part_ranks": [
+    3,
+    1
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 16.838833600000044
+  },
+  {
+   "qid": "M08",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:fd672f69ca:12",
+     "score": 0.9507
+    },
+    {
+     "rank": 2,
+     "id": "web:fd672f69ca:13",
+     "score": 0.9381
+    },
+    {
+     "rank": 3,
+     "id": "web:fd672f69ca:9",
+     "score": 0.933
+    },
+    {
+     "rank": 4,
+     "id": "web:fd672f69ca:14",
+     "score": 0.5372
+    },
+    {
+     "rank": 5,
+     "id": "web:fd672f69ca:11",
+     "score": 0.5124
+    },
+    {
+     "rank": 6,
+     "id": "web:fd672f69ca:0",
+     "score": 0.4954
+    },
+    {
+     "rank": 7,
+     "id": "web:fd672f69ca:6",
+     "score": 0.4003
+    },
+    {
+     "rank": 8,
+     "id": "web:fd672f69ca:7",
+     "score": 0.2459
+    },
+    {
+     "rank": 9,
+     "id": "web:fd672f69ca:1",
+     "score": 0.1979
+    },
+    {
+     "rank": 10,
+     "id": "web:fd672f69ca:8",
+     "score": 0.0716
+    }
+   ],
+   "part_ranks": [
+    1,
+    2
+   ],
+   "metrics": {
+    "p": 0.6,
+    "r": 1.0,
+    "f1": 0.7499999999999999,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 18.292520400000058
+  },
+  {
+   "qid": "M09",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:e92b52ac32:0",
+     "score": 0.7717
+    },
+    {
+     "rank": 2,
+     "id": "web:e92b52ac32:4",
+     "score": 0.4684
+    },
+    {
+     "rank": 3,
+     "id": "web:e045f8905e:1",
+     "score": 0.4359
+    },
+    {
+     "rank": 4,
+     "id": "web:e045f8905e:6",
+     "score": 0.3502
+    },
+    {
+     "rank": 5,
+     "id": "web:e045f8905e:2",
+     "score": 0.3243
+    },
+    {
+     "rank": 6,
+     "id": "web:e92b52ac32:1",
+     "score": 0.2381
+    },
+    {
+     "rank": 7,
+     "id": "web:e92b52ac32:7",
+     "score": 0.1389
+    },
+    {
+     "rank": 8,
+     "id": "web:e045f8905e:5",
+     "score": 0.1241
+    },
+    {
+     "rank": 9,
+     "id": "web:e045f8905e:0",
+     "score": 0.0098
+    },
+    {
+     "rank": 10,
+     "id": "web:e045f8905e:7",
+     "score": 0.0009
+    }
+   ],
+   "part_ranks": [
+    1,
+    3
+   ],
+   "metrics": {
+    "p": 0.6,
+    "r": 1.0,
+    "f1": 0.7499999999999999,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 15.958517799999981
+  },
+  {
+   "qid": "M10",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:53d53a4398:14",
+     "score": 0.999
+    },
+    {
+     "rank": 2,
+     "id": "web:53d53a4398:13",
+     "score": 0.936
+    },
+    {
+     "rank": 3,
+     "id": "web:53d53a4398:9",
+     "score": 0.4353
+    },
+    {
+     "rank": 4,
+     "id": "web:584d6034e5:12",
+     "score": 0.4279
+    },
+    {
+     "rank": 5,
+     "id": "web:53d53a4398:0",
+     "score": 0.3938
+    },
+    {
+     "rank": 6,
+     "id": "web:53d53a4398:8",
+     "score": 0.3834
+    },
+    {
+     "rank": 7,
+     "id": "web:53d53a4398:10",
+     "score": 0.1825
+    },
+    {
+     "rank": 8,
+     "id": "web:53d53a4398:11",
+     "score": 0.1271
+    },
+    {
+     "rank": 9,
+     "id": "web:584d6034e5:2",
+     "score": 0.0511
+    },
+    {
+     "rank": 10,
+     "id": "web:53d53a4398:4",
+     "score": 0.0193
+    }
+   ],
+   "part_ranks": [
+    2,
+    1
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 15.150048599999991
+  },
+  {
+   "qid": "M11",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:2dcad97311:3",
+     "score": 0.9917
+    },
+    {
+     "rank": 2,
+     "id": "web:6e286dc681:5",
+     "score": 0.9637
+    },
+    {
+     "rank": 3,
+     "id": "web:6e286dc681:2",
+     "score": 0.9401
+    },
+    {
+     "rank": 4,
+     "id": "web:6c658c1ab3:2",
+     "score": 0.8651
+    },
+    {
+     "rank": 5,
+     "id": "web:2dcad97311:0",
+     "score": 0.8485
+    },
+    {
+     "rank": 6,
+     "id": "web:53d53a4398:3",
+     "score": 0.5237
+    },
+    {
+     "rank": 7,
+     "id": "web:b20dcc6490:11",
+     "score": 0.4667
+    },
+    {
+     "rank": 8,
+     "id": "web:2dcad97311:1",
+     "score": 0.1212
+    },
+    {
+     "rank": 9,
+     "id": "web:6e286dc681:3",
+     "score": 0.0368
+    },
+    {
+     "rank": 10,
+     "id": "web:d6577e57a2:1",
+     "score": 0.0155
+    }
+   ],
+   "part_ranks": [
+    null,
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 0.5,
+    "f1": 0.28571428571428575,
+    "rr": 1.0,
+    "hit": 0
+   },
+   "seconds": 15.431245899999794
+  },
+  {
+   "qid": "M12",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "reit_etf_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:36",
+     "score": 0.9889
+    },
+    {
+     "rank": 2,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:35",
+     "score": 0.9248
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:57",
+     "score": 0.9051
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:51",
+     "score": 0.902
+    },
+    {
+     "rank": 5,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:65",
+     "score": 0.8008
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:46",
+     "score": 0.779
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:6",
+     "score": 0.7023
+    },
+    {
+     "rank": 8,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:60",
+     "score": 0.547
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:66",
+     "score": 0.3444
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:18",
+     "score": 0.2973
+    }
+   ],
+   "part_ranks": [
+    1,
+    2
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 14.631276099999923
+  },
+  {
+   "qid": "M13",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "reit_etf_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:46",
+     "score": 0.9729
+    },
+    {
+     "rank": 2,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:45",
+     "score": 0.9342
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:6",
+     "score": 0.1707
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:65",
+     "score": 0.1444
+    },
+    {
+     "rank": 5,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:48",
+     "score": 0.0433
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:20",
+     "score": 0.0339
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:35",
+     "score": 0.0293
+    },
+    {
+     "rank": 8,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:70",
+     "score": 0.0248
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:66",
+     "score": 0.0095
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:56",
+     "score": 0.0087
+    }
+   ],
+   "part_ranks": [
+    2,
+    1
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 14.80963010000005
+  },
+  {
+   "qid": "M14",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "insurer_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:12",
+     "score": 0.9912
+    },
+    {
+     "rank": 2,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:8",
+     "score": 0.8742
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:13",
+     "score": 0.758
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:9",
+     "score": 0.1404
+    },
+    {
+     "rank": 5,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:10",
+     "score": 0.0147
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:5",
+     "score": 0.0061
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:6",
+     "score": 0.0059
+    },
+    {
+     "rank": 8,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:11",
+     "score": 0.0006
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:1",
+     "score": 0.0005
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:0",
+     "score": 0.0
+    }
+   ],
+   "part_ranks": [
+    1,
+    3
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 13.413275599999906
+  },
+  {
+   "qid": "M15",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:a566c48cbe:21",
+     "score": 0.9978
+    },
+    {
+     "rank": 2,
+     "id": "web:a566c48cbe:19",
+     "score": 0.9809
+    },
+    {
+     "rank": 3,
+     "id": "web:a566c48cbe:11",
+     "score": 0.9778
+    },
+    {
+     "rank": 4,
+     "id": "web:a566c48cbe:9",
+     "score": 0.9585
+    },
+    {
+     "rank": 5,
+     "id": "web:a566c48cbe:20",
+     "score": 0.9568
+    },
+    {
+     "rank": 6,
+     "id": "web:ce1754d1b3:12",
+     "score": 0.8832
+    },
+    {
+     "rank": 7,
+     "id": "web:a566c48cbe:14",
+     "score": 0.8669
+    },
+    {
+     "rank": 8,
+     "id": "web:a566c48cbe:12",
+     "score": 0.8055
+    },
+    {
+     "rank": 9,
+     "id": "web:a566c48cbe:18",
+     "score": 0.7575
+    },
+    {
+     "rank": 10,
+     "id": "web:1a08219be7:10",
+     "score": 0.7335
+    }
+   ],
+   "part_ranks": [
+    1,
+    4
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 16.40863740000009
+  }
+ ]
+}

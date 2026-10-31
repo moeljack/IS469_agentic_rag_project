@@ -27,8 +27,8 @@ Pipeline:  intake gate (qwen3.5:4b)  ->  Supervisor (qwen3.5:4b)
                                               '-- UserStore (ChromaDB profile + pending clarifications)
 Needs: ollama running with qwen3.5:4b pulled (all models use the `ollama` Python client), and the ChromaDB
 collection built by the ingest scripts.
-Models: SUPERVISOR_MODEL / INTAKE_MODEL / PLANNER_MODEL / AUDITOR_MODEL all default to qwen3.5:4b, so one model
-stays loaded.
+Models: set in src/config.py (SUPERVISOR_MODEL / INTAKE_MODEL / PLANNER_MODEL / AUDITOR_MODEL all default to
+qwen3.5:4b, so one model stays loaded); the same-named environment variables override them.
 """
 import argparse
 import os
@@ -42,6 +42,7 @@ from supervisor import (
     AUDIT_MIN_SCORE, AUDITOR_MODEL, DEFAULT_CANDIDATES, DEFAULT_K, DEFAULT_MAX_CHUNKS, DEFAULT_MAX_QUERIES, MODEL,
     Auditor, RetrievalAgent, Supervisor, pin_ollama_keep_alive, warm_models,
 )
+from src.config import INTAKE_MODEL, PLANNER_MODEL
 from src.retrieval.user_store import UserStore
 
 
@@ -108,9 +109,7 @@ def main():
     pin_ollama_keep_alive()                      # the decomposer's own ollama.chat calls keep their model loaded too
     if not args.no_warm:
         print("Loading Ollama models ...")
-        for note in warm_models([os.environ.get("INTAKE_MODEL", "qwen3.5:4b"),
-                                 os.environ.get("PLANNER_MODEL", os.environ.get("INTAKE_MODEL", "qwen3.5:4b")),
-                                 MODEL, AUDITOR_MODEL]):
+        for note in warm_models([INTAKE_MODEL, PLANNER_MODEL, MODEL, AUDITOR_MODEL]):
             print(f"  {note}")
         print("Loading the reranker ...")         # otherwise it loads inside the first question's retrieval time
         print(f"  {sup.retrieval.warm()}")

@@ -1,13 +1,13 @@
 """Check that the configured judge works before any scoring: config, key, SDK, JSON output, and sanity of its grades.
 
 Runs the real judge prompts (score_judge.py) on five hand-written answers whose right grades are obvious, built from the
-dataset's own Q22 (penalty and GIRO instalment) and Q50 (out-of-scope GST):
+dataset's own M02 (penalty and GIRO instalment) and O01 (out-of-scope GST):
 
     right answer              -> correctness 2, numeric_ok true
     wrong number (10% for 5%) -> correctness 0, numeric_ok false
     one part missing          -> correctness 1   (a warning only: partial credit is the judge's call)
-    honest decline on Q50     -> refused true
-    confident answer on Q50   -> refused false
+    honest decline on O01     -> refused true
+    confident answer on O01   -> refused false
 
 This is a smoke test, not the validation in plan Section 4.3 (30 human-labelled pairs). It costs five judge calls.
 Exit code 1 if the config is incomplete or a must-pass case fails.
@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 import yaml
 
 from src.evaluation.rag_eval.rag_eval_approach.env import has_key, load_env
+from src.evaluation.rag_eval.rag_eval_approach.llm import resolve_model
 from src.evaluation.rag_eval.rag_eval_approach.results_io import load_dataset
 from src.evaluation.rag_eval.rag_eval_approach.score_judge import PROMPTS, ask, fill
 from src.evaluation.rag_eval.rag_eval_approach.tracking import USAGE
@@ -62,14 +63,14 @@ def main():
     # A judge that is also a compared generator rewards its own style (plan Section 4.1).
     for path in sorted((HERE / "configs").glob("*.yaml")):
         other = yaml.safe_load(path.read_text(encoding="utf-8"))
-        if path.name != "judge.yaml" and (other.get("generator") or {}).get("model") == model:
+        if path.name != "judge.yaml" and resolve_model(*[(other.get("generator") or {}).get(k) for k in ("provider", "model")]) == model:
             print(f"WARN  the judge is also the generator in {path.name} (self-preference bias)")
 
     from src.evaluation.rag_eval.rag_eval_approach.llm import make_llm
     judge = make_llm(provider, model, **(cfg.get("options") or {}))
     templates = {kind: path.read_text(encoding="utf-8") for kind, path in PROMPTS.items()}
     data = load_dataset()
-    q22, q50 = data["Q22"], data["Q50"]
+    q22, q50 = data["M02"], data["O01"]
 
     def grade(answer):
         prompt = fill(templates["correctness"], question=q22["question"], reference_answer=q22["reference_answer"],

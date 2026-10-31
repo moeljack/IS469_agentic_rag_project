@@ -1,0 +1,388 @@
+{
+ "mode": "dense",
+ "label": "R0 dense",
+ "k": 5,
+ "depth": 10,
+ "candidates": 10,
+ "reranker": null,
+ "int8": false,
+ "paraphrases": true,
+ "summary": {
+  "all": {
+   "r": 0.7,
+   "p": 0.2,
+   "f1": 0.3047619047619048,
+   "rr": 0.7333333333333333,
+   "hit": 0.6,
+   "n": 5,
+   "ms_median": 479.7155000001112
+  },
+  "simple": {
+   "r": 1.0,
+   "p": 0.26666666666666666,
+   "f1": 0.41269841269841273,
+   "rr": 1.0,
+   "hit": 1.0,
+   "n": 3,
+   "ms_median": 463.1706000000122
+  },
+  "multi": {
+   "r": 0.25,
+   "p": 0.1,
+   "f1": 0.14285714285714288,
+   "rr": 0.3333333333333333,
+   "hit": 0.0,
+   "n": 2,
+   "ms_median": 546.9402999997328
+  }
+ },
+ "questions": [
+  {
+   "qid": "P01",
+   "type": "simple",
+   "qtype": "procedure",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:6c658c1ab3:0",
+     "score": 0.6832
+    },
+    {
+     "rank": 2,
+     "id": "web:1a08219be7:3",
+     "score": 0.6101
+    },
+    {
+     "rank": 3,
+     "id": "web:173b58474f:3",
+     "score": 0.5874
+    },
+    {
+     "rank": 4,
+     "id": "web:584d6034e5:1",
+     "score": 0.5869
+    },
+    {
+     "rank": 5,
+     "id": "web:6c658c1ab3:5",
+     "score": 0.5755
+    },
+    {
+     "rank": 6,
+     "id": "web:5cf4da84a8:4",
+     "score": 0.5663
+    },
+    {
+     "rank": 7,
+     "id": "web:1a08219be7:9",
+     "score": 0.5648
+    },
+    {
+     "rank": 8,
+     "id": "web:584d6034e5:3",
+     "score": 0.5638
+    },
+    {
+     "rank": 9,
+     "id": "web:1a08219be7:6",
+     "score": 0.5629
+    },
+    {
+     "rank": 10,
+     "id": "web:ab6eaf57fa:4",
+     "score": 0.5624
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 0.4631706000000122
+  },
+  {
+   "qid": "P02",
+   "type": "simple",
+   "qtype": "edge-case",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:b20dcc6490:2",
+     "score": 0.712
+    },
+    {
+     "rank": 2,
+     "id": "web:b20dcc6490:3",
+     "score": 0.693
+    },
+    {
+     "rank": 3,
+     "id": "web:b20dcc6490:4",
+     "score": 0.6689
+    },
+    {
+     "rank": 4,
+     "id": "web:b20dcc6490:14",
+     "score": 0.6651
+    },
+    {
+     "rank": 5,
+     "id": "web:b20dcc6490:13",
+     "score": 0.6644
+    },
+    {
+     "rank": 6,
+     "id": "web:b20dcc6490:1",
+     "score": 0.663
+    },
+    {
+     "rank": 7,
+     "id": "web:ce1754d1b3:13",
+     "score": 0.6605
+    },
+    {
+     "rank": 8,
+     "id": "web:b20dcc6490:16",
+     "score": 0.6498
+    },
+    {
+     "rank": 9,
+     "id": "web:1a08219be7:4",
+     "score": 0.6105
+    },
+    {
+     "rank": 10,
+     "id": "web:b20dcc6490:15",
+     "score": 0.5895
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.4,
+    "r": 1.0,
+    "f1": 0.5714285714285715,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 0.4797155000001112
+  },
+  {
+   "qid": "P03",
+   "type": "simple",
+   "qtype": "number",
+   "source": "insurer_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16",
+     "score": 0.7547
+    },
+    {
+     "rank": 2,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:10",
+     "score": 0.6292
+    },
+    {
+     "rank": 3,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:9",
+     "score": 0.6269
+    },
+    {
+     "rank": 4,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:0",
+     "score": 0.6235
+    },
+    {
+     "rank": 5,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:4",
+     "score": 0.6215
+    },
+    {
+     "rank": 6,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:17",
+     "score": 0.6095
+    },
+    {
+     "rank": 7,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:5",
+     "score": 0.5627
+    },
+    {
+     "rank": 8,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:1",
+     "score": 0.5514
+    },
+    {
+     "rank": 9,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:18",
+     "score": 0.5418
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:7",
+     "score": 0.5022
+    }
+   ],
+   "part_ranks": [
+    1
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 1.0,
+    "f1": 0.33333333333333337,
+    "rr": 1.0,
+    "hit": 1
+   },
+   "seconds": 0.43235249999997905
+  },
+  {
+   "qid": "P04",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:87a2e70770:13",
+     "score": 0.6911
+    },
+    {
+     "rank": 2,
+     "id": "web:87a2e70770:4",
+     "score": 0.664
+    },
+    {
+     "rank": 3,
+     "id": "web:87a2e70770:7",
+     "score": 0.6404
+    },
+    {
+     "rank": 4,
+     "id": "web:054b24831c:3",
+     "score": 0.6384
+    },
+    {
+     "rank": 5,
+     "id": "web:87a2e70770:6",
+     "score": 0.6315
+    },
+    {
+     "rank": 6,
+     "id": "web:b20dcc6490:6",
+     "score": 0.6292
+    },
+    {
+     "rank": 7,
+     "id": "web:6c658c1ab3:6",
+     "score": 0.6158
+    },
+    {
+     "rank": 8,
+     "id": "web:054b24831c:1",
+     "score": 0.613
+    },
+    {
+     "rank": 9,
+     "id": "web:87a2e70770:11",
+     "score": 0.5904
+    },
+    {
+     "rank": 10,
+     "id": "web:87a2e70770:2",
+     "score": 0.5892
+    }
+   ],
+   "part_ranks": [
+    null,
+    6
+   ],
+   "metrics": {
+    "p": 0.0,
+    "r": 0.0,
+    "f1": 0.0,
+    "rr": 0.16666666666666666,
+    "hit": 0
+   },
+   "seconds": 0.5229181999998218
+  },
+  {
+   "qid": "P05",
+   "type": "multi",
+   "qtype": "multi-part",
+   "source": "online_guide",
+   "retrieved": [
+    {
+     "rank": 1,
+     "id": "web:584d6034e5:4",
+     "score": 0.7176
+    },
+    {
+     "rank": 2,
+     "id": "web:50424a296b:6",
+     "score": 0.6681
+    },
+    {
+     "rank": 3,
+     "id": "web:50424a296b:7",
+     "score": 0.6317
+    },
+    {
+     "rank": 4,
+     "id": "web:584d6034e5:10",
+     "score": 0.618
+    },
+    {
+     "rank": 5,
+     "id": "web:584d6034e5:2",
+     "score": 0.5993
+    },
+    {
+     "rank": 6,
+     "id": "web:584d6034e5:11",
+     "score": 0.599
+    },
+    {
+     "rank": 7,
+     "id": "web:584d6034e5:1",
+     "score": 0.5976
+    },
+    {
+     "rank": 8,
+     "id": "web:584d6034e5:0",
+     "score": 0.5973
+    },
+    {
+     "rank": 9,
+     "id": "web:584d6034e5:3",
+     "score": 0.5922
+    },
+    {
+     "rank": 10,
+     "id": "web:d9b810ae03:0",
+     "score": 0.5808
+    }
+   ],
+   "part_ranks": [
+    8,
+    2
+   ],
+   "metrics": {
+    "p": 0.2,
+    "r": 0.5,
+    "f1": 0.28571428571428575,
+    "rr": 0.5,
+    "hit": 0
+   },
+   "seconds": 0.5709623999996438
+  }
+ ]
+}

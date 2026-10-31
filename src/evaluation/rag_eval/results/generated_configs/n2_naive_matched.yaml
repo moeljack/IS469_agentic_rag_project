@@ -2,7 +2,7 @@ run_id: n2_naive_matched
 system: naive
 retriever:
   mode: hybrid_rerank
-  k: 6
+  k: 4
   candidates: 10
 generator:
   provider: ollama

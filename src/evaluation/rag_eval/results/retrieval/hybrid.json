@@ -15,7 +15,7 @@
    "rr": 0.8790322580645161,
    "hit": 0.7419354838709677,
    "n": 31,
-   "ms_median": 427.4660999999469
+   "ms_median": 63.89975966885686
   },
   "simple": {
    "r": 0.9375,
@@ -24,7 +24,7 @@
    "rr": 0.796875,
    "hit": 0.9375,
    "n": 16,
-   "ms_median": 401.71014999987165
+   "ms_median": 62.07006657496095
   },
   "multi": {
    "r": 0.7666666666666667,
@@ -33,12 +33,12 @@
    "rr": 0.9666666666666667,
    "hit": 0.5333333333333333,
    "n": 15,
-   "ms_median": 452.7803999999378
+   "ms_median": 72.05796893686056
   }
  },
  "questions": [
   {
-   "qid": "Q01",
+   "qid": "S01",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -104,10 +104,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.3830101000000923
+   "seconds": 0.06614293809980154
   },
   {
-   "qid": "Q03",
+   "qid": "S02",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -173,10 +173,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4089982999998938
+   "seconds": 0.06286274315789342
   },
   {
-   "qid": "Q04",
+   "qid": "S03",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -242,10 +242,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.40679260000001705
+   "seconds": 0.06188227888196707
   },
   {
-   "qid": "Q07",
+   "qid": "S04",
    "type": "simple",
    "qtype": "definition",
    "source": "online_guide",
@@ -257,48 +257,48 @@
     },
     {
      "rank": 2,
-     "id": "web:83f538fb94:0",
-     "score": 0.02899
-    },
-    {
-     "rank": 3,
      "id": "web:6e286dc681:31",
      "score": 0.01613
     },
     {
-     "rank": 4,
+     "rank": 3,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:5",
      "score": 0.01613
     },
     {
-     "rank": 5,
+     "rank": 4,
      "id": "web:6e286dc681:29",
      "score": 0.01587
     },
     {
-     "rank": 6,
+     "rank": 5,
      "id": "web:5805473c50:0",
      "score": 0.01587
     },
     {
-     "rank": 7,
+     "rank": 6,
      "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:54",
      "score": 0.01562
     },
     {
-     "rank": 8,
+     "rank": 7,
      "id": "web:53d53a4398:0",
      "score": 0.01562
     },
     {
-     "rank": 9,
+     "rank": 8,
      "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:43",
      "score": 0.01538
     },
     {
-     "rank": 10,
+     "rank": 9,
      "id": "web:ce1754d1b3:0",
      "score": 0.01538
+    },
+    {
+     "rank": 10,
+     "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:9",
+     "score": 0.01515
     }
    ],
    "part_ranks": [
@@ -311,10 +311,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4449271000000863
+   "seconds": 0.06280589988455176
   },
   {
-   "qid": "Q08",
+   "qid": "S05",
    "type": "simple",
    "qtype": "definition",
    "source": "online_guide",
@@ -380,10 +380,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4191981000001306
+   "seconds": 0.06173274898901582
   },
   {
-   "qid": "Q09",
+   "qid": "S06",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -449,10 +449,10 @@
     "rr": 0.25,
     "hit": 1
    },
-   "seconds": 0.3845886999999948
+   "seconds": 0.061383211985230446
   },
   {
-   "qid": "Q10",
+   "qid": "S07",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -518,10 +518,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4039040999998633
+   "seconds": 0.061992090195417404
   },
   {
-   "qid": "Q12",
+   "qid": "S08",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -587,10 +587,10 @@
     "rr": 0.5,
     "hit": 1
    },
-   "seconds": 0.3935113000000001
+   "seconds": 0.06145382206887007
   },
   {
-   "qid": "Q13",
+   "qid": "S09",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -656,10 +656,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4106784000000516
+   "seconds": 0.061737794894725084
   },
   {
-   "qid": "Q15",
+   "qid": "S10",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -725,10 +725,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.39067720000002737
+   "seconds": 0.06204067403450608
   },
   {
-   "qid": "Q16",
+   "qid": "S11",
    "type": "simple",
    "qtype": "definition",
    "source": "reit_etf_guide",
@@ -794,10 +794,10 @@
     "rr": 0.5,
     "hit": 1
    },
-   "seconds": 0.39605550000010226
+   "seconds": 0.06209945911541581
   },
   {
-   "qid": "Q19",
+   "qid": "S12",
    "type": "simple",
    "qtype": "number",
    "source": "insurer_guide",
@@ -863,10 +863,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.45804900000007365
+   "seconds": 0.06991174584254622
   },
   {
-   "qid": "Q20",
+   "qid": "S13",
    "type": "simple",
    "qtype": "definition",
    "source": "insurer_guide",
@@ -932,10 +932,10 @@
     "rr": 0.16666666666666666,
     "hit": 0
    },
-   "seconds": 0.39951619999988
+   "seconds": 0.0625910758972168
   },
   {
-   "qid": "Q42",
+   "qid": "S14",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -1001,10 +1001,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.36539060000018253
+   "seconds": 0.06181987002491951
   },
   {
-   "qid": "Q43",
+   "qid": "S15",
    "type": "simple",
    "qtype": "number",
    "source": "online_guide",
@@ -1070,10 +1070,10 @@
     "rr": 0.3333333333333333,
     "hit": 1
    },
-   "seconds": 0.39499000000000706
+   "seconds": 0.062125394120812416
   },
   {
-   "qid": "Q44",
+   "qid": "S16",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -1139,10 +1139,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.42474910000009913
+   "seconds": 0.06256564101204276
   },
   {
-   "qid": "Q21",
+   "qid": "M01",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1209,10 +1209,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4888206000000537
+   "seconds": 0.06476505286991596
   },
   {
-   "qid": "Q22",
+   "qid": "M02",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1279,10 +1279,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.44037170000001424
+   "seconds": 0.06356986984610558
   },
   {
-   "qid": "Q23",
+   "qid": "M03",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1349,10 +1349,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.4527803999999378
+   "seconds": 0.07141809817403555
   },
   {
-   "qid": "Q24",
+   "qid": "M04",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1419,10 +1419,10 @@
     "rr": 0.5,
     "hit": 0
    },
-   "seconds": 0.45192900000006375
+   "seconds": 0.06957734934985638
   },
   {
-   "qid": "Q26",
+   "qid": "M05",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1489,10 +1489,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.44513569999980973
+   "seconds": 0.08285852009430528
   },
   {
-   "qid": "Q28",
+   "qid": "M06",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1559,10 +1559,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.4660548000001654
+   "seconds": 0.07205796893686056
   },
   {
-   "qid": "Q29",
+   "qid": "M07",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1629,10 +1629,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.41830239999990226
+   "seconds": 0.0889834682457149
   },
   {
-   "qid": "Q30",
+   "qid": "M08",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1699,10 +1699,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4289069000001291
+   "seconds": 0.0648132050409913
   },
   {
-   "qid": "Q32",
+   "qid": "M09",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1769,10 +1769,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4319957999998678
+   "seconds": 0.06389975966885686
   },
   {
-   "qid": "Q34",
+   "qid": "M10",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1839,10 +1839,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.46376550000013594
+   "seconds": 0.06447924813255668
   },
   {
-   "qid": "Q35",
+   "qid": "M11",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -1909,10 +1909,10 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.45944840000015574
+   "seconds": 0.08220894075930119
   },
   {
-   "qid": "Q36",
+   "qid": "M12",
    "type": "multi",
    "qtype": "multi-part",
    "source": "reit_etf_guide",
@@ -1935,12 +1935,12 @@
     {
      "rank": 4,
      "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:46",
-     "score": 0.03058
+     "score": 0.0308
     },
     {
      "rank": 5,
      "id": "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:6",
-     "score": 0.03008
+     "score": 0.02986
     },
     {
      "rank": 6,
@@ -1979,10 +1979,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4274660999999469
+   "seconds": 0.07672594906762242
   },
   {
-   "qid": "Q38",
+   "qid": "M13",
    "type": "multi",
    "qtype": "multi-part",
    "source": "reit_etf_guide",
@@ -2049,10 +2049,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4690802000000076
+   "seconds": 0.07289450615644455
   },
   {
-   "qid": "Q40",
+   "qid": "M14",
    "type": "multi",
    "qtype": "multi-part",
    "source": "insurer_guide",
@@ -2119,10 +2119,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4780810999998266
+   "seconds": 0.08557138498872519
   },
   {
-   "qid": "Q41",
+   "qid": "M15",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -2189,7 +2189,7 @@
     "rr": 1.0,
     "hit": 0
    },
-   "seconds": 0.4865119999999479
+   "seconds": 0.07585272705182433
   }
  ]
 }

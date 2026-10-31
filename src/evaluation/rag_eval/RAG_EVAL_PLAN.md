@@ -1,6 +1,35 @@
 # IS469 RAG Evaluation Plan (revised for the current codebase)
 
-Oct 28, 2026 · @Joel
+Oct 28, 2026 · @Joel · updated 31 Oct 2026
+
+## Status (31 Oct 2026): what changed since the first draft, and what has been run
+
+**Changes to the plan**
+
+- **Question ids say what a question is:** `S01`–`S21` single-fact, `M01`–`M20` multi-part, `O01`–`O04` out-of-scope, `P01`–`P05` retrieval-only paraphrases (`paraphrase_of` names the original). They replace the old `Q01`–`Q64` ids; `src/evaluation/qid_map.json` records old to new, and `db_check/apply_qid_map.py` renames the ids in any older results folder.
+- **Dataset v2.1: 41 answerable questions** (was 31). 10 questions were added (S17–S21 and M16–M20) to balance the question types and sources and to cover 6 previously untested pages. 45 scored questions in all (41 answerable + 4 out-of-scope) plus 5 retrieval-only paraphrases, 50 records. The 10 new records are flagged `needs_review` and need a teammate's check. See Section 2.3.
+- **RAGAS is replaced** by a two-call judge scorer (`score_grounding.py`): one call for faithfulness and one for context precision per answer (Section 3.2). Answer relevance and context recall are dropped: part recall against the gold passages already measures recall without a judge. RAGAS is kept only as an optional cross-check on about 10 answers.
+- **The Stage 3 "OpenAI" generator is gpt-oss-120b served by Groq** (paid OpenAI avoided). The other Stage 3 generator is Claude.
+- **Local model names are set in one place**, `src/config.py` (`INTAKE_MODEL`, `PLANNER_MODEL`, `SUPERVISOR_MODEL`, `AUDITOR_MODEL`; each can still be overridden by its environment variable). An evaluation YAML with `generator.model: default` follows `SUPERVISOR_MODEL`, and every run's metadata records the models used.
+- **Cluster job:** `IS469_eval.sh` runs Stages 1–2 on the GPU node (resumable; resubmit after a time-limit stop).
+- **Judge:** not final. Gemini's free tier gave only 20 requests a day on the Flash model, so the final choice is open. Candidates are a Gemini Flash-Lite model, an Ollama cloud or Groq model, or `gemma4:12b` run locally on the cluster GPU (it passed the five canned cases in `check_judge.py`; it is slow on a CPU). Whichever is chosen must be validated on 30 human-labelled pairs (Section 4.3) before its scores are used.
+
+**Results so far** (no judge scores yet, so no accuracy numbers; retrieval figures use the first 31 answerable questions and must be recomputed with the 10 new ones)
+
+| Config | Part recall@5 | Hit@5 | MRR | Median retrieval latency (laptop CPU) |
+| --- | --- | --- | --- | --- |
+| R0 dense | 85% | 77% | 0.84 | 0.4 s |
+| R1 BM25 | 85% | 74% | 0.79 | 4 ms |
+| R2 hybrid | 85% | 74% | 0.88 | 0.4 s |
+| R3 dense + rerank | 97% | 94% | 0.94 | 17 s |
+| R4 hybrid + rerank | 97% | 94% | 0.94 | 17 s |
+
+- The reranker accounts for the whole retrieval gain (+12 points recall, +17 points Hit@5). Hybrid search adds almost nothing, and R3 equals R4. On the 5 paraphrases, hybrid and both reranked modes reach 90% recall against 70% for dense and BM25. The rule in Stage 1 selected R4.
+- **Agent (A1, 3 repeats, cluster GPU):** it answered 22–24 of 35 scored questions; the rest were refusals, clarification questions or `no_answer`. All of the agent's non-answers happen before retrieval, in the intake gate: it refused in-scope questions (S08, S12, S13, M14, S16) and asked for information the answer does not need (S10, M15, O04). Its part recall is about 68% overall but 90% on the questions it actually ran, against 97% for naive RAG at k = 5. A trial with a tightened intake prompt recovered 5 of those 8 questions (unjudged, tuned on the evaluation questions, so a diagnostic only).
+- **The three A1 repeats are nearly the same run** (repeats 2 and 3 are identical on all 35 answers), so do not treat them as independent samples.
+- **N2's matched k came out at 4**, below N1's 5, because the agent uses only about 2.9 chunks per question.
+- **Machines are mixed:** R0 and N1 answers came from a laptop CPU and A1 and N2 from the cluster GPU. Rerun R0 and N1 on the cluster before comparing latency.
+- **Not yet done:** judge selection and validation, scoring of all runs, the 10 new questions' reviews and runs, Stage 3 runs, failure coding and the qualitative cases.
 
 ## Summary and key decisions
 
@@ -8,7 +37,7 @@ Evaluate the RAG part in three stages: a retrieval ablation, then naive vs agent
 
 **Should we add retrieval methods one by one? Yes.** Do it as Stage 1, as a 2×2 design: dense vs hybrid, each with and without the cross-encoder reranker. Dense-only with no reranker is the naive baseline. Retrieval metrics need no LLM, so all configurations are cheap to score. This answers the slides' point that each technique must earn its place.
 
-**Is the dataset big enough? Just enough, with caveats.** Dataset v2 (`src/evaluation/eval_questions.json`) has 35 scored questions: 16 single-fact, 15 multi-part and 4 out-of-scope, plus 5 retrieval-only paraphrases (40 records). One question is worth 2.9 percentage points, so gaps under about 12 points (4 questions) are likely noise, and only gaps of about 25 points or more can be shown reliably. Use all 35 as the test set. The 5 paraphrases give retrieval something to discriminate (Section 2.3).
+**Is the dataset big enough? Just enough, with caveats.** Dataset v2.1 (`src/evaluation/eval_questions.json`) has 45 scored questions: 21 single-fact, 20 multi-part and 4 out-of-scope (41 answerable in all), plus 5 retrieval-only paraphrases (50 records). One answerable question moves accuracy by about 2.4 points (1 in 41), so gaps under about 10 points (4 questions) are likely noise, and only gaps of about 23 points or more can be shown reliably. Use all 45 as the test set. The 5 paraphrases give retrieval something to discriminate (Section 2.3).
 
 **Gold passages: auto-labelled, then audited.** `label_gold.py` marks the chunks that contain each verbatim fact and stores their ids. The corpus will not be re-ingested, so the ids stay valid. You need them for retrieval Precision/Recall/F1 and for the Stage 2 stratification. Verify the 11 `needs_review` reference answers first, then hand-check about 15 questions' labels (Section 2.4).
 
@@ -32,14 +61,14 @@ A secondary objective is to find *where* each system fails, by question type and
 
 ## 2. Dataset preparation
 
-Dataset v2 is `src/evaluation/eval_questions.json` (40 records: 35 scored + 5 paraphrases). It was built from the original 40 questions, with the unnatural ones reworded, duplicates removed, four new gap questions and four out-of-scope questions added, and tags, reference answers and key facts for every record. Its `facts` field keeps the original format (a list of parts, each a list of alternative verbatim strings). Commit it and freeze it before any comparison run.
+Dataset v2.1 is `src/evaluation/eval_questions.json` (50 records: 45 scored + 5 paraphrases). It was built from the original 40 questions, with the unnatural ones reworded, duplicates removed, four new gap questions and four out-of-scope questions added, and tags, reference answers and key facts for every record. Its `facts` field keeps the original format (a list of parts, each a list of alternative verbatim strings). Commit it and freeze it before any comparison run.
 
 ### 2.1 Record format
 
 Each record is one question. `facts` is a list of parts: each part is one fact the answer needs, written as one or more alternative verbatim strings from the corpus. `gold_passages` is filled by `label_gold.py` with one list of chunk ids per part (the ids below are illustrative; real ids look like `web:<10 hex characters>:<n>` or `<pdf name>:<n>`).
 
 ```json
-{"qid": "Q22", "type": "multi", "tier": "webpage",
+{"qid": "M02", "type": "multi", "tier": "webpage",
  "qtype": "multi-part", "source": "online_guide", "difficulty": "hard", "numeric": true,
  "answerable": true,
  "question": "What penalty applies if my company pays its tax after the due date, and what is the minimum monthly GIRO amount if it spreads payment under the instalment plan?",
@@ -66,14 +95,14 @@ Dataset v2 is already tagged on these fields. Have a second member check the tag
 
 ### 2.3 Is the dataset enough? Dataset v2 plus paraphrases
 
-Dataset v2 has 35 scored questions (31 answerable + 4 out-of-scope) and 5 paraphrases. The set was sized as the smallest that still fills every table in this plan (see the task section at the end for the reasoning).
+Dataset v2.1 has 45 scored questions (41 answerable + 4 out-of-scope) and 5 paraphrases. The first version had 31 answerable questions, sized as the smallest that fills every table in this plan; 10 more were added to bring the single-fact types to 5–6 each, the two PDF sources to 4 each, the number of multi-part questions to 20, and to cover pages that no question tested (tax computation, liquidation and judicial management, the compliance programmes page, foreign-entity classification and payment difficulties).
 
 | Bucket | Target | Dataset v2 | Note |
 | --- | --- | --- | --- |
-| Each of the 3 sources | ≥ 3 (descriptive only, no significance claims) | online guide 25, REIT ETF guide 3, insurer guide 3 | Met |
-| numeric (flag) | ≥ 10 | 19 | Met |
-| multi-part | ≥ 10 | 15 | Met |
-| single-fact types (number, definition, procedure, edge-case) | 3–5 each | 5, 4, 3, 4 | Met |
+| Each of the 3 sources | ≥ 3 (descriptive only, no significance claims) | online guide 33, REIT ETF guide 4, insurer guide 4 | Met |
+| numeric (flag) | ≥ 10 | 22 | Met |
+| multi-part | ≥ 10 | 20 | Met |
+| single-fact types (number, definition, procedure, edge-case) | 3–5 each | 6, 5, 5, 5 | Met |
 | out-of-scope | 4 | 4 | Four is too few for a precise refusal rate, so report refusals as counts (e.g. 3/4) |
 | paraphrased / colloquial | 5 (retrieval only) | 5 | Met: 3 single-part, 2 multi-part |
 
@@ -94,7 +123,7 @@ Estimate: 2–3 hours split across the team for the flagged questions and the au
 
 ## 3. Metrics
 
-Use four groups of metrics: retrieval (no LLM needed), RAGAS (LLM-graded), a custom correctness rubric, and efficiency. Skip BLEU/ROUGE, since the slides note they reward word overlap rather than correctness.
+Use four groups of metrics: retrieval (no LLM needed), faithfulness and context precision (LLM-graded), a custom correctness rubric, and efficiency. Skip BLEU/ROUGE, since the slides note they reward word overlap rather than correctness.
 
 **Primary metric: accuracy**, the % of questions with correctness = 2 (Section 3.3). All headline claims about which system or configuration is better rest on this one number. Everything else is diagnostic: it explains *why* accuracy differs and is not used to declare a winner, which avoids cherry-picking among many scores.
 
@@ -133,32 +162,22 @@ def retrieval_metrics(retrieved_ids, gold_parts, k=5):
     return {"p": p, "r": r, "f1": f1, "rr": rr, "hit": int(all(covered))}
 ```
 
-### 3.2 RAGAS metrics
+### 3.2 Faithfulness and context precision (judge-based)
 
-Compute with the `ragas` library, using the fixed judge model (Section 4). Inputs per question: `user_input` (question), `retrieved_contexts` (the chunk texts **exactly as they appeared in the answer prompt**, including any truncation), `response` (answer), `reference` (reference answer). Scoring faithfulness against text the generator never saw would be wrong.
+These are RAGAS-style scores computed with the fixed judge (Section 4) in two calls per answer, by `score_grounding.py`. Call them "RAGAS-style" in the report, not RAGAS. The contexts are the chunk texts **exactly as they appeared in the answer prompt** (`context_used`, including the 1,200-character cut). Scoring faithfulness against text the generator never saw would be wrong.
 
-| Metric | What it checks | RAGAS class (pin your version; names change between releases) |
+| Metric | What it checks | How it is computed |
 | --- | --- | --- |
-| Faithfulness | Every claim in the answer is supported by the retrieved context | `Faithfulness` |
-| Answer relevance | The answer addresses the question | `ResponseRelevancy` (needs an embedding model; reuse Qwen3-Embedding-0.6B) |
-| Context precision | Retrieved chunks are relevant, and relevant ones rank high | `LLMContextPrecisionWithReference` |
-| Context recall | Retrieved chunks cover everything in the reference answer | `LLMContextRecall` |
+| Faithfulness | Every claim in the answer is supported by the retrieved context | Call 1: the judge lists the answer's factual claims and marks each supported or not, **without seeing the reference answer**. Score = supported claims / claims |
+| Context precision | Retrieved chunks are relevant, and relevant ones rank high | Call 2: the judge marks each numbered chunk relevant or not, using the reference answer. `ctx_precision` = share of relevant chunks; `ctx_ap` = average precision (relevant chunks near the top score higher), the quantity RAGAS's `LLMContextPrecisionWithReference` computes |
 
-```python
-from ragas import evaluate, EvaluationDataset
-from ragas.metrics import Faithfulness, ResponseRelevancy, LLMContextPrecisionWithReference, LLMContextRecall
+Answer relevance and context recall are not computed: part recall against the gold passages (Section 3.1) already measures recall with no judge, and the correctness rubric measures whether the answer is right.
 
-ds = EvaluationDataset.from_list(rows)  # rows: dicts with the 4 fields above
-result = evaluate(ds, metrics=[Faithfulness(), ResponseRelevancy(), LLMContextPrecisionWithReference(), LLMContextRecall()],
-                  llm=judge_llm, embeddings=judge_emb)
-result.to_pandas().to_csv("results/ragas_<run_id>.csv")
-```
-
-Run RAGAS only on answerable questions. Faithfulness is undefined for a refusal. Expect roughly 10 or more judge calls per question per run: context precision calls the judge once per retrieved chunk, so agentic runs with larger contexts cost more. Cache every score.
+Run it only on answerable questions with a real answer: a refusal, clarification or failed run has nothing to ground. It costs 2 judge calls per answer. Raw judge output is cached with every score. Cross-check about 10 answers with the real RAGAS (`score_ragas.py`, separate environment) to show the scores agree.
 
 ### 3.3 Custom correctness rubric (LLM-as-judge)
 
-RAGAS checks grounding and relevance, but not whether the answer is *right*. A faithful answer built on the wrong chunk is still wrong. Add a correctness score against the reference answer:
+The grounding metrics check support and relevance, but not whether the answer is *right*. A faithful answer built on the wrong chunk is still wrong. Add a correctness score against the reference answer:
 
 | Score | Label | Rule |
 | --- | --- | --- |
@@ -191,7 +210,7 @@ Latency for local Qwen and for API models isn't directly comparable (different h
 
 ## 4. LLM-as-judge design
 
-Use one strong judge model, at temperature 0, for every LLM-graded score (RAGAS and the correctness rubric) across every run.
+Use one strong judge model, at temperature 0, for every LLM-graded score (faithfulness, context precision and the correctness rubric) across every run.
 
 ### 4.1 Choosing the judge
 
@@ -199,6 +218,7 @@ Use one strong judge model, at temperature 0, for every LLM-graded score (RAGAS 
 - **Not one of the compared generators.** LLM judges tend to rate their own outputs higher (self-preference bias). Since Stage 3 compares an Anthropic and an OpenAI model, the cleanest choice is a strong model from a third provider (e.g. a Gemini model). If you only have Anthropic and OpenAI access, use a model from one family that is *not* in your comparison, and name this as a limitation.
 - **Strong enough.** Qwen 3.5 4B is too weak to judge faithfulness reliably. Don't use it as the judge.
 - Record the exact model ID and date in the run config.
+- **Free-tier choices (Oct 2026).** A Gemini Flash model allows only about 20 requests a day free; a Flash-Lite model allows more. Ollama cloud models are pay-per-token with no published daily cap. Groq's free tier is limited by tokens per day. A model that fits the cluster GPU (about 12B parameters, such as `gemma4:12b`) is free but weaker and slow. Small judges miss subtle numeric errors, so the 30-pair validation in 4.3 decides, not the model size. Scoring is cached and resumable, so a daily quota only slows it down.
 
 ### 4.2 Sample correctness judge prompt
 
@@ -245,7 +265,7 @@ For out-of-scope questions, use the status check in Section 3.3, and a short jud
 4. Target ≥ 80% exact agreement. A kappa point estimate of 0.6 on 30 pairs still has a wide interval, so treat the interval as the finding. Below target, read the disagreements, tighten the rubric wording, and re-validate on a fresh 10 pairs.
 5. Report the agreement numbers in the evaluation section. This is a cheap way to show the LLM scores can be trusted.
 
-Do a lighter spot check for RAGAS faithfulness: read 10 answers with the lowest and highest faithfulness and confirm the scores make sense.
+Do a lighter spot check for faithfulness: read 10 answers with the lowest and highest faithfulness and confirm the scores make sense.
 
 Some reference answers were drafted by an LLM. A person must verify every reference answer and key-facts list against the source documents before the judge runs, especially the 11 records flagged `needs_review`. Otherwise the judge grades against unverified answers.
 
@@ -267,6 +287,7 @@ All systems read these values from one config file (`src/evaluation/rag_eval/con
 | Answer function | One shared function for N1, N2 and A1: the supervisor's `ANSWER_SYSTEM` prompt, temperature 0, `think=False`, each chunk cut to 1,200 characters (`DOC_CHARS`) |
 | Agent-only limits (part of what "agentic" means here) | `max_steps` 4, `max_queries` 2, `max_chunks` 6, `audit_min_score` 0.5 |
 | Tools | None registered (`tools=None`), so no calculator or web search is used |
+| Local models | Set in `src/config.py` (`INTAKE_MODEL`, `PLANNER_MODEL`, `SUPERVISOR_MODEL`, `AUDITOR_MODEL`, all `qwen3.5:4b`; the same-named environment variables override them). An evaluation YAML with `generator.model: default` follows `SUPERVISOR_MODEL`. Each run's metadata records the models used |
 
 ### Stage 1: Retrieval ablation (RQ1, RQ2)
 
@@ -297,7 +318,7 @@ Non-reranked configs have no reranker score; use the vector or RRF score in the 
 **Procedure:**
 
 1. Retrieval only, all 5 configs: compute part recall@5, P@5, F1@5, MRR, Hit@5 and retrieval latency. No LLM calls, so this takes minutes. Extend `evaluate.py`'s `MODES` dict, which was built for this.
-2. Generate answers with R0 and with the config picked by the rule in step 3. Score with RAGAS and the correctness rubric.
+2. Generate answers with R0 and with the config picked by the rule in step 3. Score with the grounding scorer and the correctness rubric.
 3. **Write the selection rule down before running anything.** Suggested: carry R4 (hybrid + rerank) forward unless its part recall@5 is below R0's, or its median retrieval latency is more than 3× R0's with no recall gain; in that case carry the config with the highest part recall@5, breaking ties by MRR.
 4. The selection uses the same questions as the final report, so treat the ablation as descriptive. Don't claim the chosen config is best in general. If R4 wins on retrieval but not on correctness, report that as a finding.
 
@@ -313,10 +334,10 @@ Non-reranked configs have no reranker score; use the vector or RRF score in the 
 
 **Table 1b: end-to-end answer quality** (naive pipeline, Qwen 3.5 4B)
 
-| Config | Accuracy (%) | Mean correctness (0–2) | Numeric acc. (%) | Faithfulness | Answer rel. | Ctx precision | Ctx recall |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| R0 |  |  |  |  |  |  |  |
-| Best config |  |  |  |  |  |  |  |
+| Config | Accuracy (%) | Mean correctness (0–2) | Numeric acc. (%) | Faithfulness | Ctx precision |
+| --- | --- | --- | --- | --- | --- |
+| R0 |  |  |  |  |  |
+| Best config |  |  |  |  |  |
 
 ### Stage 2: Naive vs agentic RAG (RQ3)
 
@@ -342,11 +363,11 @@ Run all three systems on every question, including out-of-scope ones. Run A1 thr
 
 **Table 2a: overall**
 
-| System | Accuracy (%) | Numeric acc. (%) | Refusal acc. | Faithfulness | Answer rel. | Ctx precision | Ctx recall | Part recall@5 | Chunks seen (mean) | Latency median / p90 (s) | Tokens per question |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| N1 Naive |  |  |  |  |  |  |  |  | 5 |  |  |
-| N2 Naive, matched context |  |  |  |  |  |  |  |  |  |  |  |
-| A1 Agentic (mean of 3 runs) |  |  |  |  |  |  |  |  |  |  |  |
+| System | Accuracy (%) | Numeric acc. (%) | Refusal acc. | Faithfulness | Ctx precision | Part recall@5 | Chunks seen (mean) | Latency median / p90 (s) | Tokens per question |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N1 Naive |  |  |  |  |  |  | 5 |  |  |
+| N2 Naive, matched context |  |  |  |  |  |  |  |  |  |
+| A1 Agentic (mean of 3 runs) |  |  |  |  |  |  |  |  |  |
 
 **Table 2b: accuracy by question type** (shows *where* agentic helps)
 
@@ -391,28 +412,29 @@ The off-diagonal cells are the questions that matter. They also feed the qualita
 | G5 | OpenAI model (similar tier) | Naive |
 | G6 | OpenAI model | Agentic (supervisor LLM swapped) |
 
-This needs only 4 new runs, since G1 and G2 are reused. If time is short, run one API model only (G3 and G4) and add the other later. Pick API models of a similar price tier so the comparison is fair, and record exact model IDs. Count tool-call failures as wrong (Section 3.3).
+The "OpenAI" generator in this project is gpt-oss-120b served by Groq (an open-weight model, not GPT-4 or GPT-5). This needs only 4 new runs, since G1 and G2 are reused. If time is short, run one API model only (G3 and G4) and add the other later. Pick API models of a similar price tier so the comparison is fair, and record exact model IDs. Count tool-call failures as wrong (Section 3.3).
 
 **Table 3: generator comparison**
 
-| Generator | System | Accuracy (%) | Numeric acc. (%) | Faithfulness | Answer rel. | Latency median (s) | Cost per 100 questions (USD) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Qwen 3.5 4B | Naive |  |  |  |  |  | local |
-| Qwen 3.5 4B | Agentic |  |  |  |  |  | local |
-| Anthropic | Naive |  |  |  |  |  |  |
-| Anthropic | Agentic (supervisor LLM only) |  |  |  |  |  |  |
-| OpenAI | Naive |  |  |  |  |  |  |
-| OpenAI | Agentic (supervisor LLM only) |  |  |  |  |  |  |
+| Generator | System | Accuracy (%) | Numeric acc. (%) | Faithfulness | Latency median (s) | Cost per 100 questions (USD) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Qwen 3.5 4B | Naive |  |  |  |  | local |
+| Qwen 3.5 4B | Agentic |  |  |  |  | local |
+| Anthropic | Naive |  |  |  |  |  |
+| Anthropic | Agentic (supervisor LLM only) |  |  |  |  |  |
+| OpenAI | Naive |  |  |  |  |  |
+| OpenAI | Agentic (supervisor LLM only) |  |  |  |  |  |
 
 Key reading for RQ4: compare the agentic gain (agentic minus naive accuracy) per model. If the gain is largest for Qwen, agentic RAG compensates for a small model. If it is largest for API models, the small model can't drive the agent well.
 
 ### Run budget
 
-| Stage | Generation runs | Judge calls (≈ 370 per run: 31 answerable questions × roughly 12 RAGAS and rubric calls) |
+| Stage | Generation runs | Judge calls (a naive run ≈ 127: 41 correctness + 82 grounding + up to 4 refusal checks; an agent run ≈ 87, because only about 70% of answerable questions get an answer) |
 | --- | --- | --- |
-| 1 | 2–3 (R0 + chosen config) | ~750–1,100 |
-| 2 | 4 new (N2, A1 × 3); N1 reused from Stage 1 | ~1,500–1,900 (larger agentic contexts cost more) |
-| 3 | 4 | ~1,500 |
+| 1 | 2 (R0 + chosen config) | ~250 |
+| 2 | 4 new (N2, A1 × 3); N1 reused from Stage 1 | ~390 |
+| 3 | 4 | ~430 |
+| Total |  | ~1,070 judge calls, each 2,000–3,000 tokens (about 3 million tokens), plus the 30-pair validation |
 
 Cache every generation (Section 9.3) so you never regenerate just to re-score.
 
@@ -493,7 +515,7 @@ F1–F3 are retrieval failures, F4–F6 and F9 are generation failures, F7–F8 
 
 ## 7. Statistical caution for a small dataset
 
-With 35 scored questions, one question moves accuracy by about 2.9 points. Report uncertainty on every headline number and compare systems per question, not just by averages.
+With 41 answerable questions, one question moves accuracy by about 2.4 points. Report uncertainty on every headline number and compare systems per question, not just by averages.
 
 1. **Report n everywhere.** Every table and per-category row shows its question count. Never report a percentage for a category with n < 5 without the raw count ("3/4").
 2. **Bootstrap 95% confidence intervals** for accuracy and mean scores. Resample questions with replacement 1,000 times:
@@ -575,7 +597,7 @@ The plan was checked against the repo on 28 Oct 2026. The structure fits; these 
 | 5 | **Logging is not exposed.** `SupervisorResult` has no chunk ids or token counts; the run state is internal | Wrap `retrieval.run` (record every returned chunk) and the `llm` callable; patch both `ollama.chat` and `ollama.Client.chat` to sum token counts (Section 9.3) |
 | 6 | **Dataset v2 is written but not yet committed or labelled.** `src/evaluation/eval_questions.json` now has all tags, reference answers and key facts, but no `gold_passages` | Commit it, then run `label_gold.py` to add `gold_passages` (Section 2.4) |
 | 7 | **The tracked database is at risk.** `.gitignore` has `# chroma_db/` commented out, so `chroma_db/` is committed, and `UserStore` writes into it | Use a temporary `UserStore` path during evaluation; record the `chroma_db/` commit as the corpus snapshot |
-| 8 | **Dependencies.** `ragas`, a judge SDK (`anthropic`, `openai` or Google) and `statsmodels` are not in `requirements.txt`, which pins torch 2.14 and transformers 5.x. `scikit-learn` and PyYAML are already present | Run the scoring scripts in a **separate virtual environment** (they only read the JSONL outputs). Generation keeps the existing environment |
+| 8 | **Dependencies.** The judge and API-generator SDKs (`anthropic`, `openai`, `google-genai`) are now pinned in `requirements.txt`. `ragas` is needed only for the optional cross-check, and `statsmodels` is not pinned. `scikit-learn` and PyYAML are already present | Run the optional RAGAS cross-check in a **separate virtual environment** (it only reads the JSONL outputs). Everything else, including `score_grounding.py`, runs in the main environment |
 | 9 | **Compute.** The cluster script has a 2-hour limit and 1 GPU; a laptop CPU takes about 18 s per reranked search at pool 10 | Time 5 questions first; make `run.py` resumable and slice-able; record the machine in every run config |
 
 What already works and should be reused:
@@ -598,8 +620,8 @@ What already works and should be reused:
 | Local LLMs | `ollama` (existing) |
 | Config files | `PyYAML` (existing) |
 | Kappa | `scikit-learn` (existing) |
-| RAGAS metrics | `ragas` (scoring environment only; pin the exact version) |
-| Judge / API generators | Provider SDKs (`anthropic`, `openai`, `google-genai`), or `langchain` wrappers that RAGAS accepts (scoring environment) |
+| Faithfulness / context precision | `score_grounding.py` with the judge SDK (main environment); `ragas` only for the optional cross-check (separate environment, pin the exact version) |
+| Judge / API generators | Provider SDKs (`anthropic`, `openai`, `google-genai`), and the OpenAI-compatible Groq endpoint |
 | Analysis | `pandas`, `numpy`, `statsmodels` (McNemar), `matplotlib` (scoring environment) |
 
 ### 9.3 Repo structure and logging
@@ -626,11 +648,15 @@ src/evaluation/
       run.py                  # generate: config + dataset -> results/outputs/<run_id>.jsonl (resumable)
       score_retrieval.py      # retrieval metrics on what each run retrieved (no LLM)
       score_judge.py          # correctness rubric and refusal checks -> results/scores/<run_id>_judge.jsonl
-      score_ragas.py          # RAGAS -> results/scores/<run_id>_ragas.csv (separate scoring environment)
+      score_grounding.py      # faithfulness + context precision, 2 judge calls per answer -> results/scores/<run_id>_grounding.jsonl
+      score_ragas.py          # optional RAGAS cross-check -> results/scores/<run_id>_ragas.csv (separate environment)
+      check_judge.py          # connects to the judge and grades five canned cases before any real scoring
+      env.py                  # loads API keys from .env (never committed)
       results_io.py           # result paths and loaders
       configs/                # one YAML per run (s1_naive_r0_dense, n1_naive_r4, n2_naive_matched, a1_agentic_qwen,
                               #   g_naive_* / g_agentic_* for Stage 3) + judge.yaml
-      prompts/                # judge_correctness_v1.txt, judge_refusal_v1.txt
+      prompts/                # judge_correctness_v1.txt, judge_refusal_v1.txt, grounding_faithfulness_v1.txt,
+                              #   grounding_context_precision_v1.txt
       requirements-api.txt, requirements-scoring.txt
     results/                  # retrieval/, outputs/ (never edited by hand), scores/, report_assets/
 ```
@@ -638,7 +664,7 @@ src/evaluation/
 Each line in `outputs/<run_id>.jsonl` holds one question's full record:
 
 ```json
-{"run_id": "s2_agentic_qwen_r1", "qid": "Q07", "config_hash": "a1b2c3", "git_commit": "9f8e7d",
+{"run_id": "s2_agentic_qwen_r1", "qid": "S04", "config_hash": "a1b2c3", "git_commit": "9f8e7d",
  "timestamp": "2026-11-03T14:02:11", "machine": "cluster-gpu", "generator": "qwen3.5:4b", "system": "agentic",
  "status": "answered",
  "retrieved_seen": [{"id": "web:ab12cd34ef:3", "headings": "...", "text": "...", "score": 0.83, "rank": 1}],
@@ -650,7 +676,7 @@ Each line in `outputs/<run_id>.jsonl` holds one question's full record:
 
 - `run_id` = config name + repeat number. Never overwrite an existing output file; a re-run gets a new ID.
 - Save the config YAML and its hash with every run. Store prompt versions as files, not inline strings. Record the corpus snapshot (git commit of `chroma_db/`, scrape date) and the agent limits (`max_steps`, `max_queries`, `max_chunks`, `audit_min_score`).
-- **Two chunk lists per record.** `retrieved_seen` is every chunk any search returned (used for retrieval metrics and chunks seen). `context_used` is the text actually placed in the answer prompt (used for RAGAS). For naive systems both are the same top-k.
+- **Two chunk lists per record.** `retrieved_seen` is every chunk any search returned (used for retrieval metrics and chunks seen). `context_used` is the text actually placed in the answer prompt (used for faithfulness and context precision). For naive systems both are the same top-k.
 - **Capturing what `SupervisorResult` does not expose:** wrap `RetrievalAgent.run` to append each returned chunk to `retrieved_seen`; wrap the supervisor's `llm` callable to record token counts; and patch **both** `ollama.chat` and `ollama.Client.chat` (the auditor and the existing naive generator call the client method) to add `prompt_eval_count` and `eval_count` to a per-question counter.
 - `run.py` skips questions already in the output file and accepts `--start/--end` (or a slice list), so a crash or a 2-hour cluster job limit resumes instead of restarting.
 - Log errors per question and keep going. Report error counts.
@@ -690,7 +716,7 @@ def run(config_path, dataset_path, out_path, start=0, end=None):
 | --- | --- | --- |
 | A | Dataset: flagged questions, paraphrases, gold labelling and audit; commit `eval_dataset_v2.json` | Second-checks failure codes |
 | B | Harness: `run.py`, `answer.py`, `systems.py`, `retrieval_modes.py`, logging wrappers; Stage 1 retrieval ablation | Retrieval metrics script |
-| C | Judge + RAGAS: scoring scripts and separate environment, judge validation, API adapters | Stage 3 API model runs |
+| C | Judge and grounding scorer: scoring scripts, judge validation, API adapters | Stage 3 API model runs |
 | D | Stage 2 runs (agent wrapper: fresh user, fixed date, temp store), analysis script, statistics, qualitative analysis lead | Assembles report tables and figures |
 
 Everyone completes about 4 of the flagged questions, audits about 4 gold labels, and scores about 15 judge-validation pairs (two scorers per pair).
@@ -701,7 +727,7 @@ Assumes the earlier G1 deadline. G2 (13 Nov) gains 3 days of buffer.
 
 | Dates | Milestone | Owner | Done when |
 | --- | --- | --- | --- |
-| 27–29 Oct | Write the shared answer function; verify the 11 `needs_review` reference answers (dataset v2 is already written: 35 scored + 5 paraphrases); run `label_gold.py` and hand-check about 15 questions' labels; harness runs N1 and A1 end to end on 5 questions; time those 5 questions on the cluster | A, B, D | `eval_dataset_v2.json` committed and frozen; gold audit passed |
+| 27–29 Oct | Write the shared answer function; verify the `needs_review` reference answers (dataset v2.1 is written: 45 scored + 5 paraphrases; the 10 added questions still need review); run `label_gold.py` and hand-check about 15 questions' labels; harness runs N1 and A1 end to end on 5 questions; time those 5 questions on the cluster | A, B, D | `eval_dataset_v2.json` committed and frozen; gold audit passed |
 | 30 Oct – 1 Nov | Retrieval modes R0–R3; Stage 1 retrieval metrics for R0–R4; judge prompt written; Stage 1 generation (R0 + chosen config) | B; C | Table 1a filled; selection rule applied |
 | 2–3 Nov | Judge validated on 30 pairs; Stage 2 runs: N1, A1 (3 repeats), then N2 matched to A1's mean chunks seen | C; D | Judge agreement ≥ 80%; Tables 1b, 2a–2d filled |
 | 4–5 Nov | Stage 3 API model runs and scoring | C | Table 3 filled |
@@ -747,7 +773,7 @@ Open each subsection with its finding and number (e.g. "Agentic RAG answered 6 m
 
 These choices were assumed; change them if they don't match your setup.
 
-- Dataset v2 (35 scored questions + 5 paraphrases) is written at `src/evaluation/eval_questions.json` and will be committed to the repo. 11 records are flagged `needs_review` and must be verified before the judge runs.
+- Dataset v2.1 (45 scored questions + 5 paraphrases) is written at `src/evaluation/eval_questions.json` and will be committed to the repo. The original 11 flagged records have been reviewed; the 10 added questions (S17–S21 and M16–M20) are flagged `needs_review` and must be verified before the judge runs.
 - Gold passages are auto-labelled with `label_gold.py` and audited by hand. The corpus is not re-ingested, so chunk ids stay valid.
 - Final k = 5 for every system; reranker candidate pool 10 (the existing `CANDIDATES`); RRF constant 60.
 - All systems share one answer function (supervisor prompt, temperature 0, thinking off, 1,200-character truncation).
@@ -755,7 +781,7 @@ These choices were assumed; change them if they don't match your setup.
 - Agent statuses `clarify`, `refused` and `no_answer` on answerable questions count as incorrect.
 - Qwen 3.5 4B runs through Ollama (laptop or the cluster GPU), so its cost is reported as tokens and latency, not USD. Record the machine per run.
 - In Stage 3 only the supervisor's LLM is swapped; the decomposer and auditor stay on Qwen 3.5 4B.
-- RAGAS class names follow recent releases (0.2+). Check them against the version you install, in the separate scoring environment.
+- RAGAS is used only for the optional cross-check. Its class names follow recent releases (0.2+); check them against the version you install, in the separate environment.
 - The deadline is 10 Nov (G1). With 13 Nov (G2), add the 3 days as buffer before writing.
 - You have API access to a judge model outside the compared generators. If not, see Section 4.1.
 

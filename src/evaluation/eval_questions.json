@@ -1,6 +1,6 @@
 [
  {
-  "qid": "Q01",
+  "qid": "S01",
   "type": "simple",
   "tier": "webpage",
   "qtype": "number",
@@ -29,7 +29,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q03",
+  "qid": "S02",
   "type": "simple",
   "tier": "webpage",
   "qtype": "procedure",
@@ -55,7 +55,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q04",
+  "qid": "S03",
   "type": "simple",
   "tier": "webpage",
   "qtype": "edge-case",
@@ -84,7 +84,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q07",
+  "qid": "S04",
   "type": "simple",
   "tier": "webpage",
   "qtype": "definition",
@@ -112,7 +112,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q08",
+  "qid": "S05",
   "type": "simple",
   "tier": "webpage",
   "qtype": "definition",
@@ -140,7 +140,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q09",
+  "qid": "S06",
   "type": "simple",
   "tier": "webpage",
   "qtype": "procedure",
@@ -168,7 +168,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q10",
+  "qid": "S07",
   "type": "simple",
   "tier": "webpage",
   "qtype": "number",
@@ -196,7 +196,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q12",
+  "qid": "S08",
   "type": "simple",
   "tier": "webpage",
   "qtype": "edge-case",
@@ -226,7 +226,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q13",
+  "qid": "S09",
   "type": "simple",
   "tier": "webpage",
   "qtype": "procedure",
@@ -254,7 +254,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q15",
+  "qid": "S10",
   "type": "simple",
   "tier": "webpage",
   "qtype": "number",
@@ -282,7 +282,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q16",
+  "qid": "S11",
   "type": "simple",
   "tier": "pdf",
   "qtype": "definition",
@@ -310,7 +310,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q19",
+  "qid": "S12",
   "type": "simple",
   "tier": "pdf",
   "qtype": "number",
@@ -336,7 +336,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q20",
+  "qid": "S13",
   "type": "simple",
   "tier": "pdf",
   "qtype": "definition",
@@ -362,7 +362,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q42",
+  "qid": "S14",
   "type": "simple",
   "tier": "webpage",
   "qtype": "edge-case",
@@ -388,7 +388,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q43",
+  "qid": "S15",
   "type": "simple",
   "tier": "webpage",
   "qtype": "number",
@@ -415,7 +415,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q44",
+  "qid": "S16",
   "type": "simple",
   "tier": "webpage",
   "qtype": "edge-case",
@@ -442,7 +442,141 @@
   "needs_review": false
  },
  {
-  "qid": "Q21",
+  "qid": "S17",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "procedure",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "Do we have to submit our tax computation when we file Form C-S?",
+  "reference_answer": "No. A company filing Form C-S or Form C-S (Lite) does not need to file its financial statements, tax computation and supporting schedules, but it should have them ready for submission if IRAS asks. (A company filing Form C must file them together with the return.)",
+  "key_facts": [
+   "does not need to file",
+   "ready for submission upon request"
+  ],
+  "facts": [
+   [
+    "If your company is filing Form C-S/ Form C-S (Lite), you do not need to file its financial statements, tax computation and supporting schedules, but these documents should be ready for submission upon IRAS"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:ab6eaf57fa:0"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "S18",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "procedure",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "Our accounts are in US dollars. How do we work out the average exchange rate to convert amounts for our tax return?",
+  "reference_answer": "The average rate is the average of the month-end exchange rates for the financial period that makes up the basis period, using the exchange rates supplied by the Monetary Authority of Singapore (MAS).",
+  "key_facts": [
+   "average of the month-end exchange rates",
+   "Monetary Authority of Singapore"
+  ],
+  "facts": [
+   [
+    "This is computed using the average of the month-end exchange rates for the financial period that constitutes the basis period. The exchange rates supplied by the Monetary Authority of Singapore (MAS) should be used for this purpose."
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:ab6eaf57fa:11"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "S19",
+  "type": "simple",
+  "tier": "pdf",
+  "qtype": "definition",
+  "source": "insurer_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "We're a captive insurer. What do we use to work out our IBNR provision, and what must we furnish?",
+  "reference_answer": "A captive insurer may use the table of percentages at Annex 2 (derived from industry experience worldwide) to compute the IBNR provision, and must furnish an external auditors' confirmation of claim liabilities valued under Regulation 19 of the Insurance (Valuation and Capital) Regulations 2004.",
+  "key_facts": [
+   "table of percentages at Annex 2",
+   "external auditors"
+  ],
+  "facts": [
+   [
+    "The use of the table of percentages at Annex 2 to compute the provision will be accepted"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:11"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "S20",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "number",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": true,
+  "answerable": true,
+  "question": "At what value of related party transactions does my company have to complete the RPT Form?",
+  "reference_answer": "A company must complete the RPT Form if the value of related party transactions disclosed in its financial statements for the financial period exceeds S$15 million.",
+  "key_facts": [
+   "S$15 million"
+  ],
+  "facts": [
+   [
+    "Companies are required to complete the RPT Form if the value of related party transactions disclosed in the financial statements for the financial period exceeds S$15 million"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:173b58474f:8"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "S21",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "edge-case",
+  "source": "online_guide",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": true,
+  "question": "My company is under judicial management. Do we still have to file the company's tax return?",
+  "reference_answer": "Yes. A company under judicial management or receivership must still file its Form C-S, Form C-S (Lite) or Form C, together with its financial statements and tax computation, with IRAS every year.",
+  "key_facts": [
+   "still required to file",
+   "yearly"
+  ],
+  "facts": [
+   [
+    "A company under judicial management/ receivership is still required to file its Form C-S/ Form C-S (Lite)/ Form C, financial statements and tax computation with IRAS yearly"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:d9b810ae03:12"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "M01",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -475,7 +609,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q22",
+  "qid": "M02",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -508,7 +642,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q23",
+  "qid": "M03",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -541,7 +675,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q24",
+  "qid": "M04",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -576,7 +710,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q26",
+  "qid": "M05",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -613,7 +747,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q28",
+  "qid": "M06",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -647,7 +781,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q29",
+  "qid": "M07",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -680,7 +814,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q30",
+  "qid": "M08",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -715,7 +849,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q32",
+  "qid": "M09",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -751,7 +885,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q34",
+  "qid": "M10",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -784,7 +918,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q35",
+  "qid": "M11",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -817,7 +951,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q36",
+  "qid": "M12",
   "type": "multi",
   "tier": "pdf",
   "qtype": "multi-part",
@@ -853,7 +987,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q38",
+  "qid": "M13",
   "type": "multi",
   "tier": "pdf",
   "qtype": "multi-part",
@@ -886,7 +1020,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q40",
+  "qid": "M14",
   "type": "multi",
   "tier": "pdf",
   "qtype": "multi-part",
@@ -919,7 +1053,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q41",
+  "qid": "M15",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -952,7 +1086,172 @@
   "needs_review": false
  },
  {
-  "qid": "Q50",
+  "qid": "M16",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Our company is in liquidation. Do we need to apply for tax clearance before the final meeting, and by when must the last Declaration of Receipts and Payments be filed once the final meeting is called?",
+  "reference_answer": "No, tax clearance is not required: the liquidator should log in to mytax.iras.gov.sg to retrieve the company's latest Notices of Assessment and Statements of Accounts to confirm nothing is outstanding. The last Declaration must be filed within 7 days of the decision to call the Final Meeting, which must take place within 6 months of that decision.",
+  "key_facts": [
+   "not required to apply for tax clearance",
+   "7 days"
+  ],
+  "facts": [
+   [
+    "they are not required to apply for tax clearance"
+   ],
+   [
+    "The last Declaration must be filed within 7 days of the decision taken to call for the Final Meeting"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:d9b810ae03:11"
+   ],
+   [
+    "web:d9b810ae03:4"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "M17",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "How does IRAS decide whether a foreign entity is treated as a company or a partnership, and what happens if the entity does not meet all the listed factors?",
+  "reference_answer": "IRAS generally applies a resemblance approach, comparing the foreign entity with its corresponding Singapore entity (to be treated as a company it is expected to be in substance similar to a company incorporated under the Companies Act). If the entity does not meet all the company or partnership factors, IRAS considers all relevant factors, such as how the entity is classified for tax purposes in its home jurisdiction.",
+  "key_facts": [
+   "resemblance approach",
+   "home jurisdiction"
+  ],
+  "facts": [
+   [
+    "IRAS generally applies a resemblance approach to determine the classification of a foreign entity for Singapore income tax purposes"
+   ],
+   [
+    "Where a foreign entity does not meet all the factors as a company or a partnership, IRAS will consider all relevant factors such as how the entity is classified for tax purposes in its home jurisdiction"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:b04173540d:0"
+   ],
+   [
+    "web:b04173540d:1"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "M18",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "Our company paid for the directors' family holiday overseas, and we also took a loan that was used to buy a personal asset. Can we deduct the holiday cost or the loan interest?",
+  "reference_answer": "No. To be deductible, expenses must be incurred wholly and exclusively in the production of income and solely for business purposes; family meals, vacation/overseas holiday expenses and domestic groceries are non-business elements. Interest and borrowing costs on loans obtained for non-income producing purposes are also not tax deductible.",
+  "key_facts": [
+   "solely for business purposes",
+   "non-income producing purposes"
+  ],
+  "facts": [
+   [
+    "these expenses must be expended solely for business purposes and must not include any non-business element, such as family meals, vacation/ overseas holiday expenses and domestic groceries"
+   ],
+   [
+    "Where the loans or borrowings were obtained for non-income producing purposes, such expenses and costs are not tax deductible"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:173b58474f:4"
+   ],
+   [
+    "web:173b58474f:7"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "M19",
+  "type": "multi",
+  "tier": "pdf",
+  "qtype": "multi-part",
+  "source": "reit_etf_guide",
+  "difficulty": "hard",
+  "numeric": false,
+  "answerable": true,
+  "question": "Our REIT ETF's units are held through several tiers of nominees. Whose confirmation must the trustee obtain, and what must it do if a nominee gave wrong information and too little tax was deducted?",
+  "reference_answer": "Where units are held through more than one tier of nominees, the trustee/manager must obtain confirmation from the ultimate beneficiaries that they are qualifying unit holders, qualifying non-resident non-individual unit holders or qualifying non-resident funds (a one-off declaration is allowed). If it relied on incorrect information from nominees and deducted too little tax, it must immediately recover the shortfall from the nominees, and may recover it out of future amounts payable to them.",
+  "key_facts": [
+   "confirmation from the ultimate beneficiaries",
+   "recover from the nominees the shortfall"
+  ],
+  "facts": [
+   [
+    "Where the units are held through more than one tier of nominees, the trustee/manager must obtain confirmation from the ultimate beneficiaries"
+   ],
+   [
+    "the trustee/manager must take immediate action to recover from the nominees the shortfall in the amount of tax which should have been deducted"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:40"
+   ],
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:42"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "M20",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "multi-part",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "My company can't pay its tax on time. When should I contact IRAS, and how long does IRAS take to reply to a payment plan request?",
+  "reference_answer": "Contact IRAS before the payment due date so it can arrange a suitable payment arrangement. IRAS will review the request and inform you of the outcome within 15 working days.",
+  "key_facts": [
+   "before the payment due date",
+   "15 working days"
+  ],
+  "facts": [
+   [
+    "If you are facing difficulties paying your tax, you may reach out to us before the payment due date"
+   ],
+   [
+    "IRAS will review your request and inform you of the outcome within 15 working days"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:87a2e70770:0"
+   ],
+   [
+    "web:87a2e70770:7"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "O01",
   "type": "simple",
   "tier": "none",
   "qtype": "out-of-scope",
@@ -968,7 +1267,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q51",
+  "qid": "O02",
   "type": "simple",
   "tier": "none",
   "qtype": "out-of-scope",
@@ -984,7 +1283,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q52",
+  "qid": "O03",
   "type": "simple",
   "tier": "none",
   "qtype": "out-of-scope",
@@ -1000,7 +1299,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q53",
+  "qid": "O04",
   "type": "simple",
   "tier": "none",
   "qtype": "out-of-scope",
@@ -1016,7 +1315,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q55",
+  "qid": "P01",
   "type": "simple",
   "tier": "webpage",
   "qtype": "procedure",
@@ -1024,7 +1323,7 @@
   "difficulty": "easy",
   "numeric": true,
   "answerable": true,
-  "paraphrase_of": "Q03",
+  "paraphrase_of": "S02",
   "question": "when do i need to submit my company's tax return by this yr?",
   "reference_answer": "The deadline to file the YA 2026 Corporate Income Tax Return is 30 Nov 2026 at mytax.iras.gov.sg. This includes companies that did not carry on business or incurred a loss in the financial year 2025.",
   "key_facts": [
@@ -1043,7 +1342,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q56",
+  "qid": "P02",
   "type": "simple",
   "tier": "webpage",
   "qtype": "edge-case",
@@ -1051,7 +1350,7 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "paraphrase_of": "Q04",
+  "paraphrase_of": "S03",
   "question": "my company made no profit this year, still need to do the ECI thing?",
   "reference_answer": "A company does not need to file the ECI if its ECI is nil and its annual revenue is $5 million or below. If the ECI is nil but annual revenue is more than $5 million, it must still file (the ECI to be taxed can be entered as 0).",
   "key_facts": [
@@ -1073,7 +1372,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q57",
+  "qid": "P03",
   "type": "simple",
   "tier": "pdf",
   "qtype": "number",
@@ -1081,7 +1380,7 @@
   "difficulty": "easy",
   "numeric": true,
   "answerable": true,
-  "paraphrase_of": "Q19",
+  "paraphrase_of": "S12",
   "question": "max IBNR % for motor policies?",
   "reference_answer": "The maximum IBNR factor for motor insurance is 20% of net written premium.",
   "key_facts": [
@@ -1100,7 +1399,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q58",
+  "qid": "P04",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -1108,7 +1407,7 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "paraphrase_of": "Q22",
+  "paraphrase_of": "M02",
   "question": "we paid our corporate tax late, whats the penalty? and if we go on a GIRO plan whats the smallest monthly amount?",
   "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax if full payment is not received by the due date. Under a GIRO instalment plan the minimum monthly deduction is $50.",
   "key_facts": [
@@ -1134,7 +1433,7 @@
   "needs_review": false
  },
  {
-  "qid": "Q59",
+  "qid": "P05",
   "type": "multi",
   "tier": "webpage",
   "qtype": "multi-part",
@@ -1142,7 +1441,7 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "paraphrase_of": "Q23",
+  "paraphrase_of": "M03",
   "question": "we're shutting the company down, do we have to clear our tax first before striking off? and how many yrs do we keep the books after?",
   "reference_answer": "Companies must settle all outstanding tax liabilities and obligations with IRAS before applying to ACRA for strike-off, otherwise IRAS will object to the application. After the company has been struck off and dissolved, its books and papers must be retained for at least 5 years from the date of dissolution.",
   "key_facts": [

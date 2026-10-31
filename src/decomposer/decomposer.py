@@ -44,8 +44,8 @@ from decomposer_general_schemas import (
     Result,
 )
 
-MODEL = os.environ.get("INTAKE_MODEL", "qwen3.5:4b")
-PLANNER_MODEL = os.environ.get("PLANNER_MODEL", MODEL)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # make `src` importable when run on its own
+from src.config import INTAKE_MODEL as MODEL, PLANNER_MODEL    # the models live in src/config.py
 NUM_CTX = 8192
 
 FEW_SHOT_PATH = Path(__file__).parent / "few_shots.txt"

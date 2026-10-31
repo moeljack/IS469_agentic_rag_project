@@ -1,0 +1,43 @@
+{
+ "run_id": "a1_agentic_qwen_rep2",
+ "config": {
+  "run_id": "a1_agentic_qwen",
+  "system": "agentic",
+  "retriever": {
+   "mode": "hybrid_rerank",
+   "k": 5,
+   "candidates": 10
+  },
+  "agent": {
+   "max_steps": 4,
+   "max_queries": 2,
+   "max_chunks": 6,
+   "audit_min_score": 0.5
+  },
+  "generator": {
+   "provider": "ollama",
+   "model": "qwen3.5:4b"
+  },
+  "today": "2026-10-28"
+ },
+ "config_file": "a1_agentic_qwen.yaml",
+ "config_hash": "b102973d",
+ "prompt_version": "supervisor.ANSWER_SYSTEM",
+ "git_commit": "65992b284e50cf8c80be59f44e88ac8dce3dcdcd",
+ "git_dirty": true,
+ "corpus": {
+  "collection": "manuals",
+  "chunks": 546,
+  "embed_model": "Qwen/Qwen3-Embedding-0.6B",
+  "chroma_db_commit": "2268572e199f3ee7cfdb2f4e5f1203eda595a770",
+  "chroma_db_dirty": true
+ },
+ "dataset": "eval_questions.json",
+ "today": "2026-10-28",
+ "machine": {
+  "node": "bat",
+  "platform": "Linux-5.14.0-687.48.1.el9_8.x86_64-x86_64-with-glibc2.34",
+  "cuda": "NVIDIA GeForce GTX 1080 Ti"
+ },
+ "started": "2026-10-29T12:32:06"
+}

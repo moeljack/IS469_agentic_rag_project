@@ -3,7 +3,14 @@
     "allow": [
       "WebSearch",
       "Bash(cd /c/Users/joelm/IS469_agentic_rag_project/src/evaluation/rag_eval && grep -n \"score_grounding\\\\|grounding\" run_all.py analyze.py | head; echo ---; cat results/scores/zz_grounding_test_grounding.jsonl | head -c 600; echo; rm -f results/outputs/zz_grounding_test.jsonl results/scores/zz_grounding_test_grounding.jsonl; ls results/outputs results/scores)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(bash -n IS469_eval.sh)",
+      "Bash(cd /c/Users/joelm/IS469_agentic_rag_project/src/evaluation/rag_eval && ls results results/outputs results/retrieval results/scores 2>&1 | head -50; tail -n 60 ../../../ziyi.lim.2022.*.out 2>/dev/null | head -5)",
+      "Read(//c//**)",
+      "Bash(cat)",
+      "Bash(python /tmp/an.py)",
+      "Bash(python -)",
+      "Bash(python src/../run_all.py --help)"
     ],
     "additionalDirectories": [
       "C:\\Users\\joelm\\IS469_agentic_rag_project\\results\\outputs"

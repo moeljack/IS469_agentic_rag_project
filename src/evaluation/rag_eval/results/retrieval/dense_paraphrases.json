@@ -15,7 +15,7 @@
    "rr": 0.7333333333333333,
    "hit": 0.6,
    "n": 5,
-   "ms_median": 479.7155000001112
+   "ms_median": 62.25713109597564
   },
   "simple": {
    "r": 1.0,
@@ -24,7 +24,7 @@
    "rr": 1.0,
    "hit": 1.0,
    "n": 3,
-   "ms_median": 463.1706000000122
+   "ms_median": 64.0164390206337
   },
   "multi": {
    "r": 0.25,
@@ -33,12 +33,12 @@
    "rr": 0.3333333333333333,
    "hit": 0.0,
    "n": 2,
-   "ms_median": 546.9402999997328
+   "ms_median": 60.91339257545769
   }
  },
  "questions": [
   {
-   "qid": "Q55",
+   "qid": "P01",
    "type": "simple",
    "qtype": "procedure",
    "source": "online_guide",
@@ -46,52 +46,52 @@
     {
      "rank": 1,
      "id": "web:6c658c1ab3:0",
-     "score": 0.6832
+     "score": 0.6825
     },
     {
      "rank": 2,
      "id": "web:1a08219be7:3",
-     "score": 0.6101
+     "score": 0.6099
     },
     {
      "rank": 3,
      "id": "web:173b58474f:3",
-     "score": 0.5874
+     "score": 0.587
     },
     {
      "rank": 4,
      "id": "web:584d6034e5:1",
-     "score": 0.5869
+     "score": 0.5868
     },
     {
      "rank": 5,
      "id": "web:6c658c1ab3:5",
-     "score": 0.5755
+     "score": 0.5745
     },
     {
      "rank": 6,
      "id": "web:5cf4da84a8:4",
-     "score": 0.5663
+     "score": 0.5653
     },
     {
      "rank": 7,
      "id": "web:1a08219be7:9",
-     "score": 0.5648
+     "score": 0.5641
     },
     {
      "rank": 8,
      "id": "web:584d6034e5:3",
-     "score": 0.5638
+     "score": 0.5631
     },
     {
      "rank": 9,
      "id": "web:1a08219be7:6",
-     "score": 0.5629
+     "score": 0.5622
     },
     {
      "rank": 10,
      "id": "web:ab6eaf57fa:4",
-     "score": 0.5624
+     "score": 0.5612
     }
    ],
    "part_ranks": [
@@ -104,10 +104,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4631706000000122
+   "seconds": 0.06225713109597564
   },
   {
-   "qid": "Q56",
+   "qid": "P02",
    "type": "simple",
    "qtype": "edge-case",
    "source": "online_guide",
@@ -115,52 +115,52 @@
     {
      "rank": 1,
      "id": "web:b20dcc6490:2",
-     "score": 0.712
+     "score": 0.7143
     },
     {
      "rank": 2,
      "id": "web:b20dcc6490:3",
-     "score": 0.693
+     "score": 0.6948
     },
     {
      "rank": 3,
      "id": "web:b20dcc6490:4",
-     "score": 0.6689
+     "score": 0.6711
     },
     {
      "rank": 4,
-     "id": "web:b20dcc6490:14",
-     "score": 0.6651
+     "id": "web:b20dcc6490:13",
+     "score": 0.6666
     },
     {
      "rank": 5,
-     "id": "web:b20dcc6490:13",
-     "score": 0.6644
+     "id": "web:b20dcc6490:14",
+     "score": 0.6666
     },
     {
      "rank": 6,
      "id": "web:b20dcc6490:1",
-     "score": 0.663
+     "score": 0.6649
     },
     {
      "rank": 7,
      "id": "web:ce1754d1b3:13",
-     "score": 0.6605
+     "score": 0.6626
     },
     {
      "rank": 8,
      "id": "web:b20dcc6490:16",
-     "score": 0.6498
+     "score": 0.6519
     },
     {
      "rank": 9,
      "id": "web:1a08219be7:4",
-     "score": 0.6105
+     "score": 0.6128
     },
     {
      "rank": 10,
      "id": "web:b20dcc6490:15",
-     "score": 0.5895
+     "score": 0.5919
     }
    ],
    "part_ranks": [
@@ -173,10 +173,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.4797155000001112
+   "seconds": 0.06441012676805258
   },
   {
-   "qid": "Q57",
+   "qid": "P03",
    "type": "simple",
    "qtype": "number",
    "source": "insurer_guide",
@@ -184,52 +184,52 @@
     {
      "rank": 1,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16",
-     "score": 0.7547
+     "score": 0.7544
     },
     {
      "rank": 2,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:10",
-     "score": 0.6292
+     "score": 0.63
     },
     {
      "rank": 3,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:9",
-     "score": 0.6269
+     "score": 0.6273
     },
     {
      "rank": 4,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:0",
-     "score": 0.6235
+     "score": 0.6229
     },
     {
      "rank": 5,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:4",
-     "score": 0.6215
+     "score": 0.6219
     },
     {
      "rank": 6,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:17",
-     "score": 0.6095
+     "score": 0.6097
     },
     {
      "rank": 7,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:5",
-     "score": 0.5627
+     "score": 0.5625
     },
     {
      "rank": 8,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:1",
-     "score": 0.5514
+     "score": 0.5512
     },
     {
      "rank": 9,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:18",
-     "score": 0.5418
+     "score": 0.542
     },
     {
      "rank": 10,
      "id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:7",
-     "score": 0.5022
+     "score": 0.5025
     }
    ],
    "part_ranks": [
@@ -242,10 +242,10 @@
     "rr": 1.0,
     "hit": 1
    },
-   "seconds": 0.43235249999997905
+   "seconds": 0.0640164390206337
   },
   {
-   "qid": "Q58",
+   "qid": "P04",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -253,47 +253,47 @@
     {
      "rank": 1,
      "id": "web:87a2e70770:13",
-     "score": 0.6911
+     "score": 0.6909
     },
     {
      "rank": 2,
      "id": "web:87a2e70770:4",
-     "score": 0.664
+     "score": 0.6638
     },
     {
      "rank": 3,
      "id": "web:87a2e70770:7",
-     "score": 0.6404
+     "score": 0.6399
     },
     {
      "rank": 4,
      "id": "web:054b24831c:3",
-     "score": 0.6384
+     "score": 0.6371
     },
     {
      "rank": 5,
      "id": "web:87a2e70770:6",
-     "score": 0.6315
+     "score": 0.6309
     },
     {
      "rank": 6,
      "id": "web:b20dcc6490:6",
-     "score": 0.6292
+     "score": 0.6294
     },
     {
      "rank": 7,
      "id": "web:6c658c1ab3:6",
-     "score": 0.6158
+     "score": 0.6145
     },
     {
      "rank": 8,
      "id": "web:054b24831c:1",
-     "score": 0.613
+     "score": 0.6107
     },
     {
      "rank": 9,
      "id": "web:87a2e70770:11",
-     "score": 0.5904
+     "score": 0.5905
     },
     {
      "rank": 10,
@@ -312,10 +312,10 @@
     "rr": 0.16666666666666666,
     "hit": 0
    },
-   "seconds": 0.5229181999998218
+   "seconds": 0.06094989087432623
   },
   {
-   "qid": "Q59",
+   "qid": "P05",
    "type": "multi",
    "qtype": "multi-part",
    "source": "online_guide",
@@ -323,56 +323,56 @@
     {
      "rank": 1,
      "id": "web:584d6034e5:4",
-     "score": 0.7176
+     "score": 0.7178
     },
     {
      "rank": 2,
      "id": "web:50424a296b:6",
-     "score": 0.6681
+     "score": 0.6679
     },
     {
      "rank": 3,
      "id": "web:50424a296b:7",
-     "score": 0.6317
+     "score": 0.631
     },
     {
      "rank": 4,
      "id": "web:584d6034e5:10",
-     "score": 0.618
+     "score": 0.6186
     },
     {
      "rank": 5,
      "id": "web:584d6034e5:2",
-     "score": 0.5993
+     "score": 0.5992
     },
     {
      "rank": 6,
      "id": "web:584d6034e5:11",
-     "score": 0.599
+     "score": 0.5984
     },
     {
      "rank": 7,
-     "id": "web:584d6034e5:1",
-     "score": 0.5976
+     "id": "web:584d6034e5:0",
+     "score": 0.5984
     },
     {
      "rank": 8,
-     "id": "web:584d6034e5:0",
-     "score": 0.5973
+     "id": "web:584d6034e5:1",
+     "score": 0.5972
     },
     {
      "rank": 9,
      "id": "web:584d6034e5:3",
-     "score": 0.5922
+     "score": 0.5916
     },
     {
      "rank": 10,
      "id": "web:d9b810ae03:0",
-     "score": 0.5808
+     "score": 0.5806
     }
    ],
    "part_ranks": [
-    8,
+    7,
     2
    ],
    "metrics": {
@@ -382,7 +382,7 @@
     "rr": 0.5,
     "hit": 0
    },
-   "seconds": 0.5709623999996438
+   "seconds": 0.060876894276589155
   }
  ]
 }

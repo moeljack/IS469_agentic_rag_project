@@ -26,7 +26,17 @@ def split_system(messages):
     return system, [m for m in messages if m["role"] != "system"]
 
 
+def resolve_model(provider, model):
+    """`model: default` on an Ollama provider means the project's SUPERVISOR_MODEL in src/config.py, so the evaluation
+    runs the same model as the CLI and the app. Any other value is returned unchanged."""
+    if provider == "ollama" and str(model) == "default":
+        from src.config import SUPERVISOR_MODEL
+        return SUPERVISOR_MODEL
+    return model
+
+
 def make_llm(provider, model, **options):
+    model = resolve_model(provider, model)
     if not model or str(model).startswith("REPLACE"):
         raise ValueError(f"set an exact model id for provider {provider!r} in the config (got {model!r})")
     from src.evaluation.rag_eval.rag_eval_approach.env import has_key, load_env
