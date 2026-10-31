@@ -64,7 +64,9 @@ if ! timeout 30 bash -c 'until curl -s "http://$OLLAMA_HOST/api/tags" > /dev/nul
 fi
 
 echo "Ollama is online. Pulling model..."
-ollama pull qwen3.5:4b
+for MODEL in $(PYTHONPATH=. python3 -c "from src import config as c; print(' '.join({c.INTAKE_MODEL, c.PLANNER_MODEL, c.SUPERVISOR_MODEL, c.AUDITOR_MODEL}))"); do
+    ollama pull "$MODEL"   # the tags set in src/config.py
+done
 
 #################################################
 ##            RUN THE EVALUATION               ##
