@@ -1,0 +1,6 @@
+| name | questions | stopped_at_intake | reached_loop | steps_mean | steps_median | steps_p90 | steps_max | searches_mean | one_shot_share | wasted_search_rate | wasted_search_rate_answerable | wasted_followup_rate | followup_searches | redundant_query_rate | blocked_queries | budget_hit_rate | llm_calls_mean | stop_reasons |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| a1_agentic_qwen_rep1 | 35 | 10 | 25 | 1.32 | 1 | 2 | 3 | 1.2 | 80% | 23% | 12% | 80% | 5 | 2% | 3 | 0% | 3.28 | auditor_sufficient 19, no_progress 3, suggestions_repeat 2, no_new_queries 1 |
+| a1_agentic_qwen_rep2 | 35 | 9 | 26 | 1.38 | 1 | 2.5 | 4 | 1.27 | 81% | 24% | 14% | 86% | 7 | 2% | 5 | 4% | 3.35 | auditor_sufficient 20, suggestions_repeat 2, no_progress 2, max_steps 1, no_new_queries 1 |
+| a1_agentic_qwen_rep3 | 35 | 9 | 26 | 1.38 | 1 | 2.5 | 4 | 1.27 | 81% | 24% | 14% | 86% | 7 | 2% | 5 | 4% | 3.35 | auditor_sufficient 20, suggestions_repeat 2, no_progress 2, max_steps 1, no_new_queries 1 |
+| a1_agentic_qwen (pooled 3) | 105 | 28 | 77 | 1.36 | 1 | 2.4 | 4 | 1.25 | 81% | 24% | 13% | 84% | 19 | 2% | 13 | 3% | 3.32 | auditor_sufficient 59, no_progress 7, suggestions_repeat 6, no_new_queries 3, max_steps 2 |

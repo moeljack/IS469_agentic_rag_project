@@ -1,0 +1,22 @@
+[
+ {"case_id": "R01", "variant_of": "S01", "kind": "colloquial", "question": "whats the company tax rate in sg?"},
+ {"case_id": "R02", "variant_of": "S01", "kind": "typos", "question": "wat is the corprate tax rate in singapore"},
+ {"case_id": "R03", "variant_of": "S04", "kind": "verbose", "question": "Our overseas customer's tax office has asked us for a Certificate of Residence before they will apply the treaty rate. What exactly is that document and what is it used for?"},
+ {"case_id": "R04", "variant_of": "S04", "kind": "typos", "question": "what is a certifcate of residance and what is it for"},
+ {"case_id": "R05", "variant_of": "S05", "kind": "colloquial", "question": "form c-s vs form c-s lite, whats the diff?"},
+ {"case_id": "R06", "variant_of": "S05", "kind": "typos", "question": "differnce between form CS and form CS lite?"},
+ {"case_id": "R07", "variant_of": "S06", "kind": "colloquial", "question": "want to change our FYE, how do i do it?"},
+ {"case_id": "R08", "variant_of": "S06", "kind": "verbose", "question": "We have always closed our books in December, but our new parent company uses a March year end and we want to align with them. What do we have to do to change our company's financial year end?"},
+ {"case_id": "R09", "variant_of": "S07", "kind": "colloquial", "question": "whats the max fine if we just dont file our company tax return?"},
+ {"case_id": "R10", "variant_of": "S07", "kind": "typos", "question": "maximun penalty for not fileing a company tax return"},
+ {"case_id": "R11", "variant_of": "S09", "kind": "colloquial", "question": "can i just use my credit card to pay the company's tax?"},
+ {"case_id": "R12", "variant_of": "S09", "kind": "typos", "question": "pay corprate tax by credit card posible?"},
+ {"case_id": "R13", "variant_of": "S11", "kind": "colloquial", "question": "what does a REIT ETF need to do to get tax transparency?"},
+ {"case_id": "R14", "variant_of": "S11", "kind": "typos", "question": "conditons for reit etf tax transparancy treatment"},
+ {"case_id": "R15", "variant_of": "M08", "kind": "colloquial", "question": "how much does an advance ruling cost, and if i dont like the ruling can i appeal it?"},
+ {"case_id": "R16", "variant_of": "M08", "kind": "verbose", "question": "We're planning a restructuring and want certainty on the tax treatment before we go ahead. What fees would we pay to apply for an income tax advance ruling, and if IRAS rules against us, is there any way to appeal?"},
+ {"case_id": "R17", "variant_of": "M10", "kind": "colloquial", "question": "dormant co here - do i need to reapply for the filing waiver every year? and can a foreign co's sg branch apply too?"},
+ {"case_id": "R18", "variant_of": "M10", "kind": "typos", "question": "dormant compnay filing waiver, need to apply evry year? can singapore brnach of foreign company apply?"},
+ {"case_id": "R19", "variant_of": "M13", "kind": "colloquial", "question": "reit etf trustee here - how often can we claim back wrongly deducted WHT, and when is form UT due?"},
+ {"case_id": "R20", "variant_of": "M13", "kind": "verbose", "question": "I'm the trustee of a REIT ETF and we deducted too much withholding tax from some distributions. How frequently are we allowed to submit refund claims for that, and what is the annual deadline for filing the Form UT?"}
+]

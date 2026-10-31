@@ -11,10 +11,14 @@ Every record has the same fields, so the scorers never need to know which system
     context_used      the chunks shown to the answer step, as truncated there (RAGAS contexts)
     latency_s         seconds per stage plus total
     tokens            LLM input/output tokens and calls, over every LLM call for the question
+The agentic record also has:
+    search_log        one entry per executed search: queries, chunk ids returned, ids new to the run, ids the auditor
+                      saw and ids it approved (agent_eval/score_trajectory.py: step efficiency, gold-based evidence)
 
 Running the agent on evaluation questions (plan Section 5, Stage 2): a fresh user id per question, a fixed `today`,
 a temporary user store (the default one writes into the tracked chroma_db/), and no tools. SupervisorResult does not
-expose which chunks were seen or used, so the retrieval step and the answer-prompt builder are wrapped to record them.
+expose which chunks were seen or used, so the retrieval step, the auditor and the answer-prompt builder are wrapped to
+record them.
 """
 import shutil
 import sys
@@ -86,10 +90,19 @@ class AgenticSystem:
         self.sup.llm = make_llm(generator["provider"], generator["model"], **generator.get("options", {}))
 
         run_search, build_answer_prompt = self.sup.retrieval.run, self.sup._answer_messages
+        run_audit = self.sup.auditor.audit
 
         def recording_search(plan, queries=None, exclude=()):
             batch = run_search(plan, queries=queries, exclude=exclude)
-            self._queries.append([q.text for q in (queries if queries is not None else plan.queries)])
+            texts = [q.text for q in (queries if queries is not None else plan.queries)]
+            self._queries.append(texts)
+            new = [c.id for c in batch if c.id not in self._seen_ids]
+            # per-query "N new" from the retrieval adapter's notes ("retrieved 5 chunk(s), 3 new, for '...'")
+            notes = getattr(self.sup.retrieval, "last_notes", [])
+            query_new = [int(n.split(", ")[1].split()[0]) for n in notes if n.startswith("retrieved ")]
+            self._searches.append({"queries": texts, "returned": [c.id for c in batch], "new": new,
+                                   "query_new": query_new if len(query_new) == len(texts) else None,
+                                   "audited": [], "approved": []})
             for c in batch:
                 if c.id not in self._seen_ids:
                     self._seen_ids.add(c.id)
@@ -97,16 +110,24 @@ class AgenticSystem:
                                             c.metadata.get("source", ""), c.metadata.get("headings", "")))
             return batch
 
+        def recording_audit(question, chunks, kept_context="", tried=(), year=None):
+            audit = run_audit(question, chunks, kept_context, tried=tried, year=year)
+            if self._searches:                  # the audit always follows the search that retrieved these chunks
+                self._searches[-1]["audited"] = [c.id for c in chunks]
+                self._searches[-1]["approved"] = [c.id for c, ok in zip(chunks, audit.relevant) if ok]
+            return audit
+
         def recording_answer_prompt(question, plan, docs, assumptions, partial):
             self._context = [{"id": d.id, "text": d.content[:self.doc_chars]} for d in docs]
             return build_answer_prompt(question, plan, docs, assumptions, partial)
 
         self.sup.retrieval.run = recording_search
+        self.sup.auditor.audit = recording_audit
         self.sup._answer_messages = recording_answer_prompt   # instance attribute: called without self, like the staticmethod
         self.sup.retrieval.warm()
 
     def answer(self, question, qid, today):
-        self._seen, self._seen_ids, self._context, self._queries = [], set(), [], []
+        self._seen, self._seen_ids, self._context, self._queries, self._searches = [], set(), [], [], []
         USAGE.reset()
         result = self.sup.handle_turn(f"eval-{self.run_id}-{qid}", [{"role": "user", "content": question}], today=today)
         latency = {}
@@ -115,8 +136,8 @@ class AgenticSystem:
         return {"system": self.name, "status": result.status,
                 "answer": result.draft if result.status == "answered" else result.message,
                 "stop_reason": result.stop_reason, "retrieved_seen": self._seen, "context_used": self._context,
-                "searches": len(self._queries), "queries": self._queries, "latency_s": latency,
-                "tokens": USAGE.snapshot(), "trace": result.trace}
+                "searches": len(self._queries), "queries": self._queries, "search_log": self._searches,
+                "latency_s": latency, "tokens": USAGE.snapshot(), "trace": result.trace}
 
     def close(self):
         shutil.rmtree(self.store_dir, ignore_errors=True)
