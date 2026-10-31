@@ -26,7 +26,7 @@ CANDIDATES = int(os.environ.get("CANDIDATES", 10))   # chunks pulled from each r
 # The local LLMs (all run through Ollama). One place to change them; each can still be overridden by its environment
 # variable. The supervisor and the evaluation's `generator: model: default` read SUPERVISOR_MODEL, so the CLI, the
 # web app and the evaluation run the same models unless a config names another one on purpose.
-LLM_MODEL = "qwen3.5:9b"                                                        # tag to `ollama pull`
+LLM_MODEL = "qwen3.5:4b"                                                        # tag to `ollama pull`
 INTAKE_MODEL = os.environ.get("INTAKE_MODEL", LLM_MODEL)                        # intake gate: domain, intent, entities
 PLANNER_MODEL = os.environ.get("PLANNER_MODEL", INTAKE_MODEL)                   # follow-up search queries
 SUPERVISOR_MODEL = os.environ.get("SUPERVISOR_MODEL", INTAKE_MODEL)             # route, decide and answer calls
