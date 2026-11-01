@@ -349,12 +349,17 @@ def resolve(
 
     if missing:
         questions = [CLARIFY_TEMPLATES[m] for m in missing if m in CLARIFY_TEMPLATES]
-        return Clarify(
-            question=" ".join(questions),
-            missing=missing,
-            domain=raw.domain,
-            entities=entities,
-        )
+        if re.search(r"\d", question):   # the user gave figures, so a precise answer needs the rest: ask first
+            return Clarify(
+                question=" ".join(questions),
+                missing=missing,
+                domain=raw.domain,
+                entities=entities,
+            )
+        # No figures in the question ("When is the deadline?", "How much is the CIT rebate?"): the documents hold the
+        # general rule, so answer that first and offer to make it specific, instead of a bare question back.
+        assumptions = [*assumptions, "Answered in general terms because the question gave no company details. "
+                                     "For a specific answer, tell me: " + " ".join(questions)]
 
     # 2. Sub-queries, only when the intake call was asked to plan them
     queries = build_planned_queries(getattr(raw, "sub_queries", []), raw.domain, tax_year, max_queries)

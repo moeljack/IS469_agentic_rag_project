@@ -26,7 +26,7 @@ route step is skipped and step 1 searches those queries: the original pipeline, 
 
 Integration layer (this file): the real components have different shapes from what the loop needs, so two small
 adapters live here instead of changing them:
-  * RetrievalAgent  - .run(plan, queries=None, exclude=()) -> list[Chunk], built on Retriever.search()
+  * RetrievalAgent  - .run(plan, queries=None, exclude=(), question=None) -> list[Chunk], built on Retriever.search()
   * Auditor         - .audit(question, chunks, kept_context) -> RetrievalAudit, built on AuditorAgent.evaluate()
                       (via agent_judge). Any failure fails open: chunks are kept unjudged and the trace says so.
 
@@ -94,7 +94,7 @@ QUERY_SIMILARITY = 0.7              # a follow-up query sharing this much of its
                                     # retrieves the same chunks, so it is not run
 DOC_CHARS = 1200                   # per-chunk text shown to the model when answering
 AUDIT_CHARS = 800                   # per-chunk text shown to the auditor
-MAX_DOCS = 6                        # vetted chunks put in the answer prompt
+MAX_DOCS = 8                        # vetted chunks put in the answer prompt (8 x DOC_CHARS fits the 8k context)
 MAX_DRY_ROUNDS = 2                  # stop after this many searches in a row that approve nothing new (and nothing is vetted)
 
 NO_CONTEXT = "The IRAS sources I have don't cover this. Please check iras.gov.sg or rephrase your question."
@@ -205,7 +205,9 @@ class RetrievalAgent:
             return f"could not warm the retriever: {e}"
         return f"retriever warm ({time.perf_counter() - t0:.1f}s)"
 
-    def run(self, plan: Decompose, queries=None, exclude=()) -> list[Chunk]:
+    def run(self, plan: Decompose, queries=None, exclude=(), question: Optional[str] = None) -> list[Chunk]:
+        """question: when given, every merged chunk is re-scored by the reranker against it, so the batch cap and the
+        supervisor's reranker cutoff judge relevance to the question rather than to the keyword query that found it."""
         self.last_notes = []
         chosen = queries if queries is not None else plan.queries
         seen, found = set(exclude), {}
@@ -220,7 +222,12 @@ class RetrievalAgent:
                 found[h["id"]] = h
                 new += 1
             self.last_notes.append(f"retrieved {len(hits)} chunk(s), {new} new, for {q.text!r}")
-        ranked = sorted(found.values(), key=lambda h: h.get("score") or 0.0, reverse=True)[: self.max_chunks]
+        rerank = getattr(self.retriever, "_rerank", None)
+        reranked = "rerank" in getattr(self.retriever, "mode", "rerank")   # a mode without a reranker keeps its scores
+        if question and found and rerank and reranked:
+            scores = rerank(question, list(found))
+            found = {i: {**h, "score": round(scores[i], 4)} for i, h in found.items()}
+        ranked =sorted(found.values(), key=lambda h: h.get("score") or 0.0, reverse=True)[: self.max_chunks]
         return [Chunk(id=h["id"], content=h["text"],
                       metadata={"source": h.get("source", ""), "headings": h.get("headings", ""),
                                 "pages": h.get("pages", ""), "source_type": h.get("source_type", ""),
@@ -275,8 +282,19 @@ def agent_judge(agent=None, model: str = AUDITOR_MODEL) -> Callable:
             v = str(v or "").strip()
             return "" if v.strip('"').lower() in ("null", "none") else v
         suggested = [text(resp.recommended_search_query)] if text(resp.recommended_search_query) else []
-        return {"chunks": rows, "suggested_queries": suggested, "sufficient": resp.is_sufficient,
-                "missing": text(getattr(resp, "missing", None)) or None}
+        sufficient, missing = resp.is_sufficient, text(getattr(resp, "missing", None)) or None
+        # The 4B model says "sufficient" too easily, so it is checked part by part: every part of the question must
+        # name an approved chunk (or an earlier-approved topic, 0) that covers it, whatever the overall verdict says.
+        parts = list(getattr(resp, "question_parts", None) or [])
+        if parts:
+            approved = {i for i, r in enumerate(rows, 1) if r["relevant"]}
+            has_earlier = bool(kept_context.strip())
+            uncovered = [p for p in parts
+                         if not (p.covered_by in approved or (p.covered_by == 0 and has_earlier))]
+            if uncovered:
+                sufficient = False
+                missing = missing or text(uncovered[0].part)
+        return {"chunks": rows, "suggested_queries": suggested, "sufficient": sufficient, "missing": missing}
 
     return judge
 
@@ -368,6 +386,7 @@ class _Run:
     seen_chunk_ids: set = field(default_factory=set)    # every chunk id any search returned
     last_new_chunks_count: Optional[int] = None         # chunks the latest search returned for the first time
     route: str = ""                                     # how step 1 searched (see SupervisorResult.route)
+    question: str = ""                                  # what every retrieved chunk is scored against (the question as written)
 
 
 # ---------------------------------------------------------------- Ollama runtime: keep the models loaded
@@ -456,7 +475,7 @@ class Supervisor:
                  planner: Optional[Callable] = None, intake_plans: bool = False):
         """
         store:      UserStore
-        retrieval:  RetrievalAgent (anything with .run(plan, queries=None, exclude=()) -> list[Chunk])
+        retrieval:  RetrievalAgent (anything with .run(plan, queries=None, exclude=(), question=None) -> list[Chunk])
         auditor:    Auditor        (anything with .audit(question, chunks, kept_context) -> RetrievalAudit)
         llm:        callable(messages, schema=None) -> str; defaults to local Ollama (SUPERVISOR_MODEL, qwen3.5:4b).
                     Used for the route step, every decide step and the answer.
@@ -527,6 +546,8 @@ class Supervisor:
                                + ". Tell me if any of these changed.")
 
         run = _Run()
+        # the unplanned query is the question with every user turn, so a clarification answer is scored in context
+        run.question = plan.queries[0].text if plan.queries and not plan.planned else question
         audit_q = _audit_question(plan, question)
         stop, ask = self._agent_loop(plan, question, audit_q, run, trace)
 
@@ -573,11 +594,19 @@ class Supervisor:
                 # queries already searched (or near-repeats): another search would bring back the same chunks, so
                 # answer now instead of paying for a decide call whose search would be skipped anyway.
                 repeats = _repeated_suggestions(run, available)
-                if repeats:
+                gap = _uncovered_fact(run)
+                if repeats and gap:
+                    # the auditor says a fact is still missing but only suggests queries already searched: search the
+                    # missing fact itself, once, instead of answering with part of the question uncovered
+                    trace.append(f"step {step}: search - auditor's suggestions {repeats} repeat searched queries; "
+                                 f"searching its missing fact {gap!r} instead")
+                    d = {"action": "search", "queries": [gap], "reason": "searching the fact the auditor reports missing"}
+                elif repeats:
                     trace.append(f"step {step}: answer - auditor's suggestions {repeats} repeat searched queries; "
                                  "skipping the decide call")
                     return "suggestions_repeat", None
-                d = _timed(run.timings, "decide", self._decide, question, plan, run, available, trace)
+                else:
+                    d = _timed(run.timings, "decide", self._decide, question, plan, run, available, trace)
 
             action = d["action"]
             trace.append(f"step {step}: {action} - {d.get('reason', '')[:120]}")
@@ -659,7 +688,13 @@ class Supervisor:
                 trace.append(f"  guard: skipped near-duplicate planned queries {skipped}")
             if texts:
                 trace.append(f"  planner queries{f' for missing {missing!r}' if missing else ''}: {texts}")
-                return [make(text=q, filter=flt) for q in texts[: self.max_queries]]
+                queries = [make(text=q, filter=flt) for q in texts[: self.max_queries]]
+                if step == 1 and plan.queries and not plan.planned:
+                    # the question as written goes first: sub-queries alone can miss a part the whole question finds
+                    first = plan.queries[0]
+                    queries = [first] + [q for q in queries if q.text.lower() != first.text.lower()]
+                    trace.append("  also searching the question as written")
+                return queries
             trace.append("  planner gave no new queries; falling back to "
                          + ("the question as written" if step == 1 else "the model's and auditor's queries"))
             skipped = []
@@ -709,7 +744,8 @@ class Supervisor:
     def _search(self, plan: Decompose, audit_q: str, queries, run: _Run, trace: list[str]):
         """Retrieve, drop low-scoring chunks, audit the rest. Returns this search's RetrievalAudit, or None if no
         auditor call was made (nothing new retrieved, or everything new fell below the reranker cutoff)."""
-        batch = _timed(run.timings, "retrieval", self.retrieval.run, plan, queries=queries, exclude=run.judged)
+        batch = _timed(run.timings, "retrieval", self.retrieval.run, plan, queries=queries, exclude=run.judged,
+                       question=run.question)
         # chunks never returned before in this run: zero of them on a follow-up search ends the loop
         run.last_new_chunks_count = sum(1 for c in batch if c.id not in run.seen_chunk_ids)
         run.seen_chunk_ids.update(c.id for c in batch)
@@ -894,6 +930,14 @@ def _repeated_suggestions(run: _Run, available: list[str]) -> list[str]:
     if _new_queries(run.suggestions, run.tried):
         return []
     return list(run.suggestions)
+
+
+def _uncovered_fact(run: _Run) -> str:
+    """The fact the latest audit says is still missing, when it is a new query worth searching, else ''."""
+    if not run.audits or run.audits[-1].sufficient is not False:
+        return ""
+    missing = run.audits[-1].missing or ""
+    return missing if missing and _new_queries([missing], run.tried) else ""
 
 
 def _score(c: Chunk) -> Optional[float]:

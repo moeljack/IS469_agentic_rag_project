@@ -68,8 +68,17 @@ def test_intake_with_sub_queries_is_still_the_original_planned_pipeline():
 def test_gates_still_refuse_and_clarify_before_any_supervisor_work():
     assert isinstance(resolve(IntakeOutput(domain=TaxDomain.OUT_OF_SCOPE, intent=Intent.OUT_OF_SCOPE), "q", TODAY),
                       Refuse)
-    clar = resolve(IntakeOutput(domain=TaxDomain.CIT, intent=Intent.COMPUTATION, cit=CITEntities(ya=2026)), "q", TODAY)
+    clar = resolve(IntakeOutput(domain=TaxDomain.CIT, intent=Intent.COMPUTATION, cit=CITEntities(ya=2026)),
+                   "Compute the tax on my profit for YA 2026", TODAY)      # the question has a figure: ask first
     assert isinstance(clar, Clarify) and clar.missing == ["chargeable_income"]
+
+
+def test_missing_detail_without_figures_is_answered_in_general_terms_with_an_offer_to_refine():
+    for intent, question in ((Intent.COMPUTATION, "How much CIT rebate will my company get?"),
+                             (Intent.DEADLINE, "When is the deadline to file my company's tax return?")):
+        p = resolve(IntakeOutput(domain=TaxDomain.CIT, intent=intent, cit=CITEntities(ya=2026)), question, TODAY)
+        assert not isinstance(p, Clarify) and p.queries[0].text == question
+        assert "general terms" in p.assumptions[-1] and "tell me" in p.assumptions[-1]
 
 
 def test_refused_question_never_reaches_the_route_step(store):
@@ -107,7 +116,7 @@ def test_complex_question_routes_to_decompose_and_searches_the_planner_queries(s
     assert out.route == "decompose" and out.status == "answered"
     assert planner.calls[0]["question"] == q and planner.calls[0]["missing"] is None
     assert "newly incorporated: True" in planner.calls[0]["known"] and planner.calls[0]["max_queries"] == 2
-    assert ret.calls[0][0] == ["start-up tax exemption qualifying conditions", "partial tax exemption"]  # max_queries
+    assert ret.calls[0][0] == [q, "start-up tax exemption qualifying conditions", "partial tax exemption"]  # question first, then max_queries
     assert any(t.startswith("  planner queries: ") for t in out.trace) and "plan" in dict(out.timings)
 
 

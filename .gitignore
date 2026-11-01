@@ -9,3 +9,4 @@ models/
 __init.py__
 .DS_Store
 src/evaluation/rag_eval/results/
+src/evaluation/rag_eval/results_stale_old_agent/

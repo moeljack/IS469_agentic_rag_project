@@ -35,7 +35,7 @@ def plan(intent=Intent.LOOKUP, **ent):
 class FakeRetrieval:
     """Returns the first scripted batch for the plan's queries, then one batch per call. Records queries used."""
     def __init__(self, *batches): self.batches, self.calls, self.last_notes = list(batches), [], []
-    def run(self, plan, queries=None, exclude=()):
+    def run(self, plan, queries=None, exclude=(), question=None):
         self.calls.append(([q.text for q in (queries or plan.queries)], set(exclude)))
         return list(self.batches.pop(0)) if self.batches else []
 
@@ -126,6 +126,19 @@ def test_retrieval_agent_uses_given_queries_and_skips_excluded():
     assert [q[0] for q in r.calls] == ["x"] and [c.id for c in out] == ["web:2:0"]
 
 
+def test_retrieval_agent_rescores_against_the_question_before_ordering_and_capping():
+    class Reranking(FakeRetriever):
+        def _rerank(self, query, ids):
+            self.reranked = (query, list(ids))
+            return {"web:1:0": .95, "web:2:0": .1, "web:3:0": .6}
+    r = Reranking({"a": [H("web:1:0", .3), H("web:2:0", .9)], "b": [H("web:3:0", .8)]})
+    p = plan(); p.queries = planned("a", "b")
+    out = RetrievalAgent(r, max_chunks=2).run(p, question="the whole question")
+    assert r.reranked == ("the whole question", ["web:1:0", "web:2:0", "web:3:0"])
+    assert [(c.id, c.metadata["score"]) for c in out] == [("web:1:0", .95), ("web:3:0", .6)]
+    assert [c.id for c in RetrievalAgent(r).run(p)] == ["web:2:0", "web:3:0", "web:1:0"]   # no question: query scores
+
+
 def test_retrieval_agent_caps_batch_and_passes_min_score():
     r = FakeRetriever({"a": [H(f"web:{i}:0", 1 - i / 20) for i in range(1, 6)]})
     p = plan(); p.queries = planned("a")
@@ -134,16 +147,18 @@ def test_retrieval_agent_caps_batch_and_passes_min_score():
 
 
 # ---------------------------------------------------------------- adapter: AuditorAgent -> Auditor
-def fake_agent(evals, sufficient=False, recommended=None, missing=None):
-    """evals: (key, status, reason); an int key is the chunk number (current auditor), a str key a chunk id (older)."""
+def fake_agent(evals, sufficient=False, recommended=None, missing=None, parts=None):
+    """evals: (key, status, reason); an int key is the chunk number (current auditor), a str key a chunk id (older).
+    parts: (part text, covered_by) pairs for the auditor's question_parts; None = an older auditor without them."""
     calls, kwargs = [], []
     def evaluate(original_query, sub_prompt, chunks, **kw):
         calls.append((original_query, sub_prompt, chunks))
         kwargs.append(kw)
+        extra = {} if parts is None else {"question_parts": [SimpleNamespace(part=p, covered_by=c) for p, c in parts]}
         return SimpleNamespace(is_sufficient=sufficient, recommended_search_query=recommended, missing=missing,
                                chunk_evaluations=[SimpleNamespace(chunk=k, status=s, reason=r) if isinstance(k, int)
                                                   else SimpleNamespace(chunk_id=k, status=s, reason=r)
-                                                  for k, s, r in evals])
+                                                  for k, s, r in evals], **extra)
     return SimpleNamespace(evaluate=evaluate, calls=calls, kwargs=kwargs)
 
 
@@ -183,6 +198,28 @@ def test_auditor_passes_tried_queries_and_year_and_reports_what_is_missing():
     audit = Auditor(judge=agent_judge(agent)).audit("q", [C(1)], tried=["sute conditions"], year=2026)
     assert agent.kwargs == [{"tried_queries": ["sute conditions"], "year": 2026}]
     assert audit.missing == "shareholder count limit" and audit.reasons == [""]
+
+
+def test_sufficient_only_when_every_question_part_names_an_approved_chunk():
+    chunks = [C(1), C(2)]
+    ok = fake_agent([(1, "approved", None), (2, "approved", None)], sufficient=True,
+                    parts=[("tax rate", 1), ("filing deadline", 2)])
+    assert Auditor(judge=agent_judge(ok)).audit("q", chunks).sufficient is True
+    # the model says "sufficient", but the second part names no chunk: the check overrides it and names the gap
+    gap = fake_agent([(1, "approved", None), (2, "approved", None)], sufficient=True,
+                     parts=[("tax rate", 1), ("filing deadline", None)])
+    audit = Auditor(judge=agent_judge(gap)).audit("q", chunks)
+    assert audit.sufficient is False and audit.missing == "filing deadline"
+    # a part "covered" by a rejected chunk is not covered
+    rejected = fake_agent([(1, "approved", None), (2, "rejected", "off topic")], sufficient=True,
+                          parts=[("tax rate", 1), ("filing deadline", 2)])
+    assert Auditor(judge=agent_judge(rejected)).audit("q", chunks).sufficient is False
+    # 0 means an earlier-approved topic, which only exists when kept_context is given
+    earlier = fake_agent([(1, "approved", None)], sufficient=True, parts=[("tax rate", 1), ("deadline", 0)])
+    assert Auditor(judge=agent_judge(earlier)).audit("q", [C(1)], "- Deadlines").sufficient is True
+    assert Auditor(judge=agent_judge(earlier)).audit("q", [C(1)], "").sufficient is False
+    # an auditor that returns no parts keeps its own verdict
+    assert Auditor(judge=agent_judge(fake_agent([(1, "approved", None)], sufficient=True))).audit("q", [C(1)]).sufficient
 
 
 def test_three_argument_judges_still_work_without_tried_or_year():
@@ -481,8 +518,9 @@ def test_real_decomposer_refuses_and_clarifies_through_the_supervisor(store):
     sup, llm, _ = make(store)
     refuse = resolve(LLMOutput(domain=TaxDomain.OUT_OF_SCOPE, intent=Intent.OUT_OF_SCOPE), "q", TODAY)
     assert sup.supervise("u1", refuse, "q").status == "refused"
-    clar = resolve(LLMOutput(domain=TaxDomain.CIT, intent=Intent.COMPUTATION, cit=CITEntities(ya=2026)), "q", TODAY)
-    out = sup.supervise("u1", clar, "q")
+    clar = resolve(LLMOutput(domain=TaxDomain.CIT, intent=Intent.COMPUTATION, cit=CITEntities(ya=2026)),
+                   "Compute my tax for YA 2026", TODAY)
+    out = sup.supervise("u1", clar, "Compute my tax for YA 2026")
     assert out.status == "clarify" and "chargeable income" in out.message and llm.answer_calls == []
     assert store.pop_pending("u1").ya == 2026
 
@@ -499,6 +537,16 @@ def test_first_search_uses_at_most_max_queries_in_order(store):
     sup.max_queries = 2
     out = sup.supervise("u1", plan_with_queries("q1", "q2", "q3", "q4"), "q")
     assert ret.calls[0][0] == ["q1", "q2"] and any("2 of 4 planned queries" in t for t in out.trace)
+
+
+def test_decompose_first_search_includes_the_question_as_written(store):
+    llm = ScriptedLLM([D("decompose")])
+    ret = FakeRetrieval((DOC,))
+    sup = Supervisor(store, ret, Auditor(judge=judge_script(({1}, []))), llm=llm,
+                     planner=lambda q, known, missing, tried, n: ["sub a", "sub b", "sub c"])
+    p = plan(); p.planned = False                              # as resolve() builds it when the intake wrote no queries
+    sup.supervise("u1", p, "what is the rate?")
+    assert ret.calls[0][0] == ["rate", "sub a", "sub b"]       # the question first, then max_queries sub-queries
 
 
 def test_follow_up_searches_are_capped_too(store):
@@ -932,6 +980,23 @@ def test_repeated_suggestions_skip_the_decide_call(store):
     out = sup.supervise("u1", plan(), "q")
     assert llm.decide_calls == [] and len(ret.calls) == 1
     assert out.stop_reason == "suggestions_repeat" and out.status == "answered"
+
+
+def test_repeated_suggestions_with_a_missing_fact_search_that_fact_before_answering(store):
+    verdicts = iter([{"chunks": [{"index": 1, "relevant": True, "reason": ""}], "suggested_queries": ["rates"],
+                      "sufficient": False, "missing": "late payment penalty"},
+                     {"chunks": [{"index": 1, "relevant": True, "reason": ""}], "suggested_queries": [],
+                      "sufficient": True, "missing": None}])
+    judge = lambda question, chunks, kept: next(verdicts)
+    sup, llm, ret = make(store, [], batches=([C(1)], [C(2)]), judge=judge)
+    out = sup.supervise("u1", plan(), "q")
+    assert [c[0] for c in ret.calls] == [["rate"], ["late payment penalty"]]      # "rates" repeated; the gap was searched
+    assert llm.decide_calls == [] and out.status == "answered" and out.stop_reason == "auditor_sufficient"
+    # a missing fact that was already searched cannot loop: the old stop applies
+    verdicts = iter([{"chunks": [{"index": 1, "relevant": True, "reason": ""}], "suggested_queries": ["rates"],
+                      "sufficient": False, "missing": "rates"}])
+    sup, llm, ret = make(store, [], batches=([C(1)],), judge=lambda question, chunks, kept: next(verdicts))
+    assert sup.supervise("u1", plan(), "q").stop_reason == "suggestions_repeat" and len(ret.calls) == 1
 
 
 def test_a_new_suggestion_or_no_suggestion_still_asks_the_model(store):

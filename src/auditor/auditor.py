@@ -43,10 +43,22 @@ class ChunkEvaluation(BaseModel):
     _clean_reason = field_validator("reason", mode="before")(_none_if_empty)
 
 
+class QuestionPart(BaseModel):
+    part: str = Field(description="One distinct thing the question asks for, in at most 10 words.",
+                      json_schema_extra=lambda s: s.update(maxLength=80))
+    covered_by: Optional[int] = Field(
+        default=None,
+        description="The number of an APPROVED chunk that states the answer to this part, or 0 if a topic under "
+                    "'Topics already covered' does; null if no chunk does.")
+
+
 class AuditorResponse(BaseModel):
     # Order matters: the model writes fields in this order, so the verdicts come first and the overall judgement after.
     chunk_evaluations: List[ChunkEvaluation] = Field(description="Evaluation of each individual chunk.")
-    is_sufficient: bool = Field(description="True only if the approved chunks together answer ALL parts of the question.")
+    question_parts: List[QuestionPart] = Field(
+        default_factory=list,
+        description="The distinct things the question asks for (1 to 4), each with the chunk that answers it.")
+    is_sufficient: bool = Field(description="True only if every question part is covered by an approved chunk.")
     missing: Optional[str] = Field(
         default=None,
         description="If is_sufficient is false: the fact still missing, in at most 8 words. Otherwise null.",
@@ -85,8 +97,9 @@ Decide which retrieved chunks are useful for answering the user's question, and 
 - reason: only for rejected chunks, at most 8 words. Use null for approved chunks.
 
 ### Then
-- is_sufficient: true only if the approved chunks together answer ALL parts of the question.
-- missing: if is_sufficient is false, name the fact that is still missing in at most 8 words (e.g. "shareholder count limit"); otherwise null.
+- question_parts: list the distinct things the question asks for (1 to 4; a one-fact question has one part). For each part give covered_by: the number of an APPROVED chunk whose text actually states the answer to that part, 0 if a topic under "Topics already covered" does, or null if no chunk does. A chunk on the same topic that does not state the answer does NOT cover the part.
+- is_sufficient: true only if every part has a covered_by that is not null.
+- missing: if is_sufficient is false, name the part that is still uncovered in at most 8 words (e.g. "shareholder count limit"); otherwise null.
 - recommended_search_query: if is_sufficient is false, a short keyword query (max 8 words, no years) that would find the missing fact and is NOT one of the queries already searched; otherwise null.
 Return JSON matching the schema.
 """

@@ -92,8 +92,8 @@ class AgenticSystem:
         run_search, build_answer_prompt = self.sup.retrieval.run, self.sup._answer_messages
         run_audit = self.sup.auditor.audit
 
-        def recording_search(plan, queries=None, exclude=()):
-            batch = run_search(plan, queries=queries, exclude=exclude)
+        def recording_search(plan, queries=None, exclude=(), question=None):
+            batch = run_search(plan, queries=queries, exclude=exclude, question=question)
             texts = [q.text for q in (queries if queries is not None else plan.queries)]
             self._queries.append(texts)
             new = [c.id for c in batch if c.id not in self._seen_ids]
