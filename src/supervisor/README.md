@@ -154,8 +154,9 @@ actions (including what the auditor said is missing) and picks one action:
 
 1. **Retrieve.** `RetrievalAgent` runs each query through `Retriever.search()` (vector + BM25 + reranker), drops
    chunks already judged, merges, sorts by reranker score and keeps the top `max_chunks`.
-2. **Reranker cutoff.** Chunks scoring below `audit_min_score` are rejected without an auditor call. While nothing
-   is approved yet, the best low-scoring chunk is still audited, so a weakly matching topic isn't lost entirely.
+2. **Reranker cutoff.** Chunks scoring below `audit_min_score` are rejected without an auditor call, except the best
+   `audit_keep_top` (3) of each search, which are always audited. A chunk's score is the better of its score for the
+   question and for the query that found it, so the chunk answering one part of a multi-part question isn't dropped.
 3. **Audit.** `Auditor` asks the auditor model whether each chunk is related to the question. It also reports
    whether the approved chunks are sufficient, what is missing, and a suggested query. If the auditor fails, chunks
    are kept unjudged and the trace says so.

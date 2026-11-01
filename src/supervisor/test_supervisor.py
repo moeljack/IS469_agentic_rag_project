@@ -135,7 +135,8 @@ def test_retrieval_agent_rescores_against_the_question_before_ordering_and_cappi
     p = plan(); p.queries = planned("a", "b")
     out = RetrievalAgent(r, max_chunks=2).run(p, question="the whole question")
     assert r.reranked == ("the whole question", ["web:1:0", "web:2:0", "web:3:0"])
-    assert [(c.id, c.metadata["score"]) for c in out] == [("web:1:0", .95), ("web:3:0", .6)]
+    # each chunk keeps the better of its question score and its query score: 2 scored .9 for query "a", 3 scored .8 for "b"
+    assert [(c.id, c.metadata["score"]) for c in out] == [("web:1:0", .95), ("web:2:0", .9)]
     assert [c.id for c in RetrievalAgent(r).run(p)] == ["web:2:0", "web:3:0", "web:1:0"]   # no question: query scores
 
 
@@ -500,7 +501,8 @@ def test_real_decomposer_feeds_retriever_adapter_and_auditor_adapter(store):
     })
     agent = fake_agent([("web:1:0", "approved", "gives the rate"), ("web:2:0", "rejected", "GST")], sufficient=True)
     llm = ScriptedLLM([D("answer")], "The rate is 17% [Doc 1].")
-    sup = Supervisor(store, RetrievalAgent(retriever), Auditor(judge=agent_judge(agent)), llm=llm, intake=intake)
+    sup = Supervisor(store, RetrievalAgent(retriever), Auditor(judge=agent_judge(agent)), llm=llm, intake=intake,
+                     audit_keep_top=0)                                    # this test is about the plain cutoff
 
     out = sup.handle_turn("u1", [{"role": "user", "content": "what is the rate?"}], TODAY)
 
@@ -854,6 +856,7 @@ def recording_judge(*steps):
 def test_chunks_below_the_reranker_cutoff_skip_the_auditor_and_are_traced(store):
     judge = recording_judge(({1}, []))
     sup, _, _ = make(store, [D("answer")], batches=([S(1, .9), S(2, .45), S(3, .1)],), judge=judge)
+    sup.audit_keep_top = 0
     out = sup.supervise("u1", plan(), "q")
     assert judge.seen == [["web:1:0"]]
     assert "    skipped [0.45] H2: reranker score below 0.50, not audited" in out.trace
@@ -864,16 +867,39 @@ def test_a_search_whose_new_chunks_are_all_below_the_cutoff_makes_no_auditor_cal
     judge = recording_judge(({1}, []))
     sup, _, ret = make(store, [D("search", queries=["more"]), D("answer")], batches=([S(1, .9)], [S(2, .3)]),
                        judge=judge)
+    sup.audit_keep_top = 0
     out = sup.supervise("u1", plan(), "q")
     assert len(ret.calls) == 2 and judge.seen == [["web:1:0"]] and len(out.audits) == 1
     assert any("1 chunk(s) below reranker cutoff 0.50, none audited" in t for t in out.trace)
 
 
-def test_best_low_scoring_chunk_is_still_audited_while_nothing_is_vetted(store):
+def test_the_best_chunks_of_a_search_are_audited_whatever_their_score(store):
+    judge = recording_judge(({1}, []))
+    sup, _, _ = make(store, [D("answer")], batches=([S(1, .4), S(2, .3), S(3, .2), S(4, .1), S(5, .05)],), judge=judge)
+    out = sup.supervise("u1", plan(), "q")
+    assert judge.seen == [["web:1:0", "web:2:0", "web:3:0"]] and out.status == "answered"
+    assert "    skipped [0.10] H4: reranker score below 0.50, not audited" in out.trace
+
+
+def test_high_scoring_chunks_beyond_the_top_few_are_audited_and_keep_top_zero_restores_the_plain_cutoff(store):
+    chunks = [S(1, .9), S(2, .8), S(3, .7), S(4, .6), S(5, .1)]
+    judge = recording_judge(({1}, []))
+    sup, _, _ = make(store, [D("answer")], batches=(chunks,), judge=judge)
+    sup.supervise("u1", plan(), "q")
+    assert judge.seen == [["web:1:0", "web:2:0", "web:3:0", "web:4:0"]]
     judge = recording_judge(({1}, []))
     sup, _, _ = make(store, [D("answer")], batches=([S(1, .2), S(2, .4)],), judge=judge)
-    out = sup.supervise("u1", plan(), "q")
-    assert judge.seen == [["web:2:0"]] and out.status == "answered"
+    sup.audit_keep_top = 0
+    sup.supervise("u1", plan(), "q")
+    assert judge.seen == []                                          # nothing reaches the auditor
+
+
+def test_chunks_left_out_by_the_cutoff_are_not_blocked_from_later_searches(store):
+    judge = recording_judge(({1}, ["more"]), ({1, 2}, []))
+    sup, _, ret = make(store, [D("search", queries=["more"]), D("answer")],
+                       batches=([S(1, .9), S(2, .8), S(3, .7), S(4, .1)], [S(4, .8)]), judge=judge)
+    sup.supervise("u1", plan(), "q")
+    assert ret.calls[1][1] == {"web:1:0", "web:2:0", "web:3:0"}      # web:4:0 was never audited, so not excluded
 
 
 def test_cutoff_zero_audits_everything_and_unscored_chunks_are_always_audited(store):
@@ -933,6 +959,7 @@ def test_sute_trace_stops_after_one_audit_instead_of_three_searches(store):
                                       "start-up tax exemption shareholder requirements 50%"]),
                  D("search", queries=["Start-Up Tax Exemption shareholder conditions"])]
     sup, llm, ret = make(store, decisions, batches=(first, [S(6, .48)]), judge=judge, max_steps=4)
+    sup.audit_keep_top = 0
     out = sup.supervise("u1", sute_plan(), "Do we qualify for SUTE?")
     assert ret.calls[1][0] == ["start-up tax exemption shareholder ownership percentage"]
     assert len(ret.calls) == 2 and len(judge.seen) == 1 and judge.seen[0] == [f"web:{i}:0" for i in (1, 2, 3, 4)]

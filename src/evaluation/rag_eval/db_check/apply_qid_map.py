@@ -3,6 +3,7 @@
 The ids were renumbered from Q01-Q64 (with gaps) to a scheme that says what a question is:
     S01-S21  single-fact answerable      M01-M20  multi-part answerable
     O01-O04  out-of-scope                P01-P05  paraphrases (retrieval only; `paraphrase_of` names the original)
+    A01-A10  multi-step answerable (qtype "multi-step", added later; never had Q ids, so the map leaves them alone)
 The map is the record of which old id became which new id.
 
 Run:  python src/evaluation/rag_eval/db_check/apply_qid_map.py src/evaluation/rag_eval/results      rewrites in place

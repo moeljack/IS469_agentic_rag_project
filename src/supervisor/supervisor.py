@@ -39,7 +39,8 @@ Guard rails in code (a 4B model is not trusted with the loop itself):
   * unparseable model output falls back to: answer if anything is vetted, else give_up
   * follow-up queries that repeat or nearly repeat a searched one (keyword overlap >= QUERY_SIMILARITY) are
     dropped before retrieval; when none are left, the loop stops and answers from what is vetted
-  * chunks the reranker scores below `audit_min_score` are rejected without an auditor call
+  * chunks the reranker scores below `audit_min_score` are rejected without an auditor call, except the best
+    `audit_keep_top` of each search
   * when the auditor reports the approved chunks are sufficient, the loop answers without another decide call
   * when every query the auditor suggests repeats one already searched, the loop answers without a decide call
 
@@ -89,6 +90,8 @@ DEFAULT_CANDIDATES = 6              # chunks the reranker scores per query (conf
                                     # is the slowest part of retrieval, and k=3 rarely comes from below rank 6
 AUDIT_MIN_SCORE = 0.5               # chunks the reranker scores below this are rejected without asking the auditor
                                     # (every audited chunk costs LLM output tokens); 0 sends everything to the auditor
+AUDIT_KEEP_TOP = 3                  # ...except the best this-many chunks of a search, which are always audited: on a
+                                    # multi-part question the chunk for one part scores low against the whole question
 QUERY_SIMILARITY = 0.7              # a follow-up query sharing this much of its keywords (Jaccard) with one already
                                     # searched, or adding no keyword not searched before, is a near-duplicate: it
                                     # retrieves the same chunks, so it is not run
@@ -217,6 +220,8 @@ class RetrievalAgent:
             new = 0
             for h in hits:
                 if h["id"] in seen:
+                    if h["id"] in found and (h.get("score") or 0.0) > (found[h["id"]].get("score") or 0.0):
+                        found[h["id"]] = h                      # found by two queries: keep the better score
                     continue
                 seen.add(h["id"])
                 found[h["id"]] = h
@@ -225,9 +230,11 @@ class RetrievalAgent:
         rerank = getattr(self.retriever, "_rerank", None)
         reranked = "rerank" in getattr(self.retriever, "mode", "rerank")   # a mode without a reranker keeps its scores
         if question and found and rerank and reranked:
+            # the better of its score for the question and for the query that found it: against a two-part question
+            # the chunk answering one part scores low, but it scored well for the query written for that part
             scores = rerank(question, list(found))
-            found = {i: {**h, "score": round(scores[i], 4)} for i, h in found.items()}
-        ranked =sorted(found.values(), key=lambda h: h.get("score") or 0.0, reverse=True)[: self.max_chunks]
+            found = {i: {**h, "score": round(max(scores[i], h.get("score") or 0.0), 4)} for i, h in found.items()}
+        ranked = sorted(found.values(), key=lambda h: h.get("score") or 0.0, reverse=True)[: self.max_chunks]
         return [Chunk(id=h["id"], content=h["text"],
                       metadata={"source": h.get("source", ""), "headings": h.get("headings", ""),
                                 "pages": h.get("pages", ""), "source_type": h.get("source_type", ""),
@@ -472,7 +479,8 @@ class Supervisor:
     def __init__(self, store, retrieval, auditor, llm: Optional[Callable] = None, intake: Callable = None,
                  tools: Optional[dict] = None, max_steps: int = 4,
                  max_queries: int = DEFAULT_MAX_QUERIES, audit_min_score: float = AUDIT_MIN_SCORE,
-                 planner: Optional[Callable] = None, intake_plans: bool = False):
+                 planner: Optional[Callable] = None, intake_plans: bool = False,
+                 audit_keep_top: int = AUDIT_KEEP_TOP):
         """
         store:      UserStore
         retrieval:  RetrievalAgent (anything with .run(plan, queries=None, exclude=(), question=None) -> list[Chunk])
@@ -484,6 +492,7 @@ class Supervisor:
         max_steps:  action budget before the supervisor must answer with what it has
         max_queries: most queries run per search (first search: the planned ones, in order; follow-ups: new ones)
         audit_min_score: chunks with a reranker score below this are rejected without an auditor call (0 = off)
+        audit_keep_top: the best this-many chunks of each search are audited whatever their score (0 = off)
         planner:    callable(question, known, missing, tried, max_queries) -> list[str]; defaults to
                     decomposer.plan_queries. Runs only when the supervisor chooses `decompose`.
         intake_plans: True = the default intake also writes sub-queries (the original pipeline, no route step)
@@ -494,6 +503,7 @@ class Supervisor:
         self.max_steps = max_steps
         self.max_queries = max(1, max_queries)
         self.audit_min_score = audit_min_score or 0.0
+        self.audit_keep_top = max(0, audit_keep_top)
         self.planner = planner or default_planner
         self.intake_plans = intake_plans
         if intake is None:
@@ -760,16 +770,14 @@ class Supervisor:
             return None
 
         # Reranker pre-filter: a chunk the cross-encoder scores this low is almost never approved, and every chunk
-        # handed to the auditor costs generated tokens. Safety net: while nothing is approved yet, the best of
-        # them is still audited, so a uniformly low-scoring topic can't end the search with no evidence at all.
+        # handed to the auditor costs generated tokens. The best few of each search are exempt (the batch is sorted
+        # best first), so a low-scoring but right chunk, or a uniformly low-scoring topic, still reaches the auditor.
+        # Chunks left out are not marked judged: a later query may rank them higher.
         cutoff = self.audit_min_score
-        below = [c for c in batch if cutoff and _score(c) is not None and _score(c) < cutoff]
-        if below and len(below) == len(batch) and not run.vetted:
-            below.remove(max(below, key=_score))
+        below = [c for c in batch[self.audit_keep_top:]
+                 if cutoff and _score(c) is not None and _score(c) < cutoff]
         below_ids = {c.id for c in below}
         batch = [c for c in batch if c.id not in below_ids]
-        for c in below:
-            run.judged.add(c.id)
         skipped_lines = [f"    skipped [{_score(c):.2f}] {_where(c)}: reranker score below {cutoff:.2f}, not audited"
                          for c in below]
         if not batch:
