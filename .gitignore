@@ -8,3 +8,4 @@ models/
 .vscode
 __init.py__
 .DS_Store
+src/evaluation/rag_eval/results/
