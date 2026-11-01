@@ -15,6 +15,7 @@ CIT answers can update the company profile, because e.g. IndividualTaxEntities.t
 
 Used by supervisor.py:  ensure_profile, profile_entities, remember, save_pending, pop_pending
 Used by harness.py:     set_company_info, forget
+Used by app.py:         list_users, get_profile, ensure_profile, pop_pending
 """
 import json
 import sys
@@ -64,6 +65,13 @@ class UserStore:
     # ------------------------------------------------------------ profile
     def get_profile(self, user_id: str) -> Optional[dict]:
         return self._get(f"profile:{user_id}")
+
+    def list_users(self) -> list[dict]:
+        """Every user with a profile, oldest first, as their profile dicts
+        ({user_id, created_at, company, facts})."""
+        res = self.col.get(where={"kind": "profile"}, include=["documents"])
+        profiles = [json.loads(d) for d in res["documents"]]
+        return sorted(profiles, key=lambda p: p.get("created_at", 0))
 
     def ensure_profile(self, user_id: str) -> tuple[dict, bool]:
         """(profile, created). Created on the user's first message, then loaded."""

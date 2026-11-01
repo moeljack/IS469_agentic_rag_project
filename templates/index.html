@@ -30,7 +30,45 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
+    .user-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .user-controls label {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    select {
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    .small-btn {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: #334155;
+      font-weight: 600;
+    }
+    .profile {
+      padding: 8px 20px;
+      background: #111827;
+      border-bottom: 1px solid #334155;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+    }
+    .profile b { color: #e2e8f0; font-weight: 600; }
+    .profile .empty { font-style: italic; }
     .status-badge {
       font-size: 0.85rem;
       padding: 4px 8px;
@@ -67,6 +105,13 @@
       align-self: flex-start;
       background-color: #1e293b;
       border: 1px solid #334155;
+    }
+    .bubble.system {
+      align-self: center;
+      background: transparent;
+      color: #64748b;
+      font-size: 0.85rem;
+      padding: 4px 8px;
     }
     .trace {
       margin-top: 8px;
@@ -106,7 +151,7 @@
       font-weight: bold;
       cursor: pointer;
     }
-    button:disabled {
+    button:disabled, select:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
@@ -115,12 +160,17 @@
 <body>
   <div class="chat-container">
     <div class="header">
-      <div>
+      <div class="user-controls">
         <strong>Agentic RAG Supervisor</strong>
-        <span style="color: #64748b; font-size: 0.9rem;">(user: bingbling)</span>
+        <label for="userSelect">User:</label>
+        <select id="userSelect"></select>
+        <button class="small-btn" id="addUserBtn" type="button">+ Add</button>
+        <button class="small-btn" id="clearBtn" type="button">Clear chat</button>
       </div>
       <div id="status" class="status-badge">Warming up...</div>
     </div>
+
+    <div class="profile" id="profile"><span class="empty">Loading users…</span></div>
 
     <div class="messages" id="messages"></div>
 
@@ -131,21 +181,180 @@
   </div>
 
   <script>
+    const DEFAULT_USER = "{{ default_user }}";
+    const USER_ID_RE = /^[A-Za-z0-9_.\-]{1,64}$/;
+
     const statusEl = document.getElementById("status");
     const inputEl = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendBtn");
     const messagesEl = document.getElementById("messages");
+    const userSelect = document.getElementById("userSelect");
+    const addUserBtn = document.getElementById("addUserBtn");
+    const clearBtn = document.getElementById("clearBtn");
 
+    // Per-user chat transcripts, kept in the page: { user_id: [ {content, role, trace, status} ] }
+    const histories = {};
+    // Profiles from the user store: { user_id: {user_id, company, facts, created_at} }
+    const profiles = {};
+    let currentUser = loadPref("currentUser") || DEFAULT_USER;
+    let ready = false;
+    let busy = false;
+
+    const profileEl = document.getElementById("profile");
+
+    // --- localStorage helpers (only the last selected user is remembered; safe if storage is blocked) ---
+    function loadPref(key) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+    function savePref(key, val) {
+      try { localStorage.setItem(key, val); } catch (e) {}
+    }
+
+    // --- users from the user store ---
+    async function loadUsers() {
+      try {
+        const res = await fetch("/users");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        for (const p of data.users) profiles[p.user_id] = p;
+      } catch (e) {
+        profileEl.innerHTML = `<span class="empty">Could not load users: ${escapeHtml(e.message)}</span>`;
+      }
+      const ids = Object.keys(profiles);
+      // Saved choice no longer in the store → fall back to the default, then the first stored user
+      if (!profiles[currentUser]) {
+        currentUser = profiles[DEFAULT_USER] ? DEFAULT_USER : (ids[0] || DEFAULT_USER);
+      }
+      renderUserOptions();
+      renderProfile();
+    }
+
+    function optionLabel(p) {
+      const name = p.company && p.company.company_name;
+      return name ? `${p.user_id} — ${name}` : p.user_id;
+    }
+
+    function renderUserOptions() {
+      userSelect.innerHTML = "";
+      const ids = Object.keys(profiles);
+      if (!ids.includes(currentUser)) ids.push(currentUser); // new user, no profile until first message
+      for (const id of ids) {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = profiles[id] ? optionLabel(profiles[id]) : `${id} (new)`;
+        userSelect.appendChild(opt);
+      }
+      userSelect.value = currentUser;
+    }
+
+    const FACT_LABELS = {
+      fye: "Financial year end",
+      is_new_company: "New company",
+      incorporation_year: "Incorporated",
+      tax_resident: "Tax resident",
+    };
+
+    function renderProfile() {
+      const p = profiles[currentUser];
+      if (!p) {
+        profileEl.innerHTML = `<span class="empty">No saved profile for ${escapeHtml(currentUser)} yet — one is created with the first question.</span>`;
+        return;
+      }
+      const parts = [];
+      const c = p.company || {};
+      if (c.company_name) parts.push(`Company: <b>${escapeHtml(c.company_name)}</b>`);
+      if (c.uen) parts.push(`UEN: <b>${escapeHtml(c.uen)}</b>`);
+      for (const [k, v] of Object.entries(p.facts || {})) {
+        if (v === null || v === undefined || v === "") continue;
+        const shown = typeof v === "boolean" ? (v ? "Yes" : "No") : String(v);
+        parts.push(`${escapeHtml(FACT_LABELS[k] || k)}: <b>${escapeHtml(shown)}</b>`);
+      }
+      profileEl.innerHTML = parts.length
+        ? parts.map(x => `<span>${x}</span>`).join("")
+        : `<span class="empty">No facts remembered for ${escapeHtml(currentUser)} yet.</span>`;
+    }
+
+    // Re-read one profile after an answer, so newly learned facts appear
+    async function refreshProfile(user) {
+      try {
+        const res = await fetch(`/users/${encodeURIComponent(user)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const isNew = !profiles[user];
+        profiles[user] = data.user;
+        if (isNew) renderUserOptions(); else {
+          const opt = Array.from(userSelect.options).find(o => o.value === user);
+          if (opt) opt.textContent = optionLabel(data.user);
+        }
+        if (user === currentUser) renderProfile();
+      } catch (e) {}
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, ch => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
+      ));
+    }
+
+    function switchUser(user) {
+      currentUser = user;
+      savePref("currentUser", user);
+      userSelect.value = user;
+      renderProfile();
+      renderHistory();
+      if (ready) inputEl.focus();
+    }
+
+    userSelect.addEventListener("change", () => switchUser(userSelect.value));
+
+    addUserBtn.addEventListener("click", async () => {
+      const name = (prompt("New user id (letters, numbers, _ . -):") || "").trim();
+      if (!name) return;
+      if (!USER_ID_RE.test(name)) {
+        alert("Invalid user id. Use letters, numbers, underscore, dot or dash (max 64).");
+        return;
+      }
+      try {
+        const res = await fetch("/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: name })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        profiles[data.user.user_id] = data.user;
+        currentUser = data.user.user_id;
+        renderUserOptions();
+        switchUser(currentUser);
+      } catch (e) {
+        alert("Could not create user: " + e.message);
+      }
+    });
+
+    clearBtn.addEventListener("click", async () => {
+      histories[currentUser] = [];
+      renderHistory();
+      try {
+        await fetch("/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: currentUser })
+        });
+      } catch (e) {}
+    });
+
+    // --- status polling ---
     async function checkStatus() {
       try {
         const res = await fetch("/status");
         const data = await res.json();
         if (data.ready) {
+          ready = true;
           statusEl.innerText = "System Ready";
           statusEl.classList.add("status-ready");
-          inputEl.disabled = false;
-          sendBtn.disabled = false;
           inputEl.placeholder = "Ask your question...";
+          setBusy(false);
+          loadUsers().then(renderHistory);
         } else {
           statusEl.innerText = data.step;
           setTimeout(checkStatus, 1500);
@@ -156,37 +365,60 @@
       }
     }
 
+    function setBusy(isBusy) {
+      busy = isBusy;
+      const disabled = isBusy || !ready;
+      inputEl.disabled = disabled;
+      sendBtn.disabled = disabled;
+      // Prevent switching user while a request is in flight
+      userSelect.disabled = isBusy;
+      addUserBtn.disabled = isBusy;
+      clearBtn.disabled = isBusy;
+    }
+
+    // --- chat ---
     async function sendMessage() {
       const text = inputEl.value.trim();
-      if (!text) return;
+      if (!text || busy) return;
 
-      appendBubble(text, "user");
+      const user = currentUser; // lock the user for this request
+      addToHistory(user, { content: text, role: "user" });
       inputEl.value = "";
-      inputEl.disabled = true;
-      sendBtn.disabled = true;
+      setBusy(true);
 
       try {
         const res = await fetch("/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user: "bingbling", message: text })
+          body: JSON.stringify({ user, message: text })
         });
         const data = await res.json();
         if (data.error) {
-          appendBubble("Error: " + data.error, "bot");
+          addToHistory(user, { content: "Error: " + data.error, role: "bot" });
         } else {
-          appendBubble(data.reply, "bot", data.trace, data.status);
+          addToHistory(user, { content: data.reply, role: "bot", trace: data.trace, status: data.status });
+          refreshProfile(user);
         }
       } catch (err) {
-        appendBubble("Request failed: " + err.message, "bot");
+        addToHistory(user, { content: "Request failed: " + err.message, role: "bot" });
       } finally {
-        inputEl.disabled = false;
-        sendBtn.disabled = false;
+        setBusy(false);
         inputEl.focus();
       }
     }
 
-    function appendBubble(content, role, trace = [], status = "") {
+    function addToHistory(user, entry) {
+      (histories[user] = histories[user] || []).push(entry);
+      if (user === currentUser) appendBubble(entry);
+    }
+
+    function renderHistory() {
+      messagesEl.innerHTML = "";
+      appendBubble({ content: `Chatting as ${currentUser}`, role: "system" });
+      for (const entry of histories[currentUser] || []) appendBubble(entry);
+    }
+
+    function appendBubble({ content, role, trace = [], status = "" }) {
       const bubble = document.createElement("div");
       bubble.className = `bubble ${role}`;
       bubble.textContent = content;
@@ -206,6 +438,7 @@
       if (e.key === "Enter" && !inputEl.disabled) sendMessage();
     });
 
+    renderHistory();
     checkStatus();
   </script>
 </body>
