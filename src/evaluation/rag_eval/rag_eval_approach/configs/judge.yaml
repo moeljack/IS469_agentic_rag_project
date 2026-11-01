@@ -8,6 +8,6 @@
 #
 # Fallback if you have no Gemini access: provider anthropic or openai with a model that is NOT used as a Stage 3
 # generator (e.g. a different tier or family from g_*.yaml), and name this as a limitation in the report.
-provider: google           # google | anthropic | openai
-model: gemini-3.6-flash
+provider: ollama           # google | anthropic | openai | ollama (local; IS469_score.sh scores on the cluster GPU with it)
+model: gemma4:12b          # not a Qwen model, so it is not one of the compared generators
 options: {}                # google/openai: {temperature: 0}; anthropic: no temperature (rejected), optionally {effort: medium}
