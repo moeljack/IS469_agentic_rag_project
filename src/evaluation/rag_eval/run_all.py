@@ -117,7 +117,7 @@ def answered(run_id):
 def main():
     parser = argparse.ArgumentParser(description="Run the whole RAG evaluation in order")
     parser.add_argument("--stages", nargs="+", type=int, default=[1, 2, 3, 4], choices=[1, 2, 3, 4])
-    parser.add_argument("--repeats", type=int, default=3, help="A1 repeats (the agent's path varies between runs)")
+    parser.add_argument("--repeats", type=int, default=1, help="A1 repeats (at temperature 0 the repeats were identical, so one is the default)")
     parser.add_argument("--skip-api", action="store_true", help="skip stage 3 even if the API SDKs are installed")
     parser.add_argument("--ragas-python", help="python of the scoring environment (requirements-scoring.txt) for RAGAS")
     parser.add_argument("--python", default=sys.executable, help="python of the project environment")

@@ -145,17 +145,18 @@ Ensure dates entered by users are actual dates. Dates like 33 October should not
 Analyze the conversation and output valid JSON strictly matching the schema.
 
 Domains:
-- cit (Corporate Income Tax: Form C/C-S, SUTE, PTE, CIT rebate, ECI)
+- cit (Corporate Income Tax: Form C/C-S, SUTE, PTE, CIT rebate, ECI, foreign-sourced income, insurers and IBNR claims reserves, REIT ETF tax transparency, digital tokens, foreign worker levy, donations, losses, penalties)
 - property_tax (Annual Value, Owner-Occupier rates, Non-owner residential, Commercial)
 - gst (Registration $1M threshold, standard-rated 9%, reverse charge)
 - stamp_duty (BSD, ABSD, SSD, lease duties)
 - individual_tax (Personal income tax, tax residency, reliefs, SRS)
 - general (General IRAS administrative enquiries)
-- out_of_scope (Foreign taxes, non-tax queries)
+- out_of_scope (ONLY taxes of other countries, taxes not administered by IRAS, or questions not about tax at all. Never use it for a question about Singapore corporate tax, even if it concerns insurers, REITs, overseas or foreign-sourced income, digital tokens, levies or deductions: those are cit)
 
 Intents: lookup | eligibility | computation | deadline | procedure | out_of_scope
 
 Rules:
+0. INTENT: use computation ONLY when the user gives figures to compute with. A question asking what a rate, rebate, cap, exemption or rule is (no figures given) is a lookup, never a computation.
 1. CONVERSATION CONTINUITY (CRITICAL):
    - Review the entire dialog turn-by-turn. Do NOT treat the last message in isolation.
    - If the previous assistant turn asked for a specific figure and the user replies with a number, currency, or short answer (e.g., "310k", "$350,000", "2m"), map that value DIRECTLY to the requested field.

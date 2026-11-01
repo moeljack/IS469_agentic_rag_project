@@ -1,3 +1,0 @@
-             name  runs  answerable  non_answers  accuracy  ci_low  ci_high accuracy_range  mean_correctness  numeric_accuracy  unscored  part_recall  hit_all_parts  chunks_seen  chunks_used  chunks_seen_p90  latency_median  latency_p90  tokens_mean
-         n1_naive     1          31            0  0.064516     0.0  0.16129                              2.0               1.0      29.0     0.967742       0.935484          5.0          5.0              5.0       67.605696    85.804157  1824.285714
-s1_naive_r0_dense     1          31            0       NaN     NaN      NaN            NaN               NaN               NaN       NaN     0.854839       0.774194          5.0          5.0              5.0       48.857766    62.491562  1668.742857

@@ -93,11 +93,36 @@ Dataset v2 is already tagged on these fields. Have a second member check the tag
 | difficulty | easy, hard | `hard` = multi-part, needs reasoning across sections, or has a tricky condition |
 | numeric | true, false | `true` if the answer hinges on a number, rate, threshold or date, whatever the qtype. Drives numeric accuracy across all questions |
 
-### 2.3 Is the dataset enough? Dataset v2 plus paraphrases
+### 2.3 Is the dataset enough? The current test data (v2.1)
 
-Dataset v2.1 has 45 scored questions (41 answerable + 4 out-of-scope) and 5 paraphrases. The first version had 31 answerable questions, sized as the smallest that fills every table in this plan; 10 more were added to bring the single-fact types to 5–6 each, the two PDF sources to 4 each, the number of multi-part questions to 20, and to cover pages that no question tested (tax computation, liquidation and judicial management, the compliance programmes page, foreign-entity classification and payment difficulties).
+The test data (`src/evaluation/eval_questions.json`) has 50 records: 45 scored questions (41 answerable + 4 out-of-scope) and 5 retrieval-only paraphrases. Accuracy is computed over the 41 answerable questions, so one question is worth 2.4 points. The first version had 31 answerable questions, sized as the smallest that fills every table in this plan; 10 more were added to bring the single-fact types to 5–6 each, the two PDF sources to 4 each, the number of multi-part questions to 20, and to cover pages that no question tested (tax computation, liquidation and judicial management, the compliance programmes page, foreign-entity classification and payment difficulties).
 
-| Bucket | Target | Dataset v2 | Note |
+**Composition by group**
+
+| Group | Ids | n | Used for |
+| --- | --- | --- | --- |
+| Single-fact, answerable | S01–S21 | 21 | Retrieval metrics and the judge |
+| Multi-part, answerable | M01–M20 | 20 | Retrieval metrics and the judge |
+| Out-of-scope | O01–O04 | 4 | Refusal check only (no gold passages) |
+| Paraphrases | P01–P05 | 5 | Retrieval metrics only |
+| **Total** |  | **50** |  |
+
+**The 41 answerable questions by tag** (every row adds up to 41)
+
+| Tag | Breakdown |
+| --- | --- |
+| Question type | multi-part 20, number 6, definition 5, procedure 5, edge-case 5 |
+| Source | online guide 33 (17 single-fact, 16 multi-part), REIT ETF guide 4 (1 + 3), insurer guide 4 (3 + 1) |
+| Tier | web page 33, PDF 8 |
+| Difficulty | hard 26, easy 15 |
+| Numeric flag | true 22 (10 single-fact, 12 multi-part), false 19 |
+| Gold parts | every multi-part question has exactly 2 parts (20 × 2); every single-fact question has 1 |
+
+**The 5 paraphrases:** P01 (of S02), P02 (of S03) and P03 (of S12) are single-part; P04 (of M02) and P05 (of M03) are two-part. Four are web-page questions and one is a PDF question.
+
+**Targets against the current data**
+
+| Bucket | Target | Current data | Note |
 | --- | --- | --- | --- |
 | Each of the 3 sources | ≥ 3 (descriptive only, no significance claims) | online guide 33, REIT ETF guide 4, insurer guide 4 | Met |
 | numeric (flag) | ≥ 10 | 22 | Met |
