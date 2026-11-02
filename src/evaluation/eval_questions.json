@@ -1260,28 +1260,34 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "Our company has been dormant this whole financial year, but we still made a donation to an approved charity (an IPC). Can we claim a tax deduction for it, how much is the deduction, and can we file with the simple dormant company form?",
-  "reference_answer": "Yes. A dormant company can claim donations made to an approved Institution of a Public Character (IPC) or to the Singapore Government for the benefit of the local community. Qualifying donations get a 250% tax deduction. To make the claim the company must file Form C-S/ Form C-S (Lite)/ Form C using the File Form C-S/ Form C-S (Lite)/ Form C digital service, not the File Form for Dormant Company service. Unutilised donations can be carried forward for up to 5 years, subject to the shareholding test.",
+  "question": "Our company stopped trading a while ago and IRAS approved our request to stop filing tax returns. This year we got a one-off bit of interest when an old fixed deposit matured. Do we need to tell IRAS about it, and does it change anything when we apply to strike the company off? What if we decide to restart the business instead?",
+  "reference_answer": "If the income is a one-off transaction and the company stays dormant, it may submit a letter to IRAS explaining this, attaching the company's financial statements and tax computation for that Year of Assessment. Before striking off, a dormant company with a filing waiver normally does not need to submit a final set of financial statements and tax computation, but because it received one-off income it should write in to IRAS via myTax Mail explaining the nature of the income and attach the financial statements and tax computation for that YA. If the company recommences business instead, it must notify IRAS within 1 month of recommencing (or of earning or receiving the income) using the Recommencement of Business form.",
   "key_facts": [
-   "can claim donations to an IPC",
-   "250%",
-   "must file Form C-S/ Form C, not the dormant company form"
+   "letter to IRAS with financial statements and tax computation",
+   "write in via myTax Mail before strike-off",
+   "notify IRAS within 1 month if business recommences"
   ],
   "facts": [
    [
-    "Your dormant company can make a claim for donations if the donations were made to an approved Institution of a Public Character (IPC)",
-    "you must file its Form C-S/ Form C-S (Lite)/ Form C using the File Form C-S/ Form C-S (Lite)/ Form C digital service instead of the File Form for Dormant Company digital service"
+    "if the income received is a one-off transaction and your company continues to be dormant, you may submit a letter to IRAS explaining as such"
    ],
    [
-    "The 250% deduction for donations is granted"
+    "if your company received one-off income before strike-off with ACRA, you should write in to IRAS via myTax Mail explaining the nature of the income"
+   ],
+   [
+    "notify IRAS within 1 month from the date of commencement of business or earning/ receiving the income"
    ]
   ],
   "gold_passages": [
    [
-    "web:53d53a4398:17"
+    "web:53d53a4398:13"
    ],
    [
-    "web:6e286dc681:9"
+    "web:584d6034e5:11"
+   ],
+   [
+    "web:53d53a4398:12",
+    "web:53d53a4398:13"
    ]
   ],
   "needs_review": true
@@ -1296,7 +1302,7 @@
   "numeric": true,
   "answerable": true,
   "question": "We missed the Form C-S filing deadline and IRAS has sent us an estimated Notice of Assessment that looks far too high. Do we have to pay it even though we disagree, what do we need to do to get it revised, and what happens if we don't pay on time?",
-  "reference_answer": "Yes. The estimated tax must be paid within 1 month from the date of the Notice of Assessment, even if the company intends to object or is awaiting the outcome of an objection. To get it revised, the company must file an objection within 2 months from the date of the Notice of Assessment and submit its Corporate Income Tax Return, financial statements and tax computation; otherwise the estimated assessment will not be revised. Any excess tax paid is refunded once the objection is reviewed. If the tax is not paid by the due date, a 5% late payment penalty is imposed on the unpaid tax, and an additional 1% per month (up to 12%) may be imposed if it remains unpaid 60 days later.",
+  "reference_answer": "Yes. The estimated tax must be paid within 1 month from the date of the Notice of Assessment, even if the company intends to object. To get it revised, the company must file an objection within 2 months from the date of the Notice of Assessment and submit its Corporate Income Tax Return, financial statements and tax computation; otherwise the estimated assessment will not be revised. Any excess tax paid is refunded. If the tax is not paid by the due date, a 5% late payment penalty is imposed on the unpaid tax.",
   "key_facts": [
    "pay within 1 month even if objecting",
    "object within 2 months and submit the return, accounts and tax computation",
@@ -1338,7 +1344,7 @@
   "numeric": true,
   "answerable": true,
   "question": "We've just found that we under-declared some income in the Form C-S we filed last year, and IRAS hasn't contacted us about it. If we tell IRAS ourselves, will we be penalised, and what makes the disclosure count? Also, how many years back can IRAS raise an additional assessment on us?",
-  "reference_answer": "Under IRAS' Voluntary Disclosure Programme, no penalty is imposed if the error is disclosed within the 1-year grace period from the statutory filing deadline and the qualifying conditions are met; after the grace period a reduced penalty applies (5% of the tax undercharged for each year late). To qualify, the disclosure must be accurate and complete, and timely and self-initiated: made before receiving a query from IRAS on the matter, or before IRAS notifies the company of an audit or investigation. The company must also cooperate with IRAS and pay the additional tax. The statutory time limit for IRAS to raise an assessment or additional assessment is 4 years (it does not apply where fraud is involved).",
+  "reference_answer": "Under IRAS' Voluntary Disclosure Programme, no penalty is imposed if the error is disclosed within the 1-year grace period from the statutory filing deadline and the qualifying conditions are met; after the grace period a reduced penalty applies. To qualify, the disclosure must be accurate and complete, and timely and self-initiated: made before receiving a query from IRAS on the matter, or before IRAS notifies the company of an audit or investigation. The statutory time limit for IRAS to raise an assessment or additional assessment is 4 years (it does not apply where fraud is involved).",
   "key_facts": [
    "no penalty within the 1-year grace period",
    "before a query from IRAS",
@@ -1372,13 +1378,12 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "Our financial year ends in December and we'd like to pay our corporate tax in as many monthly instalments as possible. By when do we need to file our ECI to get the maximum, how many instalments is that, what do we need to set up first, and what happens if one of the GIRO deductions fails later?",
-  "reference_answer": "File the ECI by 26 Jan (within 1 month of the financial year end) to get the maximum of 10 instalments (filing by 26 Feb gives 8, by 26 Mar gives 6, and none after that). The company must be Singapore-registered and on GIRO, and the GIRO arrangement must be approved before the payment due date, so it should sign up for GIRO at least 3 weeks before filing the ECI. If a GIRO deduction fails (e.g. insufficient funds), IRAS will cancel the GIRO plan and the balance of the unpaid tax becomes due and payable immediately; a penalty may apply if it is not settled promptly.",
+  "question": "Our financial year ends in December. We'd like to pay this year's company tax in monthly instalments instead of one lump sum. When do we have to send IRAS our estimate of the year's taxable profit to get the most instalments, how many would that be, and what do we need to set up beforehand?",
+  "reference_answer": "The estimate is the Estimated Chargeable Income (ECI). Filing it by 26 Jan (within 1 month of the December financial year end) gives the maximum of 10 instalments; filing by 26 Feb gives 8, by 26 Mar gives 6, and none after that. Instalments are only for Singapore-registered companies on GIRO, and the GIRO arrangement must be approved before the payment due date, so the company should sign up for GIRO at least 3 weeks before filing the ECI.",
   "key_facts": [
-   "file by 26 Jan",
+   "file the ECI by 26 Jan",
    "10 instalments",
-   "GIRO at least 3 weeks before filing",
-   "GIRO plan cancelled, balance due immediately"
+   "GIRO at least 3 weeks before filing"
   ],
   "facts": [
    [
@@ -1387,9 +1392,6 @@
    ],
    [
     "sign up for GIRO at least 3 weeks before filing the ECI"
-   ],
-   [
-    "IRAS will cancel your GIRO plan. The balance of the unpaid taxes will become due and payable immediately"
    ]
   ],
   "gold_passages": [
@@ -1399,9 +1401,6 @@
    ],
    [
     "web:b20dcc6490:18"
-   ],
-   [
-    "web:054b24831c:2"
    ]
   ],
   "needs_review": true
@@ -1416,7 +1415,7 @@
   "numeric": true,
   "answerable": true,
   "question": "Our Singapore company is about to receive dividends from its subsidiary in Vietnam. What conditions must be met for the dividends to be tax-exempt when we bring them into Singapore? Our directors usually hold the board meetings overseas, so does that matter? The Vietnamese tax office is also asking for proof that we are a Singapore tax resident.",
-  "reference_answer": "Foreign-sourced dividends remitted into Singapore are exempt only if all 3 conditions are met: the income has been subject to tax in the foreign jurisdiction, the foreign jurisdiction's headline corporate tax rate is at least 15% when the income is received in Singapore, and the Comptroller is satisfied that the exemption benefits the company. The exemption is only for Singapore tax resident companies. Tax residency is determined by where the business is controlled and managed, usually where the board meetings that make strategic decisions are held; if control and management is exercised outside Singapore, the company is a non-resident and cannot claim the exemption. To prove residency to the foreign tax authority, the company can apply for a Certificate of Residence (COR), a letter issued by IRAS certifying that it is a Singapore tax resident for the purpose of claiming DTA benefits.",
+  "reference_answer": "Foreign-sourced dividends remitted into Singapore are exempt only if all 3 conditions are met: the income has been subject to tax in the foreign jurisdiction, the foreign jurisdiction's headline corporate tax rate is at least 15% when the income is received in Singapore, and the Comptroller is satisfied that the exemption benefits the company. The exemption is only for Singapore tax resident companies. Tax residency is determined by where the business is controlled and managed, usually where the board meetings that make strategic decisions are held; if control and management is exercised outside Singapore, the company is a non-resident and cannot claim the exemption. As proof of residency the company can give the foreign tax authority a Certificate of Residence (COR), a letter issued by IRAS certifying that it is a Singapore tax resident.",
   "key_facts": [
    "subject to tax",
    "headline tax rate at least 15%",
@@ -1458,12 +1457,12 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "We're a Singapore subsidiary and most of our sales and purchases are with our overseas parent; the related party transactions in our accounts come to tens of millions of dollars a year. Is there an extra form we have to complete with our tax return? And if we have to prepare transfer pricing documentation, when must it be ready, and do we send it in with the return?",
-  "reference_answer": "Yes. A company must complete the Form for Reporting Related Party Transactions (RPT Form), which is part of Form C, if the value of related party transactions disclosed in its financial statements for the financial period exceeds S$15 million. Where transfer pricing documentation is required under Section 34F, it must be completed by the filing due date of the Income Tax Return. It is not submitted with the return, but must be submitted within 30 days of a request by IRAS and kept for at least 5 years; non-compliance can lead to a fine of up to $10,000.",
+  "question": "We're a Singapore subsidiary and most of our sales and purchases are with our overseas parent; related party transactions in last year's accounts came to about S$40 million. Is there an extra form we have to complete with our tax return? And if we have to prepare transfer pricing documentation, when must it be ready, and do we send it in with the return?",
+  "reference_answer": "Yes. Because the related party transactions disclosed in the financial statements exceed S$15 million, the company must complete the Form for Reporting Related Party Transactions (RPT Form), which is part of Form C. Transfer pricing documentation required under Section 34F must be completed by the filing due date of the Income Tax Return. It is not submitted with the return, but must be submitted within 30 days of a request by IRAS.",
   "key_facts": [
-   "RPT Form if over S$15 million",
-   "by the filing due date",
-   "submit within 30 days of a request"
+   "RPT Form (over S$15 million)",
+   "ready by the filing due date",
+   "submit within 30 days of a request, not with the return"
   ],
   "facts": [
    [
@@ -1493,8 +1492,8 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "We incorporated our company in Singapore last year and closed our first accounts in December. Revenue was small, below two hundred thousand dollars, and the only shareholders are the three of us founders. Which tax return form can we use, when is it due this year, and how much of our income can be exempt as a new start-up?",
-  "reference_answer": "The company can file Form C-S (Lite), since it qualifies for Form C-S and its annual revenue is $200,000 or below (it may also choose Form C-S or Form C). The YA 2026 Corporate Income Tax Return is due by 30 Nov 2026. Under the tax exemption scheme for new start-up companies, for each of its first 3 consecutive YAs 75% of the first $100,000 and 50% of the next $100,000 of normal chargeable income is exempt, a maximum exemption of $125,000 per YA, provided the company is incorporated in Singapore, is a Singapore tax resident and has no more than 20 shareholders who are all individuals (or at least one individual holding at least 10%).",
+  "question": "We incorporated our company in Singapore last year and closed our first accounts on 31 Dec 2025. Revenue was about $150,000 and the only shareholders are the 3 of us founders. Which tax return form can we use, when is it due this year, and how much of our income can be exempt as a new start-up?",
+  "reference_answer": "The company can file Form C-S (Lite), since it qualifies for Form C-S and its annual revenue is $200,000 or below (it may also choose Form C-S or Form C). The YA 2026 Corporate Income Tax Return is due by 30 Nov 2026. If it meets the qualifying conditions for the tax exemption scheme for new start-up companies, 75% of the first $100,000 and 50% of the next $100,000 of its normal chargeable income is exempt for each of its first 3 consecutive YAs, a maximum exemption of $125,000 per YA.",
   "key_facts": [
    "Form C-S (Lite)",
    "30 Nov 2026",
@@ -1535,7 +1534,7 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "Our Hong Kong company is opening a branch in Singapore. Can the branch claim the start-up tax exemption? Will it count as a Singapore tax resident, and what tax exemption can it get instead?",
+  "question": "Our Hong Kong company is opening a branch in Singapore. Can the branch claim the start-up tax exemption? Will it count as a Singapore tax resident, and what tax exemption can it get instead, and how much?",
   "reference_answer": "No. A foreign company or its Singapore branch cannot claim the tax exemption for new start-up companies because it is not incorporated in Singapore. Singapore branches of foreign companies are controlled and managed by their foreign parent, so they are generally not considered Singapore tax residents (unless they satisfy certain conditions). The branch is eligible for the partial tax exemption on its normal chargeable income: 75% of the first $10,000 and 50% of the next $190,000, a maximum exemption of $102,500 per YA.",
   "key_facts": [
    "not incorporated in Singapore",
@@ -1576,8 +1575,8 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "We're changing our company's financial year end from December to March. Do we have to tell IRAS ourselves, and how does the change affect our tax computations and ECI filing for the changeover?",
-  "reference_answer": "The change is filed with ACRA via BizFile+; the company does not need to inform IRAS separately, as IRAS updates its records from ACRA. Because a change from 31 Dec to 31 Mar spans 2 YAs, the company must prepare 2 separate tax computations, one for each YA, and file an ECI for each YA within 3 months from the end of its basis period. For example, if the year end changes from 31 Dec 2024 to 31 Mar 2025, the ECI for YA 2025 (1 Jan to 31 Dec 2024) is due by 31 Mar 2025 and the ECI for YA 2026 (1 Jan to 31 Mar 2025) by 30 Jun 2025.",
+  "question": "We're moving our company's year end from December to March. Is there anyone we have to notify, and what does the switch mean for our tax computations and our estimated tax filings for the changeover?",
+  "reference_answer": "The change of financial year end is filed with ACRA via BizFile+; the company does not need to inform IRAS separately, as IRAS updates its records from ACRA. Because a change from 31 Dec to 31 Mar spans 2 Years of Assessment, the company must prepare 2 separate tax computations, one for each YA, and file an Estimated Chargeable Income (ECI) for each YA, each within 3 months from the end of its basis period.",
   "key_facts": [
    "ACRA via BizFile+",
    "no need to inform IRAS separately",
@@ -1621,7 +1620,7 @@
   "numeric": true,
   "answerable": true,
   "question": "A couple of years ago we overpaid tax because we forgot to claim some deductible expenses in our return, and we never objected to that Notice of Assessment. Is it too late to object now? Is there any other way to get the overpaid tax back, and by when must we apply?",
-  "reference_answer": "An objection must be filed within 2 months from the date of the Notice of Assessment; if none is received in that period the assessment is treated as final, so it is too late to object. The company may instead apply in writing for relief for an error or mistake made in its tax return under section 93A of the Income Tax Act 1947, subject to conditions. The application must be made not later than 4 years after the end of the YA within which the assessment was made (for example, for an assessment made in 2022, by 31 Dec 2026).",
+  "reference_answer": "An objection must be filed within 2 months from the date of the Notice of Assessment; if none is received in that period the assessment is treated as final, so it is too late to object. The company may instead apply in writing for relief for an error or mistake made in its tax return under section 93A of the Income Tax Act 1947, subject to conditions. The application must be made not later than 4 years after the end of the YA within which the assessment was made.",
   "key_facts": [
    "assessment treated as final",
    "section 93A relief",

@@ -58,7 +58,7 @@ class NaiveSystem:
         t2 = time.perf_counter()
         return {"system": self.name, "status": "no_answer" if refused else "answered", "answer": draft,
                 "retrieved_seen": [_seen(h["id"], i, h["score"], h["source"], h["headings"]) for i, h in enumerate(hits, 1)],
-                "context_used": context_used(hits), "searches": 1,
+                "context_used": context_used(hits, question), "searches": 1,
                 "latency_s": {"retrieval": t1 - t0, "generation": t2 - t1, "total": t2 - t0},
                 "tokens": USAGE.snapshot()}
 
@@ -78,7 +78,7 @@ class AgenticSystem:
         if retriever.mode not in RERANKED and agent["audit_min_score"]:
             raise ValueError(f"audit_min_score {agent['audit_min_score']} compares reranker scores (0-1), but mode "
                              f"{retriever.mode!r} has no reranker: set agent.audit_min_score to 0 for this mode")
-        self.run_id, self.doc_chars = run_id, supervisor.DOC_CHARS
+        self.run_id = run_id
         self.store_dir = tempfile.mkdtemp(prefix="eval_user_store_")
         track_ollama()
         supervisor.pin_ollama_keep_alive()
@@ -118,7 +118,8 @@ class AgenticSystem:
             return audit
 
         def recording_answer_prompt(question, plan, docs, assumptions, partial):
-            self._context = [{"id": d.id, "text": d.content[:self.doc_chars]} for d in docs]
+            self._context = [{"id": d.id, "text": supervisor.excerpt(d.content, question, supervisor.DOC_CHARS)}
+                             for d in docs]
             return build_answer_prompt(question, plan, docs, assumptions, partial)
 
         self.sup.retrieval.run = recording_search

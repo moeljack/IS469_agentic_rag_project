@@ -95,9 +95,11 @@ AUDIT_KEEP_TOP = 3                  # ...except the best this-many chunks of a s
 QUERY_SIMILARITY = 0.7              # a follow-up query sharing this much of its keywords (Jaccard) with one already
                                     # searched, or adding no keyword not searched before, is a near-duplicate: it
                                     # retrieves the same chunks, so it is not run
-DOC_CHARS = 1200                   # per-chunk text shown to the model when answering
-AUDIT_CHARS = 800                   # per-chunk text shown to the auditor
-MAX_DOCS = 8                        # vetted chunks put in the answer prompt (8 x DOC_CHARS fits the 8k context)
+DOC_CHARS = 2000                    # per-chunk text shown to the model when answering (a third of the chunks are
+                                    # longer than 1200, and facts sat beyond that cut); longer chunks: see excerpt()
+AUDIT_CHARS = 2000                  # per-chunk text shown to the auditor (the same: at 1600 it missed facts it is
+                                    # meant to confirm; 8 x 2000 chars plus the prompt still fits 8k)
+MAX_DOCS = 8                        # vetted chunks put in the answer prompt (8 x DOC_CHARS, about 5k tokens, fits 8k)
 MAX_DRY_ROUNDS = 2                  # stop after this many searches in a row that approve nothing new (and nothing is vetted)
 
 NO_CONTEXT = "The IRAS sources I have don't cover this. Please check iras.gov.sg or rephrase your question."
@@ -263,8 +265,8 @@ def agent_judge(agent=None, model: str = AUDITOR_MODEL) -> Callable:
         sub_prompt = question
         if kept_context.strip():
             sub_prompt += f"\n(Topics already covered by approved chunks:\n{kept_context})"
-        payload = [{"id": c.id, "headings": c.metadata.get("headings", ""), "text": c.content[:AUDIT_CHARS]}
-                   for c in chunks]
+        payload = [{"id": c.id, "headings": c.metadata.get("headings", ""),
+                    "text": excerpt(c.content, question, AUDIT_CHARS)} for c in chunks]
         resp = holder["agent"].evaluate(original_query=question, sub_prompt=sub_prompt, chunks=payload,
                                         tried_queries=list(tried), year=year)
         position = {c.id: i for i, c in enumerate(chunks, 1)}
@@ -845,7 +847,7 @@ class Supervisor:
         def head(i, d):
             where = d.metadata.get("headings")
             return f"[Doc {i}] (source: {d.metadata.get('source', '')}" + (f" | {where}" if where else "") + ")"
-        body = "\n\n".join(f"{head(i, d)}\n{d.content[:DOC_CHARS]}" for i, d in enumerate(docs, 1))
+        body = "\n\n".join(f"{head(i, d)}\n{excerpt(d.content, question, DOC_CHARS)}" for i, d in enumerate(docs, 1))
         user = f"QUESTION: {question}\n\nUSER FACTS:\n{_user_facts(plan)}\n"
         if assumptions:
             user += "\nASSUMPTIONS MADE:\n" + "\n".join(f"- {a}" for a in assumptions) + "\n"
@@ -890,6 +892,33 @@ def _query_terms(q: str) -> set[str]:
         w = w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
         terms.add(_SYNONYMS.get(w, w))
     return terms
+
+
+def _stems(text: str) -> set[str]:
+    return {w[:6] for w in _query_terms(text)}      # crude stem: "deduct"/"deduction", "exempt"/"exemption"
+
+
+def excerpt(text: str, query: str, limit: int) -> str:
+    """The part of a chunk a model is shown, about `limit` characters: the whole chunk if it fits; the start of the
+    chunk if the line sharing the most keywords with `query` is within it (or no line shares any); otherwise the
+    chunk's opening (a quarter of the budget: it usually states the rule) plus a window centred on that line. A
+    plain cut would hide a fact near the end of a long chunk. "..." marks each cut."""
+    if len(text) <= limit:
+        return text
+    terms = _stems(query)
+    lines = [m.span() for m in re.finditer(r"[^\n]+", text)]
+    hits = [len(terms & _stems(text[a:b])) for a, b in lines]
+    if not hits or max(hits) == 0 or lines[hits.index(max(hits))][1] <= limit:
+        return text[:limit] + "..."
+    a, b = lines[hits.index(max(hits))]                     # the first best line, beyond the plain cut
+    head_end = text.rfind("\n", 0, limit // 4)
+    head = text[:head_end if head_end > 0 else limit // 4]
+    room = limit - len(head)
+    start = max(len(head), min(a - (room - (b - a)) // 2, len(text) - room))
+    snapped = text.rfind("\n", 0, start) + 1                # back to the start of a line, unless that cuts the best line
+    start = snapped if snapped >= len(head) and snapped + room >= b else start
+    end = start + room
+    return head + "\n...\n" + text[start:end] + ("..." if end < len(text) else "")
 
 
 def _near_duplicate(q: str, others: list[str], threshold: float = QUERY_SIMILARITY) -> Optional[str]:

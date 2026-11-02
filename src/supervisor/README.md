@@ -162,6 +162,9 @@ actions (including what the auditor said is missing) and picks one action:
    are kept unjudged and the trace says so.
 4. **Keep.** Only approved chunks are ever shown to the answer model.
 
+The auditor and the answer model see each chunk's text up to `AUDIT_CHARS` / `DOC_CHARS` (2,000 characters each).
+A longer chunk is not simply cut: `excerpt()` shows its opening plus the part that best matches the question.
+
 ### 4. Guard rails
 
 A 4B model isn't trusted to run the loop unchecked, so code enforces these rules:

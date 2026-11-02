@@ -19,7 +19,7 @@ from src.decomposer.decomposer import (                      # the very classes 
     Refuse, SearchFilter, TaxDomain, resolve,
 )
 SubQueryDraft = sys.modules[LLMOutput.__module__].SubQueryDraft      # not re-exported by decomposer
-from supervisor import Auditor, Chunk, RetrievalAgent, RetrievalAudit, Supervisor, agent_judge
+from supervisor import Auditor, Chunk, RetrievalAgent, RetrievalAudit, Supervisor, agent_judge, excerpt
 from src.retrieval.user_store import UserStore
 
 TODAY = date(2026, 10, 20)
@@ -1110,3 +1110,38 @@ def test_agent_judge_drops_null_words_from_reasons_missing_and_suggestions(store
                      judge=agent_judge(fake_agent([(1, "approved", "null")])))
     out = sup.supervise("u1", plan(), "q")
     assert "    approved [0.99] SUTE" in out.trace
+
+
+# ---------------------------------------------------------------- excerpt: which part of a long chunk a model sees
+def test_excerpt_keeps_a_short_chunk_whole():
+    assert excerpt("short text", "anything", 50) == "short text"
+
+
+def test_excerpt_moves_the_window_to_the_lines_that_match_the_question():
+    text = "\n".join(["intro about filing deadlines"] * 20 + ["foreign worker levy rebate deduction rule"])
+    out = excerpt(text, "Can my company deduct the foreign worker levy?", 120)
+    assert out.startswith("intro about filing deadlines\n...\n")          # the chunk's opening line is kept
+    assert "foreign worker levy rebate deduction rule" in out and not out.endswith("...")
+    assert len(out) <= 120 + 8
+
+
+def test_excerpt_cuts_plainly_when_the_best_line_is_already_in_view():
+    text = "foreign worker levy rule\n" + "unrelated filler\n" * 30
+    assert excerpt(text, "foreign worker levy", 100) == text[:100] + "..."
+
+
+def test_excerpt_keeps_the_start_on_a_tie_and_marks_the_cut():
+    text = "\n".join(f"line {i} unrelated" for i in range(40))
+    out = excerpt(text, "start-up tax exemption", 100)
+    assert out.startswith("line 0") and out.endswith("...")
+
+
+def test_answer_prompt_and_audit_show_the_matching_part_of_a_long_chunk(store):
+    long = Chunk(id="web:1:0", content="filler line\n" * 300 + "The 250% deduction for donations is granted.",
+                 metadata={"source": "https://iras/1", "headings": "Donations", "score": 0.9})
+    agent = fake_agent([(1, "approved", None)], sufficient=True)
+    sup, llm, _ = make(store, [D("answer")], batches=([long],), judge=agent_judge(agent))
+    sup.supervise("u1", plan(), "How much deduction do we get for donations?")
+    assert "250% deduction for donations" in llm.answered_docs
+    assert "250% deduction for donations" in agent.calls[0][2][0]["text"]
+

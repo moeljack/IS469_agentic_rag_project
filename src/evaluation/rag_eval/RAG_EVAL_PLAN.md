@@ -309,7 +309,7 @@ All systems read these values from one config file (`src/evaluation/rag_eval/con
 | Per-query retrieval depth k | 5 for all systems |
 | Reranker candidate pool | 10 for all systems (the existing `CANDIDATES`) |
 | RRF constant | 60 |
-| Answer function | One shared function for N1, N2 and A1: the supervisor's `ANSWER_SYSTEM` prompt, temperature 0, `think=False`, each chunk cut to 1,200 characters (`DOC_CHARS`) |
+| Answer function | One shared function for N1, N2 and A1: the supervisor's `ANSWER_SYSTEM` prompt, temperature 0, `think=False`, each chunk cut to 2,000 characters (`DOC_CHARS`; was 1,200, which hid facts in 8 questions; a longer chunk shows its opening plus the part that best matches the question, `supervisor.excerpt`) |
 | Agent-only limits (part of what "agentic" means here) | `max_steps` 4, `max_queries` 2, `max_chunks` 6, `audit_min_score` 0.5 |
 | Tools | None registered (`tools=None`), so no calculator or web search is used |
 | Local models | Set in `src/config.py` (`INTAKE_MODEL`, `PLANNER_MODEL`, `SUPERVISOR_MODEL`, `AUDITOR_MODEL`, all `qwen3.5:4b`; the same-named environment variables override them). An evaluation YAML with `generator.model: default` follows `SUPERVISOR_MODEL`. Each run's metadata records the models used |
