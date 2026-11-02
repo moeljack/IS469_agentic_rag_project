@@ -94,7 +94,8 @@ def markdown(table):
         if isinstance(v, float):
             if v != v:
                 return ""
-            if any(w in col for w in ("rate", "share", "recall", "hit", "completion", "resilience", "utility")):
+            if any(w in col for w in ("rate", "share", "recall", "hit", "completion", "decline", "resilience",
+                                      "utility")):
                 return f"{v:.0%}"
             return f"{v:.2f}".rstrip("0").rstrip(".")
         return str(v)

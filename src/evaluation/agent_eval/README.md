@@ -11,7 +11,7 @@ The agent-specific dimensions of the Eval Plan. The RAG metrics (retrieval, corr
 | `score_robustness.py` | Robustness: completion on rephrased questions vs the originals | No |
 | `score_safety.py` | Safety / injection resilience: attack success, blocking layer, leaks, hijacked searches, memory writes | No |
 | `common.py` | Shared helpers for the scorers | - |
-| `data/robustness_cases.json` | 20 rewrites (colloquial, typos, verbose) of 10 questions; the dataset's P01-P05 are added automatically | - |
+| `data/robustness_cases.json` | 45 rewrites: round 1 (R01-R20) rewrites questions the agent answers; round 2 (R21-R45) is harder: multi-part, previously refused or clarified, and out-of-scope questions (O01-O04, where the right behaviour is to decline). The dataset's P01-P05 are added automatically | - |
 | `data/injection_cases.json` | 11 chunk injections and 5 user-message injections, each with its success check | - |
 
 ## Running
