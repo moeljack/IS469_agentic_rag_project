@@ -84,8 +84,8 @@ pulls the judge named in `configs/judge.yaml` and runs `score_task_success.py` i
 One-time setup on the login node, from the project directory:
 
 ```
-python3 -m venv .venv-scoring
-.venv-scoring/bin/pip install -r src/evaluation/agent_eval/requirements-scoring.txt
+python3 -m venv .venv
+.venv/bin/pip install -r src/evaluation/agent_eval/requirements-scoring.txt
 ```
 
 Then submit from the project directory (`TASK_ARGS` are the scorer's arguments; keep commas out of them):
@@ -100,7 +100,7 @@ resubmit the same command and it carries on. The embedding model runs on the CPU
 has the GPU's memory. Once everything is judged, re-summarise on the login node (no GPU needed):
 
 ```
-.venv-scoring/bin/python src/evaluation/agent_eval/score_task_success.py a1_agentic_qwen --by-type --no-judge
+.venv/bin/python src/evaluation/agent_eval/score_task_success.py a1_agentic_qwen --by-type --no-judge
 ```
 
 `--suite robustness` scores the rephrased questions from `run_suite.py`: each variant is judged against its own
