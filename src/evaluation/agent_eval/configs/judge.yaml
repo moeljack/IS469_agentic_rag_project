@@ -1,0 +1,9 @@
+# The judge for agent_eval's LLM-graded scores (task success: RAGAS faithfulness and answer relevance).
+# Copied from rag_eval/rag_eval_approach/configs/judge.yaml. Use the same judge as rag_eval if the two reports are
+# compared, a strong model that is not one of the compared generators, and do not change it between runs.
+#
+# provider: google | anthropic | openai | ollama (local; no key needed, OLLAMA_HOST is used if set)
+# Small local judges often return unparseable output to RAGAS, which shows up as judge_failed in the scores.
+provider: ollama
+model: gemma4:12b          # not a Qwen model, so it is not one of the compared generators
+options: {}                # google/openai: {temperature: 0}; anthropic: none (temperature rejected); ollama: {num_ctx: 8192}

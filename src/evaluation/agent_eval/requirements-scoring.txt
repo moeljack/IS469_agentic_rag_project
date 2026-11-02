@@ -1,0 +1,15 @@
+# Separate environment for score_task_success.py (copied from rag_eval/rag_eval_approach/requirements-scoring.txt,
+# plus langchain-ollama for a local judge). RAGAS pulls in LangChain and pins its own versions, which can clash with
+# the project's torch / transformers pins; this script only reads JSONL files, so it never needs the agent stack.
+#   py -3.12 -m venv scoringenv && scoringenv\Scripts\activate && pip install -r requirements-scoring.txt
+# RAGAS class names change between releases: after installing, pin the exact versions (pip freeze > this file).
+ragas>=0.2
+langchain-huggingface
+sentence-transformers
+langchain-google-genai
+langchain-anthropic
+langchain-openai
+langchain-ollama
+numpy
+pandas
+pyyaml
