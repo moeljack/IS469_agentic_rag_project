@@ -1,17 +1,24 @@
 """Task success of the agent (Eval Plan: "Task Success"): did it complete the task correctly?
 
 For an agentic RAG system a task is completed when the final answer is both faithful to the chunks the agent retrieved
-(no hallucination) and relevant to the question asked. Both are scored by an LLM judge through RAGAS, not by word
-overlap (BLEU/ROUGE):
+(no hallucination) and relevant to the question asked. Both are scored by an LLM judge (LLM-as-a-judge, as the plan
+asks), not by word overlap (BLEU/ROUGE). Two judge calls per answer, each returning JSON that the schema sent to
+Ollama constrains, so a local 12B judge's replies always parse:
 
-    faithfulness        RAGAS Faithfulness: share of the answer's claims supported by the retrieved chunks
-    answer_relevancy    RAGAS ResponseRelevancy: how well the answer addresses the question (judge + embeddings)
+    faithfulness        share of the answer's factual claims supported by the retrieved chunks (RAGAS's definition).
+                        The judge lists the claims and marks each supported or not (prompts/faithfulness_v1.txt,
+                        copied from rag_eval's score_grounding.py). It never sees a reference answer.
+    answer_relevancy    share of the parts of the question the answer addresses. The judge splits the question into
+                        what it asks for and marks each part addressed or not (prompts/relevancy_v1.txt). Saying the
+                        information is unavailable does not address a part.
+RAGAS is not used: through LangChain it sends no JSON schema, and with the local gemma4:12b judge its faithfulness step
+failed to parse on almost every answer. Report both as "RAGAS-style LLM-judge scores".
 
 Per question (a "task"):
     answerable question     success = answered AND faithfulness >= --min-faithfulness AND answer_relevancy >=
                             --min-relevancy. A refusal, clarification, no_answer, error or empty answer is a failed
-                            task (it stays in the denominator). An answer the judge could not score (RAGAS returned
-                            NaN) counts as failed and is reported as judge_failed. An answer without logged chunks
+                            task (it stays in the denominator). An answer the judge could not score counts as failed
+                            and is reported as judge_failed (retried on later runs). An answer without logged chunks
                             cannot be checked for faithfulness and counts as failed (answered_without_context).
     out-of-scope question   success = the agent declined (refused / no_answer / clarify); answering is a failure.
                             No judge call is made.
@@ -30,11 +37,13 @@ Inputs (read only; nothing outside agent_eval is changed):
                          each variant is judged against its own wording and scored as its original question
     --outputs DIR        read run files from another folder instead
 Outputs (agent_eval/results/task_success/):
-    <run_id>_ragas.csv              judge scores, cached per item and judge: rerunning only scores what is new
+    <run_id>_judge.csv              judge scores, cached per item, judge and method: rerunning only scores what is new
+    <run_id>_judge_details.jsonl    per answer: the judge's claims (which were unsupported) and question parts (which
+                                    were not addressed), and the raw reply when a call failed
     <run_id>_task_success.jsonl     one row per question: status, scores, success, reason
     task_success_<suite>.md / .csv  the summary table
 
-Run (in the scoring environment, requirements-scoring.txt):
+Run (needs only ollama, numpy, pandas and pyyaml, see requirements-scoring.txt):
     python src/evaluation/agent_eval/score_task_success.py a1_agentic_qwen
     python src/evaluation/agent_eval/score_task_success.py --all --by-type
     python src/evaluation/agent_eval/score_task_success.py a1_agentic_qwen_robustness --suite robustness
@@ -45,7 +54,9 @@ import json
 import math
 import re
 import sys
+import time
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -54,7 +65,7 @@ ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT))
 
 from src.evaluation.agent_eval.judge import (  # noqa: E402
-    DEFAULT_JUDGE, chat_model, judge_name, load_judge, read_judge)
+    DEFAULT_JUDGE, json_judge, judge_name, load_judge, read_judge)
 
 DATASET = EVAL / "eval_questions.json"
 INPUTS = {"main": EVAL / "rag_eval" / "results" / "outputs",
@@ -63,7 +74,25 @@ OUT = HERE / "results" / "task_success"
 
 DECLINED = {"refused", "no_answer", "clarify"}
 SCORE_COLS = ("faithfulness", "answer_relevancy")
-NOT_RUNS = ("_scores", "_judge", "_trajectory", "_ragas", "_task_success")
+
+# The two judge prompts (faithfulness copied from rag_eval's grounding_faithfulness_v1.txt) and the JSON each returns
+METHOD = "claims-v1+parts-v1"      # part of the cache key: scores from another method or prompt are never mixed in
+PROMPTS = {"faithfulness": HERE / "prompts" / "faithfulness_v1.txt",
+           "answer_relevancy": HERE / "prompts" / "relevancy_v1.txt"}
+LIST_KEY = {"faithfulness": "claims", "answer_relevancy": "parts"}
+VERDICT = {"faithfulness": "supported", "answer_relevancy": "addressed"}
+
+
+def _schema(key, fields, verdict):
+    props = {f: {"type": "string"} for f in fields}
+    props[verdict] = {"type": "boolean"}
+    return {"type": "object", "required": [key], "properties": {key: {"type": "array", "items": {
+        "type": "object", "properties": props, "required": [*fields, verdict]}}}}
+
+
+SCHEMAS = {"faithfulness": _schema("claims", ["claim", "evidence"], "supported"),
+           "answer_relevancy": _schema("parts", ["part", "reason"], "addressed")}
+NOT_RUNS = ("_scores", "_judge", "_judge_details", "_trajectory", "_ragas", "_task_success")
 
 
 # ---------------------------------------------------------------- loading (copied from rag_eval results_io)
@@ -121,7 +150,7 @@ def judgeable(rec, q):
             and bool((rec.get("answer") or "").strip()) and bool(rec.get("context_used")))
 
 
-# ---------------------------------------------------------------- judging (RAGAS)
+# ---------------------------------------------------------------- judging
 def read_cache(path, judge):
     """{item_id: {faithfulness, answer_relevancy}} scored by this judge."""
     if not path.exists():
@@ -132,31 +161,84 @@ def read_cache(path, judge):
     return {row["item_id"]: {c: _num(row.get(c)) for c in SCORE_COLS} for _, row in frame.iterrows()}
 
 
-def make_scorer(cfg, embeddings_dir, workers, embed_device="cpu", timeout=900, max_retries=3):
-    """embed_device: where the answer-relevance embedder runs. CPU by default, so the GPU's memory is left to the
-    judge (a 12B model nearly fills an 11 GB card); the embedder only encodes a few short texts per answer.
-    timeout: seconds RAGAS allows one job (one answer x one metric, several judge calls). Time a job spends waiting for
-    a busy Ollama server counts too, so keep workers at 1 with a single local judge."""
-    from langchain_huggingface import HuggingFaceEmbeddings
-    from ragas import EvaluationDataset, RunConfig, evaluate
-    from ragas.embeddings import LangchainEmbeddingsWrapper
-    from ragas.llms import LangchainLLMWrapper
-    from ragas.metrics import Faithfulness, ResponseRelevancy
+def cache_key(cfg):
+    """What the cached scores are keyed on: the judge model plus the scoring method (prompt versions)."""
+    return f"{judge_name(cfg)}|{METHOD}"
 
-    if embeddings_dir is None:
-        from src.config import EMBED_MODEL_DIR          # the project's embedding model (Qwen3-Embedding-0.6B)
-        embeddings_dir = EMBED_MODEL_DIR
-    llm = LangchainLLMWrapper(chat_model(cfg["provider"], cfg["model"], cfg["options"]))
-    embeddings = LangchainEmbeddingsWrapper(HuggingFaceEmbeddings(
-        model_name=str(embeddings_dir), model_kwargs={"device": embed_device},
-        encode_kwargs={"normalize_embeddings": True}))
-    metrics = [Faithfulness(), ResponseRelevancy()]
-    names = {metrics[0].name: "faithfulness", metrics[1].name: "answer_relevancy"}
+
+def parse_items(raw, key):
+    """The judge's list under `key` ("claims" / "parts"), or None. Tolerates code fences and text around the JSON."""
+    text = re.sub(r"^```(?:json)?|```$", "", (raw or "").strip()).strip()
+    for candidate in (text, *re.findall(r"\{.*\}", text, flags=re.S)):
+        try:
+            data = json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get(key), list):
+            return [c for c in data[key] if isinstance(c, dict)]
+    return None
+
+
+def ask(call, metric, prompt, tries=2):
+    """(items, raw) from one judge call, retried once on an error or unparseable output. items None = failed."""
+    raw = ""
+    for _ in range(tries):
+        try:
+            raw = call(prompt, SCHEMAS[metric])
+        except Exception as e:                                 # timeout, server error: try again, then give up
+            raw = f"ERROR {type(e).__name__}: {e}"
+            continue
+        items = parse_items(raw, LIST_KEY[metric])
+        if items is not None:
+            return items, raw
+    return None, raw
+
+
+def faithfulness_of(call, template, contexts, answer):
+    """(score, claims, raw): share of the answer's factual claims the chunks support. An answer with no factual claims
+    scores 1.0 (nothing unsupported; answer relevance still judges whether it addressed the question)."""
+    context = "\n\n".join(f"[Doc {i}]\n{text}" for i, text in enumerate(contexts, 1))
+    claims, raw = ask(call, "faithfulness", template.replace("{context}", context).replace("{response}", answer))
+    if claims is None:
+        return None, None, raw
+    return (sum(bool(c.get("supported")) for c in claims) / len(claims) if claims else 1.0), claims, raw
+
+
+def relevancy_of(call, template, question, answer):
+    """(score, parts, raw): share of the question's parts the answer addresses. A reply with no parts is a failed
+    judgement (every question asks for something), so it is retried like unparseable output."""
+    parts, raw = ask(call, "answer_relevancy", template.replace("{question}", question).replace("{response}", answer))
+    if not parts:
+        return None, parts, raw
+    return sum(bool(p.get("addressed")) for p in parts) / len(parts), parts, raw
+
+
+def make_scorer(cfg, workers=1, timeout=900):
+    """score(rows) -> (frame with faithfulness + answer_relevancy, per-row details). Two judge calls per answer.
+    workers: answers judged at the same time. Keep 1 with one local Ollama server: it answers one request at a time,
+    so parallel requests only wait in its queue; raise it for an API judge."""
+    import pandas as pd
+    call = json_judge(cfg, timeout=timeout)
+    templates = {m: p.read_text(encoding="utf-8") for m, p in PROMPTS.items()}
+
+    def one(row):
+        f, claims, f_raw = faithfulness_of(call, templates["faithfulness"], row["contexts"], row["answer"])
+        r, parts, r_raw = relevancy_of(call, templates["answer_relevancy"], row["question"], row["answer"])
+        return {"faithfulness": f, "answer_relevancy": r,
+                "n_claims": None if claims is None else len(claims),
+                "unsupported": [c.get("claim") for c in claims or [] if not c.get("supported")],
+                "not_addressed": [p.get("part") for p in parts or [] if not p.get("addressed")],
+                "claims": claims, "parts": parts,
+                "faithfulness_raw": None if f is not None else f_raw[:2000],
+                "relevancy_raw": None if r is not None else r_raw[:2000]}
 
     def score(rows):
-        result = evaluate(EvaluationDataset.from_list(rows), metrics=metrics, llm=llm, embeddings=embeddings,
-                          run_config=RunConfig(max_workers=workers, timeout=timeout, max_retries=max_retries))
-        return result.to_pandas().rename(columns=names)
+        if workers > 1:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                details = list(pool.map(one, rows))
+        else:
+            details = [one(row) for row in rows]
+        return pd.DataFrame({c: [d[c] for d in details] for c in SCORE_COLS}), details
     return score
 
 
@@ -170,12 +252,13 @@ def read_attempts(path, judge):
 
 
 def judge_run(run_id, records, dataset, suite, cfg, scorer, batch_size=10, attempts=3):
-    """Score the run's judgeable answers that are not cached yet; append them to <run_id>_ragas.csv after every
+    """Score the run's judgeable answers that are not cached yet; append them to <run_id>_judge.csv after every
     batch, so a job stopped by the cluster's time limit keeps what it judged and a rerun carries on from there.
     An answer the judge returned no score for (timeout, unparseable output) is judged again on the next run, up to
     `attempts` times in all; after that it stays judge_failed and counts as a failed task."""
-    path = OUT / f"{run_id}_ragas.csv"
-    name = judge_name(cfg)
+    path = OUT / f"{run_id}_judge.csv"
+    details_path = OUT / f"{run_id}_judge_details.jsonl"
+    name = cache_key(cfg)
     cache, tries = read_cache(path, name), read_attempts(path, name)
     scored = {i for i, s in cache.items() if all(s.get(c) is not None for c in SCORE_COLS)}
     gave_up = {i for i in cache if i not in scored and tries.get(i, 0) >= attempts}
@@ -188,21 +271,29 @@ def judge_run(run_id, records, dataset, suite, cfg, scorer, batch_size=10, attem
         item_id, q, question = task(rec, dataset, suite)
         if item_id in done or item_id in ids or not judgeable(rec, q):
             continue
-        rows.append({"user_input": question, "response": rec["answer"].strip(),
-                     "retrieved_contexts": [c["text"] for c in rec["context_used"]]})
+        rows.append({"question": question, "answer": rec["answer"].strip(),
+                     "contexts": [c["text"] for c in rec["context_used"]]})
         ids.append(item_id)
     print(f"{run_id}: {len(scored)} answers already judged by {name}, {len(gave_up)} failed {attempts} times "
           f"(left as judge_failed), {len(rows)} to judge")
     step = max(1, batch_size)
+    import pandas as pd
     for start in range(0, len(rows), step):
-        frame = scorer(rows[start:start + step])
-        frame.insert(0, "item_id", ids[start:start + step])
+        t0 = time.perf_counter()
+        batch_ids = ids[start:start + step]
+        frame, details = scorer(rows[start:start + step])
+        frame.insert(0, "item_id", batch_ids)
         frame.insert(1, "judge", name)
-        keep = ["item_id", "judge", *[c for c in SCORE_COLS if c in frame]]
-        frame[keep].to_csv(path, mode="a", header=not path.exists(), index=False)
-        means = frame[[c for c in SCORE_COLS if c in frame]].mean(numeric_only=True)
-        print(f"  judged {min(start + step, len(rows))}/{len(rows)}: "
-              + ", ".join(f"{c} {v:.3f}" for c, v in means.items()), flush=True)
+        frame.reindex(columns=["item_id", "judge", *SCORE_COLS]).to_csv(
+            path, mode="a", header=not path.exists(), index=False)
+        with details_path.open("a", encoding="utf-8") as out:   # claims and parts, to read why an answer failed
+            for item_id, d in zip(batch_ids, details):
+                out.write(json.dumps({"item_id": item_id, "judge": name, **d}, ensure_ascii=False) + "\n")
+        means = frame[list(SCORE_COLS)].apply(pd.to_numeric, errors="coerce").mean()
+        failed = int(frame[list(SCORE_COLS)].isna().any(axis=1).sum())
+        print(f"  judged {min(start + step, len(rows))}/{len(rows)} ({time.perf_counter() - t0:.0f}s): "
+              + ", ".join(f"{c} {v:.3f}" for c, v in means.items())
+              + (f", {failed} not scored" if failed else ""), flush=True)
 
 
 # ---------------------------------------------------------------- task outcomes
@@ -339,7 +430,7 @@ def save_table(name, table, note):
 
 # ---------------------------------------------------------------- main
 def main():
-    parser = argparse.ArgumentParser(description="Task success of the agent: RAGAS faithfulness + answer relevance")
+    parser = argparse.ArgumentParser(description="Task success of the agent: LLM-judged faithfulness + answer relevance")
     parser.add_argument("runs", nargs="*", help="run ids (a name without _repN takes all its repeats)")
     parser.add_argument("--all", action="store_true", help="every agentic run in the input folder")
     parser.add_argument("--suite", choices=sorted(INPUTS), default="main")
@@ -349,15 +440,10 @@ def main():
     parser.add_argument("--min-faithfulness", type=float, default=0.8)
     parser.add_argument("--min-relevancy", type=float, default=0.7)
     parser.add_argument("--no-judge", action="store_true", help="make no judge calls; summarise cached scores only")
-    parser.add_argument("--embeddings", help="embedding model folder for answer relevance (default: src.config)")
-    parser.add_argument("--embed-device", default="cpu",
-                        help="device for the embedding model: cpu (default, leaves the GPU to the judge) or cuda")
     parser.add_argument("--workers", type=int, default=1,
-                        help="parallel judge jobs (default 1: one local Ollama server answers one request at a time, "
-                             "so more workers only queue and time out; raise it for an API judge)")
-    parser.add_argument("--timeout", type=int, default=900,
-                        help="seconds allowed per RAGAS job, one answer x one metric (default 900)")
-    parser.add_argument("--max-retries", type=int, default=3, help="RAGAS retries of a failed judge call (default 3)")
+                        help="answers judged at the same time (default 1: one local Ollama server answers one request "
+                             "at a time, so more only wait in its queue; raise it for an API judge)")
+    parser.add_argument("--timeout", type=int, default=900, help="seconds allowed per judge call (default 900)")
     parser.add_argument("--attempts", type=int, default=3,
                         help="runs that may try an answer the judge returned no score for (default 3)")
     parser.add_argument("--batch-size", type=int, default=10,
@@ -380,14 +466,14 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     cfg = read_judge(args.judge) if args.no_judge else load_judge(args.judge)
     if not args.no_judge:
-        scorer = make_scorer(cfg, args.embeddings, args.workers, args.embed_device, args.timeout, args.max_retries)
+        scorer = make_scorer(cfg, args.workers, args.timeout)
         for run_id, records in runs.items():
             judge_run(run_id, records, dataset, args.suite, cfg, scorer, args.batch_size, args.attempts)
 
-    name = judge_name(cfg)
+    name = cache_key(cfg)
     table, groups = [], defaultdict(list)
     for run_id, records in runs.items():
-        scores = read_cache(OUT / f"{run_id}_ragas.csv", name)
+        scores = read_cache(OUT / f"{run_id}_judge.csv", name)
         rows = [{"run_id": run_id, **outcome(rec, dataset, args.suite, scores, args.min_faithfulness,
                                              args.min_relevancy)} for rec in records]
         (OUT / f"{run_id}_task_success.jsonl").write_text(
@@ -418,7 +504,9 @@ def main():
                                           "overall_success_rate", "failures")}})
     print()
     save_table(f"task_success_{args.suite}", table,
-               note=f"Judge `{name}` (RAGAS Faithfulness + ResponseRelevancy). Success on an answerable question = "
+               note=f"Judge `{judge_name(cfg)}`, RAGAS-style LLM-judge scores ({METHOD}). Faithfulness: share of the "
+                    "answer's claims the retrieved chunks support. Answer relevancy: share of the question's parts the "
+                    "answer addresses. Success on an answerable question = "
                     f"answered, faithfulness >= {args.min_faithfulness} and answer relevancy >= {args.min_relevancy}; "
                     "refusals, clarifications, no_answer, errors and unscorable answers count as failures. "
                     "Out-of-scope success = declined. CI: bootstrap 95% over questions.")
