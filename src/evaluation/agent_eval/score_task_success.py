@@ -132,9 +132,11 @@ def read_cache(path, judge):
     return {row["item_id"]: {c: _num(row.get(c)) for c in SCORE_COLS} for _, row in frame.iterrows()}
 
 
-def make_scorer(cfg, embeddings_dir, workers, embed_device="cpu"):
+def make_scorer(cfg, embeddings_dir, workers, embed_device="cpu", timeout=900, max_retries=3):
     """embed_device: where the answer-relevance embedder runs. CPU by default, so the GPU's memory is left to the
-    judge (a 12B model nearly fills an 11 GB card); the embedder only encodes a few short texts per answer."""
+    judge (a 12B model nearly fills an 11 GB card); the embedder only encodes a few short texts per answer.
+    timeout: seconds RAGAS allows one job (one answer x one metric, several judge calls). Time a job spends waiting for
+    a busy Ollama server counts too, so keep workers at 1 with a single local judge."""
     from langchain_huggingface import HuggingFaceEmbeddings
     from ragas import EvaluationDataset, RunConfig, evaluate
     from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -153,17 +155,34 @@ def make_scorer(cfg, embeddings_dir, workers, embed_device="cpu"):
 
     def score(rows):
         result = evaluate(EvaluationDataset.from_list(rows), metrics=metrics, llm=llm, embeddings=embeddings,
-                          run_config=RunConfig(max_workers=workers, timeout=300))
+                          run_config=RunConfig(max_workers=workers, timeout=timeout, max_retries=max_retries))
         return result.to_pandas().rename(columns=names)
     return score
 
 
-def judge_run(run_id, records, dataset, suite, cfg, scorer, batch_size=10):
+def read_attempts(path, judge):
+    """{item_id: how many times this judge has been asked to score it} (one cached row per attempt)."""
+    if not path.exists():
+        return {}
+    import pandas as pd
+    frame = pd.read_csv(path, dtype={"item_id": str})
+    return frame[frame["judge"] == judge]["item_id"].value_counts().to_dict()
+
+
+def judge_run(run_id, records, dataset, suite, cfg, scorer, batch_size=10, attempts=3):
     """Score the run's judgeable answers that are not cached yet; append them to <run_id>_ragas.csv after every
-    batch, so a job stopped by the cluster's time limit keeps what it judged and a rerun carries on from there."""
+    batch, so a job stopped by the cluster's time limit keeps what it judged and a rerun carries on from there.
+    An answer the judge returned no score for (timeout, unparseable output) is judged again on the next run, up to
+    `attempts` times in all; after that it stays judge_failed and counts as a failed task."""
     path = OUT / f"{run_id}_ragas.csv"
     name = judge_name(cfg)
-    done = set(read_cache(path, name))
+    cache, tries = read_cache(path, name), read_attempts(path, name)
+    scored = {i for i, s in cache.items() if all(s.get(c) is not None for c in SCORE_COLS)}
+    gave_up = {i for i in cache if i not in scored and tries.get(i, 0) >= attempts}
+    done = scored | gave_up
+    retry = sorted(set(cache) - done)
+    if retry:
+        print(f"{run_id}: judging again {len(retry)} answer(s) the judge returned no score for: {retry[:10]}")
     rows, ids = [], []
     for rec in records:
         item_id, q, question = task(rec, dataset, suite)
@@ -172,7 +191,8 @@ def judge_run(run_id, records, dataset, suite, cfg, scorer, batch_size=10):
         rows.append({"user_input": question, "response": rec["answer"].strip(),
                      "retrieved_contexts": [c["text"] for c in rec["context_used"]]})
         ids.append(item_id)
-    print(f"{run_id}: {len(done)} answers already judged by {name}, {len(rows)} to judge")
+    print(f"{run_id}: {len(scored)} answers already judged by {name}, {len(gave_up)} failed {attempts} times "
+          f"(left as judge_failed), {len(rows)} to judge")
     step = max(1, batch_size)
     for start in range(0, len(rows), step):
         frame = scorer(rows[start:start + step])
@@ -332,7 +352,14 @@ def main():
     parser.add_argument("--embeddings", help="embedding model folder for answer relevance (default: src.config)")
     parser.add_argument("--embed-device", default="cpu",
                         help="device for the embedding model: cpu (default, leaves the GPU to the judge) or cuda")
-    parser.add_argument("--workers", type=int, default=4, help="parallel judge calls")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="parallel judge jobs (default 1: one local Ollama server answers one request at a time, "
+                             "so more workers only queue and time out; raise it for an API judge)")
+    parser.add_argument("--timeout", type=int, default=900,
+                        help="seconds allowed per RAGAS job, one answer x one metric (default 900)")
+    parser.add_argument("--max-retries", type=int, default=3, help="RAGAS retries of a failed judge call (default 3)")
+    parser.add_argument("--attempts", type=int, default=3,
+                        help="runs that may try an answer the judge returned no score for (default 3)")
     parser.add_argument("--batch-size", type=int, default=10,
                         help="answers judged per batch; each batch is saved before the next starts (default 10)")
     parser.add_argument("--any-system", action="store_true", help="with --all, also score naive runs (comparison)")
@@ -353,9 +380,9 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     cfg = read_judge(args.judge) if args.no_judge else load_judge(args.judge)
     if not args.no_judge:
-        scorer = make_scorer(cfg, args.embeddings, args.workers, args.embed_device)
+        scorer = make_scorer(cfg, args.embeddings, args.workers, args.embed_device, args.timeout, args.max_retries)
         for run_id, records in runs.items():
-            judge_run(run_id, records, dataset, args.suite, cfg, scorer, args.batch_size)
+            judge_run(run_id, records, dataset, args.suite, cfg, scorer, args.batch_size, args.attempts)
 
     name = judge_name(cfg)
     table, groups = [], defaultdict(list)

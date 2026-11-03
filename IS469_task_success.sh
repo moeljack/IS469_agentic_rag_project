@@ -5,13 +5,13 @@
 #
 # One-time setup on the login node, from the project directory (RAGAS pins its own LangChain versions, so it gets its
 # own environment instead of the project's .venv):
-#     python3 -m venv .venv
-#     PIP_CACHE_DIR=/common/scratch/users/<x>/<you>/.cache/pip .venv/bin/pip install \
+#     python3 -m venv .venv-scoring
+#     PIP_CACHE_DIR=/common/scratch/users/<x>/<you>/.cache/pip .venv-scoring/bin/pip install \
 #         -r src/evaluation/agent_eval/requirements-scoring.txt
 #
 # Submit from the project directory, after the runs to score exist:
 #     sbatch src/evaluation/agent_eval/IS469_task_success.sh
-#     sbatch --export=ALL,TASK_ARGS="a1_agentic_qwen_robustness --suite robustness --workers 2" src/evaluation/agent_eval/IS469_task_success.sh
+#     sbatch --export=ALL,TASK_ARGS="a1_agentic_qwen_robustness --suite robustness --workers 1" src/evaluation/agent_eval/IS469_task_success.sh
 # TASK_ARGS are the arguments of score_task_success.py (default below). sbatch --export splits on commas, so keep
 # commas out of TASK_ARGS. Judge scores are saved every --batch-size answers: if the job hits the time limit, submit the
 # same command again and it continues. Afterwards, re-summarise on the login node with --no-judge (no GPU needed).
@@ -39,8 +39,8 @@ export PATH="$HOME/bin:$PATH"
 
 PROJECT_DIR="${PROJECT_DIR:-/common/home/users/z/ziyi.lim.2022/IS469/IS469_agentic_rag_project}"
 export SCRATCH_DIR="${SCRATCH_DIR:-/common/scratch/users/z/ziyi.lim.2022}"
-SCORING_VENV="${SCORING_VENV:-$PROJECT_DIR/.venv}"
-TASK_ARGS="${TASK_ARGS:-a1_agentic_qwen --by-type --workers 2}"
+SCORING_VENV="${SCORING_VENV:-$PROJECT_DIR/.venv-scoring}"
+TASK_ARGS="${TASK_ARGS:-a1_agentic_qwen --by-type --workers 1}"
 export OLLAMA_MODELS="$SCRATCH_DIR/.ollama/models"
 export HF_HOME="$SCRATCH_DIR/.cache/huggingface"
 export TORCH_HOME="$SCRATCH_DIR/.cache/torch"
@@ -61,6 +61,16 @@ if [ ! -x "$SCORING_VENV/bin/python3" ]; then
 fi
 source "$SCORING_VENV/bin/activate"
 cd "$PROJECT_DIR"
+
+# Fail in seconds, before Ollama starts, if the scoring packages are missing (an unfinished pip install, or the
+# wrong environment).
+if ! python3 -c "import ragas, langchain_huggingface, langchain_ollama, sentence_transformers, pandas, numpy, yaml" 2>import_error.$SLURM_JOB_ID.log; then
+    echo "ERROR: $SCORING_VENV is missing scoring packages:"
+    tail -n 1 "import_error.$SLURM_JOB_ID.log"
+    echo "Install them on the login node: $SCORING_VENV/bin/pip install -r src/evaluation/agent_eval/requirements-scoring.txt"
+    exit 1
+fi
+rm -f "import_error.$SLURM_JOB_ID.log"
 
 echo "Job $SLURM_JOB_ID on $(hostname) | git $(git rev-parse --short HEAD 2>/dev/null)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo "WARNING: no GPU visible"
@@ -93,6 +103,13 @@ fi
 
 echo "Ollama is online. Pulling the judge..."
 ollama pull "$JUDGE" || { echo "ERROR: could not pull $JUDGE"; exit 1; }
+
+# Load the judge now, with the context size the scorer uses (Ollama reloads a model for a different num_ctx), and show
+# where it runs: PROCESSOR should read "100% GPU". A CPU/GPU split means the model does not fit the card and every
+# judge call is several times slower (the usual cause of RAGAS timeouts).
+curl -s "http://$OLLAMA_HOST/api/generate" \
+    -d "{\"model\": \"$JUDGE\", \"prompt\": \"\", \"keep_alive\": \"60m\", \"options\": {\"num_ctx\": 8192}}" > /dev/null
+ollama ps
 
 #################################################
 ##            SCORE TASK SUCCESS               ##

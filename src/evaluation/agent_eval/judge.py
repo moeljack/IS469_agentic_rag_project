@@ -77,6 +77,10 @@ def chat_model(provider, model, options):
     if provider == "ollama":                                  # added in agent_eval (see module docstring)
         from langchain_ollama import ChatOllama
         extra = {"base_url": os.environ["OLLAMA_HOST"]} if os.environ.get("OLLAMA_HOST") else {}
+        # optional, from judge.yaml options: reasoning (false turns a thinking model's thinking off, which is much
+        # faster) and num_predict (a cap on output tokens, so one rambling reply cannot use up the job's timeout)
+        extra.update({k: options[k] for k in ("reasoning", "num_predict") if k in options})
         return ChatOllama(model=model, temperature=options.get("temperature", 0),
-                          num_ctx=options.get("num_ctx", 8192), **extra)
+                          num_ctx=options.get("num_ctx", 8192), keep_alive=options.get("keep_alive", "60m"),
+                          **extra)
     raise ValueError(f"no RAGAS judge for provider {provider!r}")
