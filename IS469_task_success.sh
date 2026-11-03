@@ -5,8 +5,8 @@
 #
 # One-time setup on the login node, from the project directory (RAGAS pins its own LangChain versions, so it gets its
 # own environment instead of the project's .venv):
-#     python3 -m venv .venv-scoring
-#     PIP_CACHE_DIR=/common/scratch/users/<x>/<you>/.cache/pip .venv-scoring/bin/pip install \
+#     python3 -m venv .venv
+#     PIP_CACHE_DIR=/common/scratch/users/<x>/<you>/.cache/pip .venv/bin/pip install \
 #         -r src/evaluation/agent_eval/requirements-scoring.txt
 #
 # Submit from the project directory, after the runs to score exist:
@@ -39,7 +39,7 @@ export PATH="$HOME/bin:$PATH"
 
 PROJECT_DIR="${PROJECT_DIR:-/common/home/users/z/ziyi.lim.2022/IS469/IS469_agentic_rag_project}"
 export SCRATCH_DIR="${SCRATCH_DIR:-/common/scratch/users/z/ziyi.lim.2022}"
-SCORING_VENV="${SCORING_VENV:-$PROJECT_DIR/.venv-scoring}"
+SCORING_VENV="${SCORING_VENV:-$PROJECT_DIR/.venv}"
 TASK_ARGS="${TASK_ARGS:-a1_agentic_qwen --by-type --workers 1}"
 export OLLAMA_MODELS="$SCRATCH_DIR/.ollama/models"
 export HF_HOME="$SCRATCH_DIR/.cache/huggingface"
