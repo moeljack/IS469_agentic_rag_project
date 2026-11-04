@@ -10,7 +10,9 @@ scores the top `--k` of them (plan Section 3.1):
     MRR             1 / rank of the first gold chunk, over the full depth
     hit@k           every fact covered (strict; multi-part questions are the hardest to pass)
 
-Out-of-scope questions are skipped (they have no facts). Results per mode are saved to
+Out-of-scope questions are skipped (they have no facts). The summary's `all` (and its simple / multi split) is the
+primary set of lookup questions; the calculation questions are summarised on their own (`computation`) and only joined
+in `all_with_computation`, so they never shift the R0-R4 ranking. Results per mode are saved to
 results/retrieval/<mode>.json for analyze.py.
 
 Run:  python src/evaluation/rag_eval/rag_eval_retrieval/evaluate_rag.py --mode all
@@ -26,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))   # repo root, so `src` is importable
 
 from src.config import CANDIDATES, RERANK_MODEL, RERANK_QUANTIZE
+from src.evaluation.rag_eval.rag_eval_approach.results_io import SECONDARY_QTYPES
 from src.evaluation.rag_eval.rag_eval_retrieval.metrics import mean, part_ranks, retrieval_metrics
 from src.evaluation.rag_eval.rag_eval_retrieval.retrieval_modes import MODES, RERANKED, ModeRetriever
 
@@ -87,7 +90,10 @@ for mode in modes:
                      "retrieved": [{"rank": i, "id": h["id"], "score": h["score"]} for i, h in enumerate(hits, 1)],
                      "part_ranks": part_ranks(ids, q["gold_passages"]),
                      "metrics": retrieval_metrics(ids, q["gold_passages"], k=args.k), "seconds": seconds})
-    summary = {"all": summarise(rows), **{t: summarise([r for r in rows if r["type"] == t]) for t in ("simple", "multi")}}
+    core = [r for r in rows if r["qtype"] not in SECONDARY_QTYPES]
+    summary = {"all": summarise(core), **{t: summarise([r for r in core if r["type"] == t]) for t in ("simple", "multi")},
+               "computation": summarise([r for r in rows if r["qtype"] in SECONDARY_QTYPES]),
+               "all_with_computation": summarise(rows)}
     summaries[mode] = summary
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / f"{mode}.json").write_text(json.dumps({
@@ -98,7 +104,7 @@ for mode in modes:
     print(f"\n{MODES[mode]} ({mode}) | k {args.k} | depth {args.depth} | pool {args.candidates} | "
           f"saved to {RESULTS / f'{mode}.json'}")
     print(header)
-    for part in ("all", "simple", "multi"):
+    for part in ("all", "simple", "multi", "computation", "all_with_computation"):
         if summary[part]["n"]:
             print(line(f"  {part}", summary[part]))
     print(f"\nRank of the first gold chunk for each fact ('-' = not in the top {args.depth})")
@@ -107,7 +113,7 @@ for mode in modes:
         print(f"{i:<4}{q['qid']:<5}{q['type'][:5]:<7}{(q.get('source') or '')[:7]:<8}{ranks:>8}   {q['question'][:60]}")
 
 if len(modes) > 1:
-    print(f"\nAll modes ({len(questions)} questions)")
+    print(f"\nAll modes ({summaries[modes[0]]['all']['n']} primary questions; calculation questions not included)")
     print(header)
     for mode in modes:
         print(line(MODES[mode], summaries[mode]["all"]))

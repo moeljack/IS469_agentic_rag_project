@@ -72,11 +72,13 @@
   "facts": [
    [
     "You do not need to file the ECI for your company if it is nil",
-    "$5 million | Nil | No"
+    "$5 million | Nil | No",
+    "Your company does not need to file ECI in any Year of Assessment (YA) when both criteria are met"
    ]
   ],
   "gold_passages": [
    [
+    "web:b20dcc6490:1",
     "web:b20dcc6490:2",
     "web:b20dcc6490:3"
    ]
@@ -129,11 +131,13 @@
   ],
   "facts": [
    [
-    "The only difference is in the annual revenue condition"
+    "The only difference is in the annual revenue condition",
+    "Singapore-incorporated companies with annual revenue of $200,000 or below"
    ]
   ],
   "gold_passages": [
    [
+    "web:d6577e57a2:0",
     "web:d6577e57a2:4"
    ]
   ],
@@ -156,13 +160,19 @@
   ],
   "facts": [
    [
-    "must be filed with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+"
+    "must be filed with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+",
+    "notify the Accounting and Corporate Regulatory Authority (ACRA) of a change in financial year end",
+    "update the financial year end with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+",
+    "inform ACRA of the change in your company's financial year end"
    ]
   ],
   "gold_passages": [
    [
     "web:1a08219be7:1",
-    "web:ceef23334f:0"
+    "web:ab6eaf57fa:2",
+    "web:b20dcc6490:14",
+    "web:ceef23334f:0",
+    "web:ceef23334f:3"
    ]
   ],
   "needs_review": false
@@ -271,12 +281,16 @@
   ],
   "facts": [
    [
-    "the enhanced CIT Rebate will be 50% of the corporate tax payable"
+    "the enhanced CIT Rebate will be 50% of the corporate tax payable",
+    "2026 | 50% | $40,000 less CIT Rebate Cash Grant of $2,000",
+    "the CIT Rebate will be enhanced to 50% of the corporate tax payable for YA 2026"
    ]
   ],
   "gold_passages": [
    [
-    "web:a566c48cbe:1"
+    "web:a566c48cbe:1",
+    "web:a566c48cbe:5",
+    "web:b20dcc6490:0"
    ]
   ],
   "needs_review": false
@@ -523,32 +537,6 @@
   "needs_review": true
  },
  {
-  "qid": "S20",
-  "type": "simple",
-  "tier": "webpage",
-  "qtype": "number",
-  "source": "online_guide",
-  "difficulty": "easy",
-  "numeric": true,
-  "answerable": true,
-  "question": "At what value of related party transactions does my company have to complete the RPT Form?",
-  "reference_answer": "A company must complete the RPT Form if the value of related party transactions disclosed in its financial statements for the financial period exceeds S$15 million.",
-  "key_facts": [
-   "S$15 million"
-  ],
-  "facts": [
-   [
-    "Companies are required to complete the RPT Form if the value of related party transactions disclosed in the financial statements for the financial period exceeds S$15 million"
-   ]
-  ],
-  "gold_passages": [
-   [
-    "web:173b58474f:8"
-   ]
-  ],
-  "needs_review": true
- },
- {
   "qid": "S21",
   "type": "simple",
   "tier": "webpage",
@@ -618,14 +606,15 @@
   "numeric": true,
   "answerable": true,
   "question": "If my company pays its tax late, what penalty applies? And if we spread payment over GIRO instalments, what is the minimum monthly amount?",
-  "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax if full payment is not received by the due date. Under a GIRO instalment plan the minimum monthly deduction is $50.",
+  "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax if full payment is not received by the due date. If the tax is still unpaid 60 days after that penalty, an additional penalty of 1% per month may be imposed, up to a maximum of 12% of the unpaid tax. Under a GIRO instalment plan the minimum monthly deduction is $50.",
   "key_facts": [
    "5%",
    "$50"
   ],
   "facts": [
    [
-    "A 5% late payment penalty will be imposed on the unpaid tax"
+    "A 5% late payment penalty will be imposed on the unpaid tax",
+    "an additional penalty of 1% per month may be imposed"
    ],
    [
     "minimum monthly GIRO deduction amount of $50"
@@ -633,7 +622,8 @@
   ],
   "gold_passages": [
    [
-    "web:054b24831c:0"
+    "web:054b24831c:0",
+    "web:054b24831c:1"
    ],
    [
     "web:b20dcc6490:6"
@@ -661,7 +651,8 @@
     "settle all outstanding tax liabilities and obligations with IRAS before applying for strike off"
    ],
    [
-    "must ensure that all books and papers of the company are retained for at least 5 years after the date on which the company was dissolved"
+    "must ensure that all books and papers of the company are retained for at least 5 years after the date on which the company was dissolved",
+    "all books and papers of your company are retained for a period of at least 5 years from the date on which your company was dissolved"
    ]
   ],
   "gold_passages": [
@@ -669,7 +660,8 @@
     "web:584d6034e5:0"
    ],
    [
-    "web:50424a296b:6"
+    "web:50424a296b:6",
+    "web:584d6034e5:4"
    ]
   ],
   "needs_review": false
@@ -693,7 +685,8 @@
   ],
   "facts": [
    [
-    "you are still required to file the ECI within 3 months from your company's first financial year end"
+    "you are still required to file the ECI within 3 months from your company's first financial year end",
+    "If your company did not receive the notification and does not satisfy the conditions to be exempted from ECI filing, it is still required to file within 3 months"
    ],
    [
     "Your company does not need to file ECI in any Year of Assessment (YA) when both criteria are met"
@@ -701,7 +694,8 @@
   ],
   "gold_passages": [
    [
-    "web:1a08219be7:4"
+    "web:1a08219be7:4",
+    "web:b20dcc6490:4"
    ],
    [
     "web:b20dcc6490:1"
@@ -731,7 +725,8 @@
    [
     "These are expenses directly incurred to earn investment income and are deductible against the respective source of investment income",
     "Expenses that are attributed to the investment income may be deductible",
-    "your investment holding company may incur the following expenses: - Administrative and management fees"
+    "your investment holding company may incur the following expenses: - Administrative and management fees",
+    "Expenses are deductible against their source of income"
    ]
   ],
   "gold_passages": [
@@ -741,7 +736,8 @@
    [
     "web:ce1754d1b3:1",
     "web:ce1754d1b3:2",
-    "web:ce1754d1b3:4"
+    "web:ce1754d1b3:4",
+    "web:ce1754d1b3:6"
    ]
   ],
   "needs_review": false
@@ -830,7 +826,8 @@
   ],
   "facts": [
    [
-    "Application fee of S$660"
+    "Application fee of S$660",
+    "Application fee of S$660 It is non-refundable"
    ],
    [
     "there is no appeal process provided for in the Income Tax Act 1947"
@@ -874,9 +871,9 @@
   ],
   "gold_passages": [
    [
+    "web:e045f8905e:1",
     "web:e92b52ac32:0",
-    "web:e92b52ac32:1",
-    "web:e045f8905e:1"
+    "web:e92b52ac32:1"
    ],
    [
     "web:e045f8905e:1",
@@ -961,10 +958,10 @@
   "numeric": true,
   "answerable": true,
   "question": "How early before earning the income must our REIT ETF apply for tax transparency, and what documents must go with the application?",
-  "reference_answer": "The application should be made to IRAS at least three months before the REIT ETF derives the income for which tax transparency is sought. It is submitted with supporting documents, including a joint undertaking by the trustee and manager, a copy of the trust deed and a sample of the declaration forms used by the trustee.",
+  "reference_answer": "The application should be made to IRAS at least three months before the REIT ETF derives the income for which tax transparency is sought. The application form is submitted with the letter of undertaking (a joint undertaking by the trustee and manager) and supporting documents, including a copy of the trust deed and a sample of the declaration forms used by the trustee.",
   "key_facts": [
    "at least three months",
-   "joint undertaking",
+   "letter of undertaking (joint undertaking by the trustee and manager)",
    "trust deed"
   ],
   "facts": [
@@ -1073,7 +1070,8 @@
     "Your company is eligible for the tax exemption scheme for new companies for its first 3 consecutive YAs if it meets all the qualifying conditions"
    ],
    [
-    "The maximum exemption for each YA is $125,000"
+    "The maximum exemption for each YA is $125,000",
+    "@ 75% @ 50% | $75,000 $50,000 | $125,000"
    ]
   ],
   "gold_passages": [
@@ -1081,6 +1079,7 @@
     "web:a566c48cbe:21"
    ],
    [
+    "web:a566c48cbe:11",
     "web:a566c48cbe:9"
    ]
   ],
@@ -1106,7 +1105,8 @@
     "they are not required to apply for tax clearance"
    ],
    [
-    "The last Declaration must be filed within 7 days of the decision taken to call for the Final Meeting"
+    "The last Declaration must be filed within 7 days of the decision taken to call for the Final Meeting",
+    "file the last Declaration with IRAS within 7 days of the decision taken to call for the Final Meeting"
    ]
   ],
   "gold_passages": [
@@ -1114,7 +1114,8 @@
     "web:d9b810ae03:11"
    ],
    [
-    "web:d9b810ae03:4"
+    "web:d9b810ae03:4",
+    "web:d9b810ae03:7"
    ]
   ],
   "needs_review": true
@@ -1202,7 +1203,8 @@
   ],
   "facts": [
    [
-    "Where the units are held through more than one tier of nominees, the trustee/manager must obtain confirmation from the ultimate beneficiaries"
+    "Where the units are held through more than one tier of nominees, the trustee/manager must obtain confirmation from the ultimate beneficiaries",
+    "To obtain confirmation from the ultimate beneficiaries that they are qualifying unit holders"
    ],
    [
     "the trustee/manager must take immediate action to recover from the nominees the shortfall in the amount of tax which should have been deducted"
@@ -1210,7 +1212,8 @@
   ],
   "gold_passages": [
    [
-    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:40"
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:40",
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:65"
    ],
    [
     "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:42"
@@ -1238,7 +1241,8 @@
     "If you are facing difficulties paying your tax, you may reach out to us before the payment due date"
    ],
    [
-    "IRAS will review your request and inform you of the outcome within 15 working days"
+    "IRAS will review your request and inform you of the outcome within 15 working days",
+    "IRAS will review your appeal and inform you of the outcome within 15 working days"
    ]
   ],
   "gold_passages": [
@@ -1246,6 +1250,7 @@
     "web:87a2e70770:0"
    ],
    [
+    "web:87a2e70770:13",
     "web:87a2e70770:7"
    ]
   ],
@@ -1275,7 +1280,8 @@
     "if your company received one-off income before strike-off with ACRA, you should write in to IRAS via myTax Mail explaining the nature of the income"
    ],
    [
-    "notify IRAS within 1 month from the date of commencement of business or earning/ receiving the income"
+    "notify IRAS within 1 month from the date of commencement of business or earning/ receiving the income",
+    "Notify IRAS within 1 month from the date of commencement of your business or earning/ receiving the income"
    ]
   ],
   "gold_passages": [
@@ -1287,7 +1293,8 @@
    ],
    [
     "web:53d53a4398:12",
-    "web:53d53a4398:13"
+    "web:53d53a4398:13",
+    "web:6e286dc681:12"
    ]
   ],
   "needs_review": true
@@ -1502,24 +1509,28 @@
   "facts": [
    [
     "The annual revenue condition is $5 million or below for Form C-S and $200,000 or below for Form C-S (Lite)",
-    "if your company qualifies for Form C-S and has annual revenue of $200,000 or below"
+    "if your company qualifies for Form C-S and has annual revenue of $200,000 or below",
+    "If your company qualifies to file Form C-S and has an annual revenue of $200,000 or below, you can opt to file Form C-S (Lite)"
    ],
    [
     "by the deadline of 30 Nov 2026"
    ],
    [
-    "The maximum exemption for each YA is $125,000"
+    "The maximum exemption for each YA is $125,000",
+    "@ 75% @ 50% | $75,000 $50,000 | $125,000"
    ]
   ],
   "gold_passages": [
    [
     "web:6c658c1ab3:2",
+    "web:d6577e57a2:3",
     "web:d6577e57a2:4"
    ],
    [
     "web:6c658c1ab3:0"
    ],
    [
+    "web:a566c48cbe:11",
     "web:a566c48cbe:9"
    ]
   ],
@@ -1586,7 +1597,9 @@
   "facts": [
    [
     "You do not need to inform IRAS separately of these changes",
-    "the change must be filed with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+"
+    "the change must be filed with the Accounting and Corporate Regulatory Authority (ACRA) via BizFile+",
+    "notify the Accounting and Corporate Regulatory Authority (ACRA) of a change in financial year end",
+    "inform ACRA of the change in your company's financial year end"
    ],
    [
     "you need to prepare 2 separate tax computations"
@@ -1598,7 +1611,9 @@
   "gold_passages": [
    [
     "web:1a08219be7:1",
-    "web:ceef23334f:0"
+    "web:ab6eaf57fa:2",
+    "web:ceef23334f:0",
+    "web:ceef23334f:3"
    ],
    [
     "web:ab6eaf57fa:4",
@@ -1641,6 +1656,310 @@
    ],
    [
     "web:5cf4da84a8:6"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C01",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Our company's chargeable income this year is $150,000 and it is not a new start-up. How much of it is exempt under the partial tax exemption, and how much tax do we pay at 17%?",
+  "reference_answer": "Under the partial tax exemption, 75% of the first $10,000 ($7,500) and 50% of the next $140,000 ($70,000) are exempt: $77,500 in total. The remaining $72,500 is taxed at 17%, giving tax of $12,325 (before any CIT Rebate).",
+  "key_facts": [
+   "$77,500",
+   "$12,325"
+  ],
+  "facts": [
+   [
+    "Next $190,000 | 50% | $95,000"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a566c48cbe:16"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C02",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "We're a new start-up in our first Year of Assessment and qualify for the start-up tax exemption. Our chargeable income is $180,000. How much is exempt and what is the tax at 17%?",
+  "reference_answer": "Under the tax exemption scheme for new start-up companies (YA 2020 onwards), 75% of the first $100,000 ($75,000) and 50% of the next $80,000 ($40,000) are exempt: $115,000. The remaining $65,000 is taxed at 17%, giving tax of $11,050 (before any CIT Rebate).",
+  "key_facts": [
+   "$115,000",
+   "$11,050"
+  ],
+  "facts": [
+   [
+    "First $100,000 | 75% | $75,000"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a566c48cbe:9"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C03",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Our company made a trade loss of $150,000 this year. Last year we had taxable income of $200,000. How much of the loss can we carry back to set off against last year's income?",
+  "reference_answer": "Current year unutilised trade losses can be carried back to set off the income of the immediately preceding YA, subject to a cap of $100,000. So at most $100,000 of the $150,000 loss can be carried back (subject to the qualifying conditions).",
+  "key_facts": [
+   "$100,000"
+  ],
+  "facts": [
+   [
+    "to set-off the income from the immediate preceding YA, subject to a cap of $100,000"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:94932834d0:19"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C04",
+  "type": "simple",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Our company donated $10,000 to an approved Institution of a Public Character. How much tax deduction can we claim for it?",
+  "reference_answer": "Qualifying donations to IPCs get a 250% tax deduction, so a $10,000 donation gives a deduction of $25,000.",
+  "key_facts": [
+   "$25,000"
+  ],
+  "facts": [
+   [
+    "The 250% deduction for donations is granted based on information obtained from the Institutions of a Public Character"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:6e286dc681:9"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C05",
+  "type": "simple",
+  "tier": "pdf",
+  "qtype": "computation",
+  "source": "insurer_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "We're a general insurer. Our net written premium for fire insurance this year is $3,000,000. What is the maximum IBNR provision we can deduct for that class?",
+  "reference_answer": "The maximum IBNR factor for fire insurance is 10% of net written premium, so the maximum tax-allowable IBNR provision is 10% x $3,000,000 = $300,000.",
+  "key_facts": [
+   "10%",
+   "$300,000"
+  ],
+  "facts": [
+   [
+    "| Fire | 10 |"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C06",
+  "type": "simple",
+  "tier": "pdf",
+  "qtype": "computation",
+  "source": "reit_etf_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Our REIT ETF is paying a distribution of $500,000 in 2026 to a qualifying non-resident non-individual unit holder. How much tax must be withheld, and is that the final tax?",
+  "reference_answer": "From 1 July 2018 to 31 December 2030 the withholding tax rate on distributions to qualifying non-resident non-individual unit holders is 10%, and it is a final tax. So $50,000 must be withheld from the $500,000 distribution.",
+  "key_facts": [
+   "10%",
+   "$50,000",
+   "final tax"
+  ],
+  "facts": [
+   [
+    "the withholding tax rate for distributions made to qualifying non-resident non-individual unit holders is 10% and this 10% tax is a final tax"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "etaxguide_Income-Tax-Treatment-of-REIT-Exchange-Traded-Funds:27"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C07",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "Our company didn't pay its $20,000 corporate tax bill by the due date. What late payment penalty will we be charged, and if the tax is still unpaid for 3 more completed months after the 60-day mark, how much extra will we owe in penalties?",
+  "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax: $1,000. If the tax remains unpaid 60 days after that penalty, an additional 1% per completed month may be imposed (up to a maximum of 12%), so 3 further completed months add 3% x $20,000 = $600, bringing total penalties to $1,600.",
+  "key_facts": [
+   "$1,000",
+   "$600",
+   "$1,600"
+  ],
+  "facts": [
+   [
+    "A 5% late payment penalty will be imposed on the unpaid tax"
+   ],
+   [
+    "an additional penalty of 1% per month may be imposed for every completed month that the tax remains unpaid"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:054b24831c:0"
+   ],
+   [
+    "web:054b24831c:1"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C08",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "For YA 2026 our company's income before the donation deduction is $300,000, and we donated $40,000 to an approved IPC. We're not a new start-up and have no local employees. What is our tax payable after the CIT Rebate?",
+  "reference_answer": "The donation gets a 250% deduction ($100,000), so chargeable income is $200,000. The partial tax exemption exempts $7,500 + $95,000 = $102,500, leaving $97,500 taxed at 17% = $16,575. The YA 2026 CIT Rebate is 50% of tax payable (capped at $40,000) = $8,287.50; with no local employee the company is not eligible for the Cash Grant, so the full rebate is given. Tax payable after the rebate is $8,287.50.",
+  "key_facts": [
+   "$200,000",
+   "$16,575",
+   "$8,287.50"
+  ],
+  "facts": [
+   [
+    "The 250% deduction for donations is granted based on information obtained from the Institutions of a Public Character"
+   ],
+   [
+    "Next $190,000 | 50% | $95,000"
+   ],
+   [
+    "If CIT Rebate > $0, CIT Rebate (capped at $40,000) to be given"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:6e286dc681:9"
+   ],
+   [
+    "web:a566c48cbe:16"
+   ],
+   [
+    "web:a566c48cbe:1"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C09",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "For YA 2026 our company's chargeable income is $150,000. We're not a new start-up and we employed one local employee in 2025. After the partial tax exemption and the CIT Rebate, how much tax do we pay, and do we get any cash grant?",
+  "reference_answer": "The partial tax exemption exempts $77,500, leaving $72,500 taxed at 17% = $12,325. The YA 2026 CIT Rebate is 50% of that, $6,162.50. Because the company meets the local employee condition, it receives the $2,000 CIT Rebate Cash Grant, and the rebate given is reduced by $2,000 to $4,162.50. Tax payable after the rebate is $8,162.50, and the company also receives the $2,000 Cash Grant.",
+  "key_facts": [
+   "$12,325",
+   "$4,162.50",
+   "$2,000",
+   "$8,162.50"
+  ],
+  "facts": [
+   [
+    "Next $190,000 | 50% | $95,000"
+   ],
+   [
+    "If CIT Rebate > $2,000, CIT Rebate (capped at $40,000) less $2,000 to be given"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a566c48cbe:16"
+   ],
+   [
+    "web:a566c48cbe:1"
+   ]
+  ],
+  "needs_review": true
+ },
+ {
+  "qid": "C10",
+  "type": "multi",
+  "tier": "webpage",
+  "qtype": "computation",
+  "source": "online_guide",
+  "difficulty": "hard",
+  "numeric": true,
+  "answerable": true,
+  "question": "We incorporated in 2025, employed one local employee that year, and YA 2026 is our first YA under the start-up tax exemption. Our chargeable income is $80,000. What tax do we pay after the exemption and the CIT Rebate, and do we get the Cash Grant?",
+  "reference_answer": "Under the start-up exemption, 75% of the first $100,000 is exempt: 75% x $80,000 = $60,000, leaving $20,000 taxed at 17% = $3,400. The YA 2026 CIT Rebate would be 50% = $1,700, but for a company eligible for the Cash Grant no CIT Rebate is given when the rebate is $2,000 or less. The company receives the $2,000 Cash Grant instead, and its tax payable stays $3,400.",
+  "key_facts": [
+   "$3,400",
+   "$2,000",
+   "no CIT Rebate is given"
+  ],
+  "facts": [
+   [
+    "First $100,000 | 75% | $75,000"
+   ],
+   [
+    "If CIT Rebate ≤ $2,000, no CIT Rebate to be given"
+   ]
+  ],
+  "gold_passages": [
+   [
+    "web:a566c48cbe:9"
+   ],
+   [
+    "web:a566c48cbe:1"
    ]
   ],
   "needs_review": true
@@ -1926,8 +2245,8 @@
   "difficulty": "easy",
   "numeric": false,
   "answerable": false,
-  "question": "We are amending our YA 2020 return. What CIT Rebate rate and cap applied for that year?",
-  "reference_answer": "The sources only give the CIT Rebate for YA 2026; nothing is stated for YA 2020, so the system should say it cannot answer rather than reuse the YA 2026 figures.",
+  "question": "We're checking an old assessment. What corporate income tax rate applied to companies for YA 2008?",
+  "reference_answer": "The sources only state the current 17% rate and give no rate for YA 2008, so the system should say it cannot answer rather than assume 17% applied then.",
   "key_facts": [],
   "facts": [],
   "gold_passages": [],

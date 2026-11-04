@@ -15,6 +15,12 @@ SCORES = RESULTS / "scores"
 
 NON_ANSWERS = {"clarify", "refused", "no_answer", "error"}   # statuses that never count as a correct answer
 DECLINED = {"refused", "no_answer"}                           # the system said it cannot answer
+SECONDARY_QTYPES = {"computation"}   # answerable, but reported on their own and kept out of the headline (plan 2.3)
+
+
+def is_core(q):
+    """An answerable question in the primary (headline) set: not out-of-scope and not a calculation question."""
+    return bool(q.get("answerable", True)) and q.get("qtype") not in SECONDARY_QTYPES
 
 
 def oos_outcome(status, refused):

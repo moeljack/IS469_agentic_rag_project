@@ -96,7 +96,7 @@ Dataset v2 is already tagged on these fields. Have a second member check the tag
 
 ### 2.3 Is the dataset enough? The current test data (v2.1)
 
-**Current (3 Nov 2026):** 71 records, 51 answerable (S, M and the multi-step A01–A10) + 20 out-of-scope; the paraphrases moved to the robustness suite. Accuracy is computed over the 51 answerable questions (one question is about 2 points). The rest of this section describes v2.1 (41 answerable) as it was built; the composition table below is current.
+**Current (5 Nov 2026):** 80 records, 60 answerable (S, M, the multi-step A01–A10 and the calculation questions C01–C10) + 20 out-of-scope; the paraphrases moved to the robustness suite and S20 was dropped (it repeated A06 part 1's RPT threshold). Accuracy is computed over the 60 answerable questions (one question is about 1.7 points). The calculation questions are reported as their own row (qtype `computation`, Table 2b): the arithmetic is done by the answer LLM, since the evaluation runs the agent without tools. The rest of this section describes v2.1 (41 answerable) as it was built; the composition table below is current.
 
 The v2.1 test data had 50 records: 45 scored questions (41 answerable + 4 out-of-scope) and 5 retrieval-only paraphrases. Accuracy was computed over the 41 answerable questions, so one question was worth 2.4 points. The first version had 31 answerable questions, sized as the smallest that fills every table in this plan; 10 more were added to bring the single-fact types to 5–6 each, the two PDF sources to 4 each, the number of multi-part questions to 20, and to cover pages that no question tested (tax computation, liquidation and judicial management, the compliance programmes page, foreign-entity classification and payment difficulties).
 
@@ -104,11 +104,12 @@ The v2.1 test data had 50 records: 45 scored questions (41 answerable + 4 out-of
 
 | Group | Ids | n | Used for |
 | --- | --- | --- | --- |
-| Single-fact, answerable | S01–S21 | 21 | Retrieval metrics and the judge |
+| Single-fact, answerable | S01–S21 (no S20) | 20 | Retrieval metrics and the judge |
 | Multi-part, answerable | M01–M20 | 20 | Retrieval metrics and the judge |
 | Multi-step, answerable | A01–A10 | 10 | Retrieval metrics and the judge |
+| Calculation, answerable | C01–C10 | 10 | Retrieval metrics and the judge (numbers must be exact): 6 single-rule (C01–C06), 4 multi-step (C07–C10) |
 | Out-of-scope | O01–O20 | 20 | Refusal check only (no gold passages): off-topic 6, near-miss 8, not-in-corpus 6 |
-| **Total** |  | **71** |  |
+| **Total** |  | **80** |  |
 
 **The 41 answerable questions by tag** (every row adds up to 41)
 

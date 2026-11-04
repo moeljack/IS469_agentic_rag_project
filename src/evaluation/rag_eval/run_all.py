@@ -74,9 +74,11 @@ def select_mode():
         path = RESULTS / "retrieval" / f"{mode}.json"
         if not path.exists():
             sys.exit(f"no stage 1 retrieval results for {mode} ({path}); run stage 1 first")
-        summary[mode] = json.loads(path.read_text(encoding="utf-8"))["summary"]["all"]
-        if summary[mode]["n"] != expected:   # e.g. left over from a --limit smoke test
-            sys.exit(f"stage 1 results for {mode} cover {summary[mode]['n']} of {expected} questions; rerun stage 1")
+        saved = json.loads(path.read_text(encoding="utf-8"))["summary"]
+        summary[mode] = saved["all"]   # the primary questions decide the mode; calculation questions do not
+        covered = saved.get("all_with_computation", saved["all"])["n"]
+        if covered != expected:   # e.g. left over from a --limit smoke test, or from before questions were added
+            sys.exit(f"stage 1 results for {mode} cover {covered} of {expected} questions; rerun stage 1")
     r4, r0 = summary["hybrid_rerank"], summary["dense"]
     if r4["r"] >= r0["r"] and not (r4["ms_median"] > 3 * r0["ms_median"] and r4["r"] <= r0["r"]):
         chosen, reason = "hybrid_rerank", "R4 keeps at least R0's part recall"
