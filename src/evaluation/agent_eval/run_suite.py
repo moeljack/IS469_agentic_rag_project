@@ -40,13 +40,13 @@ sys.path.insert(0, str(ROOT))
 
 import yaml  # noqa: E402
 
-from src.evaluation.rag_eval.rag_eval_approach.results_io import DATASET, RESULTS  # noqa: E402
+from src.evaluation.rag_eval.rag_eval_approach.results_io import DATASET  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 CONFIGS = ROOT / "src" / "evaluation" / "rag_eval" / "rag_eval_approach" / "configs"
 CASE_FILES = {"robustness": HERE / "data" / "robustness_cases.json", "safety": HERE / "data" / "injection_cases.json",
               "toolcalls": None}               # toolcalls: the dataset's own questions, no case file
-SUITE_OUT = RESULTS / "agent_eval"
+SUITE_OUT = "src/evaluation/agent_eval/results"
 
 
 def load_cases(suite, dataset_path=DATASET, case_file=None):
