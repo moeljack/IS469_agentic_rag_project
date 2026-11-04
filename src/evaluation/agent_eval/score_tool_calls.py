@@ -55,7 +55,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 EVAL = HERE.parent
 DATASET = EVAL / "eval_questions.json"
-SUITES = EVAL / "rag_eval" / "results" / "agent_eval"
+SUITES = HERE / "results"                                   # run_suite.py writes agent_eval/results/<suite>/
+OLD_SUITES = EVAL / "rag_eval" / "results" / "agent_eval"   # where suite outputs went before; still read
 OUT = HERE / "results" / "tool_calls"
 NOT_RUNS = ("_scores", "_judge", "_judge_details", "_trajectory", "_ragas", "_task_success", "_tool_calls")
 MULTI = {"multi-part", "multi-step"}
@@ -75,8 +76,14 @@ def base_name(run_id):
     return re.sub(r"_rep\d+$", "", run_id)
 
 
-def find_runs(folder, names=(), every=False):
-    files = sorted(p for p in Path(folder).glob("*.jsonl") if not p.stem.endswith(NOT_RUNS))
+def find_runs(suite, names=(), every=False):
+    """{run_id: records} from agent_eval/results/<suite>/ and the old rag_eval/results/agent_eval/<suite>/ (a run in
+    both is read from the new folder)."""
+    folder = SUITES / suite
+    by_stem = {}
+    for d in (OLD_SUITES / suite, folder):                  # new folder last, so it wins
+        by_stem.update({p.stem: p for p in d.glob("*.jsonl") if not p.stem.endswith(NOT_RUNS)})
+    files = [by_stem[s] for s in sorted(by_stem)]
     if not every:
         files = [p for p in files if p.stem in names or base_name(p.stem) in names]
         found = {p.stem for p in files} | {base_name(p.stem) for p in files}
@@ -306,7 +313,7 @@ def main():
         parser.error("name runs to score, or use --all")
 
     dataset = {q["qid"]: q for q in json.loads(Path(args.data).read_text(encoding="utf-8"))}
-    runs = find_runs(SUITES / args.suite, args.runs, args.all)
+    runs = find_runs(args.suite, args.runs, args.all)
     OUT.mkdir(parents=True, exist_ok=True)
     table, groups = [], defaultdict(list)
     for run_id, records in runs.items():

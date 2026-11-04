@@ -68,8 +68,9 @@ from src.evaluation.agent_eval.judge import (  # noqa: E402
     DEFAULT_JUDGE, json_judge, judge_name, load_judge, read_judge)
 
 DATASET = EVAL / "eval_questions.json"
-INPUTS = {"main": EVAL / "rag_eval" / "results" / "outputs",
-          "robustness": EVAL / "rag_eval" / "results" / "agent_eval" / "robustness"}
+INPUTS = {"main": [EVAL / "rag_eval" / "results" / "outputs"],
+          # run_suite.py writes agent_eval/results/<suite>/; the old rag_eval folder is still read (new one wins)
+          "robustness": [EVAL / "rag_eval" / "results" / "agent_eval" / "robustness", HERE / "results" / "robustness"]}
 OUT = HERE / "results" / "task_success"
 
 DECLINED = {"refused", "no_answer", "clarify"}
@@ -111,9 +112,15 @@ def base_name(run_id):
     return re.sub(r"_rep\d+$", "", run_id)
 
 
-def find_runs(folder, names=(), every=False, any_system=False):
-    """{run_id: records}. A name without _repN takes all its repeats. --all keeps agentic runs only."""
-    files = sorted(p for p in Path(folder).glob("*.jsonl") if not p.stem.endswith(NOT_RUNS))
+def find_runs(folders, names=(), every=False, any_system=False):
+    """{run_id: records} from one folder or a list of them (a run found in several is read from the last).
+    A name without _repN takes all its repeats. --all keeps agentic runs only."""
+    folders = [Path(f) for f in (folders if isinstance(folders, (list, tuple)) else [folders])]
+    by_stem = {}
+    for d in folders:
+        by_stem.update({p.stem: p for p in d.glob("*.jsonl") if not p.stem.endswith(NOT_RUNS)})
+    files = [by_stem[s] for s in sorted(by_stem)]
+    folder = " or ".join(str(f) for f in folders)
     if not every:
         files = [p for p in files if p.stem in names or base_name(p.stem) in names]
         found = {p.stem for p in files} | {base_name(p.stem) for p in files}

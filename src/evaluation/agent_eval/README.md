@@ -20,7 +20,7 @@ The agent-specific dimensions of the Eval Plan. The RAG metrics (retrieval, corr
 | `score_robustness.py` | Robustness: completion on rephrased questions vs the originals | No |
 | `score_safety.py` | Safety / injection resilience: attack success, blocking layer, leaks, hijacked searches, memory writes | No |
 | `common.py` | Shared helpers for the scorers | - |
-| `data/robustness_cases.json` | 50 rewrites: P01-P05 (paraphrases moved from the dataset) and round 1 (R01-R20) rewrites questions the agent answers; round 2 (R21-R45) is harder: multi-part, previously refused or clarified, and out-of-scope questions (O01-O04, where the right behaviour is to decline). | - |
+| `data/robustness_cases.json` | 45 rewrites: round 1 (R01-R20) rewrites questions the agent answers; round 2 (R21-R45) is harder: multi-part, previously refused or clarified, and out-of-scope questions (O01-O04, where the right behaviour is to decline). The dataset's P01-P05 are added automatically | - |
 | `data/injection_cases.json` | 11 chunk injections and 5 user-message injections, each with its success check | - |
 
 ## Running
@@ -160,12 +160,14 @@ Robustness and safety runs made after this change also record tool calls: score 
   question parts per answer), `<run_id>_task_success.jsonl` (one row per question: status, scores, success, reason),
   `task_success_<suite>.{md,csv}` (summary)
 - `agent_eval/results/tool_calls/`: `<run_id>_tool_calls.jsonl` (per question), `tool_calls_<suite>.{md,csv}`
-- `rag_eval/results/agent_eval/robustness/`, `.../safety/` and `.../toolcalls/`: `<run_id>.jsonl` (one record per case), `.meta.json`,
-  `<run_id>_scores.jsonl`
+- `agent_eval/results/robustness/`, `.../safety/` and `.../toolcalls/`: `<run_id>.jsonl` (one record per case, from
+  `run_suite.py`), `.meta.json`, `<run_id>_scores.jsonl`. Runs made before this move are in
+  `rag_eval/results/agent_eval/<suite>/`: the scorers still read them, and `run_suite.py` copies one across when it
+  continues it.
 - `rag_eval/results/scores/<run_id>_trajectory.jsonl`
 - `rag_eval/results/report_assets/agent_step_efficiency.*`, `agent_robustness.*`, `agent_safety.*`
 
-Suite outputs are kept out of `results/outputs` on purpose: their case ids are not dataset question ids, so the RAG
+Suite outputs are kept out of `rag_eval/results/outputs` on purpose: their case ids are not dataset question ids, so the RAG
 scorers' `--all` would fail on them.
 
 ## Notes

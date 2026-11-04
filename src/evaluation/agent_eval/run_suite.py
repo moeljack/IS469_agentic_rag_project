@@ -18,8 +18,9 @@ Run (on the machine with Ollama and the retriever, like run.py):
 
 The config is any run.py config (a path, or a file name in rag_eval_approach/configs/); the system is built exactly
 as run.py builds it, only the retriever is wrapped for the safety suite (injection) or a fault run. Output:
-    rag_eval/results/agent_eval/<suite>/<run_id>_<suite>[_<fault>][_repN].jsonl   (+ .meta.json)
-Resumable (cases already in the file are skipped) and never mixes configurations, like run.py. A case that raises
+    agent_eval/results/<suite>/<run_id>_<suite>[_<fault>][_repN].jsonl   (+ .meta.json)
+Resumable (cases already in the file are skipped) and never mixes configurations, like run.py. A run started before
+outputs moved here (rag_eval/results/agent_eval/<suite>/) is copied across and continued. A case that raises
 is saved with status "error". For the agent, the record also holds what the user store saved during the case
 (`profile_facts`, `profile_history`), so the safety scorer can check whether an injection wrote to memory, and every
 tool call the agent made (`tool_calls`, from tool_trace.py), in every suite.
@@ -39,13 +40,30 @@ sys.path.insert(0, str(ROOT))
 
 import yaml  # noqa: E402
 
-from src.evaluation.rag_eval.rag_eval_approach.results_io import DATASET  # noqa: E402
+from src.evaluation.rag_eval.rag_eval_approach.results_io import DATASET, RESULTS  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 CONFIGS = ROOT / "src" / "evaluation" / "rag_eval" / "rag_eval_approach" / "configs"
 CASE_FILES = {"robustness": HERE / "data" / "robustness_cases.json", "safety": HERE / "data" / "injection_cases.json",
               "toolcalls": None}               # toolcalls: the dataset's own questions, no case file
-SUITE_OUT = "src/evaluation/agent_eval/results"
+SUITE_OUT = HERE / "results"                   # src/evaluation/agent_eval/results/<suite>/, wherever the job starts
+OLD_SUITE_OUT = RESULTS / "agent_eval"         # where suite outputs went before (rag_eval/results/agent_eval/<suite>/)
+
+
+def adopt_old_run(suite, run_id, out_path, meta_path):
+    """A run started in the old folder continues in the new one: when the new folder has no output for this run id
+    but the old one does, copy its .jsonl and .meta.json across (the originals stay), so finished cases are kept and
+    not run again."""
+    if out_path.exists() or meta_path.exists():
+        return
+    old_dir = OLD_SUITE_OUT / suite
+    old_out, old_meta = old_dir / out_path.name, old_dir / meta_path.name
+    if old_out.exists() or old_meta.exists():
+        import shutil
+        for src, dst in ((old_out, out_path), (old_meta, meta_path)):
+            if src.exists():
+                shutil.copy2(src, dst)
+        print(f"{run_id}: continuing the run found in {old_dir} (copied to {out_path.parent})")
 
 
 def load_cases(suite, dataset_path=DATASET, case_file=None):
@@ -131,6 +149,7 @@ def main():
     out_dir = SUITE_OUT / args.suite
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path, meta_path = out_dir / f"{run_id}.jsonl", out_dir / f"{run_id}.meta.json"
+    adopt_old_run(args.suite, run_id, out_path, meta_path)
     if meta_path.exists():
         previous = json.loads(meta_path.read_text(encoding="utf-8"))["config_hash"]
         if previous != config_hash:
