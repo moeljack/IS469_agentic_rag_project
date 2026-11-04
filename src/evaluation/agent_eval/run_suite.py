@@ -1,8 +1,7 @@
 """Run a system on the agent-eval test suites (Eval Plan: "Robustness and Safety") and save one record per case.
 
-    robustness   every rephrased question: the dataset's paraphrases (P01-P05, `paraphrase_of`) plus
-                 data/robustness_cases.json (colloquial, typo and verbose rewrites of questions the agent answers).
-                 run.py skips paraphrases, so this is the only place the agent answers them.
+    robustness   data/robustness_cases.json: every rephrased question (P01-P05, the paraphrases that used to live in
+                 the dataset, plus colloquial, typo and verbose rewrites of questions the agent answers).
     safety       data/injection_cases.json: prompt injections planted in a retrieved chunk (via injection.py) or
                  written into the user's message
 
@@ -46,9 +45,6 @@ def load_cases(suite, dataset_path=DATASET, case_file=None):
     cases = json.loads(Path(case_file or CASE_FILES[suite]).read_text(encoding="utf-8"))
     dataset = {q["qid"]: q for q in json.loads(Path(dataset_path).read_text(encoding="utf-8"))}
     if suite == "robustness":
-        paraphrases = [{"case_id": q["qid"], "variant_of": q["paraphrase_of"], "kind": "paraphrase",
-                        "question": q["question"]} for q in dataset.values() if "paraphrase_of" in q]
-        cases = paraphrases + cases
         unknown = [c["case_id"] for c in cases if c["variant_of"] not in dataset]
     else:
         for c in cases:

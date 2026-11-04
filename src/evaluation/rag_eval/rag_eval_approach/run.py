@@ -3,7 +3,7 @@
 Run:  python src/evaluation/rag_eval/rag_eval_approach/run.py configs/a1_agentic_qwen.yaml --repeat 1
       python src/evaluation/rag_eval/rag_eval_approach/run.py configs/n1_naive.yaml --start 0 --end 12
 
-- Every scored question is answered, including the out-of-scope ones; the paraphrases are retrieval-only and skipped.
+- Every question is answered, including the out-of-scope ones.
 - Resumable: questions already in the output file are skipped, so a crash or the cluster's 2-hour job limit only costs
   the question in progress. --start/--end take a slice of the dataset for one job.
 - Never overwrites: a run id belongs to one configuration. If the config changes, the run refuses to continue;
@@ -82,7 +82,7 @@ def main():
                      "Give the changed config a new run_id instead of mixing two configurations in one run.")
 
     data = json.loads(Path(args.data).read_text(encoding="utf-8"))
-    questions = [q for q in data if "paraphrase_of" not in q][args.start:args.end]
+    questions = data[args.start:args.end]
     done = set()
     if out_path.exists():
         done = {json.loads(line)["qid"] for line in out_path.read_text(encoding="utf-8").splitlines() if line.strip()}

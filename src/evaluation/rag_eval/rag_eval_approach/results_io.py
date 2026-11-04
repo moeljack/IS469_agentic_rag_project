@@ -14,6 +14,19 @@ OUTPUTS = RESULTS / "outputs"
 SCORES = RESULTS / "scores"
 
 NON_ANSWERS = {"clarify", "refused", "no_answer", "error"}   # statuses that never count as a correct answer
+DECLINED = {"refused", "no_answer"}                           # the system said it cannot answer
+
+
+def oos_outcome(status, refused):
+    """What a system did with an out-of-scope question: declined | clarified | answered | error | unscored.
+    Asking a clarifying question is neither a refusal nor a hallucinated answer, so it is counted on its own."""
+    if status == "error":
+        return "error"
+    if status == "clarify":
+        return "clarified"
+    if refused is None or refused != refused:   # judge output unparseable, or not judged yet (NaN)
+        return "unscored"
+    return "declined" if refused else "answered"
 
 
 def load_dataset(path=DATASET):

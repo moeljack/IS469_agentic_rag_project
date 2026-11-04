@@ -3,6 +3,8 @@
     Table 1a     retrieval ablation R0-R4 (from rag_eval_retrieval/evaluate_rag.py)
     Runs         one row per run and per repeated config: accuracy with a bootstrap 95% CI, mean correctness, numeric
                  accuracy, refusals, non-answers, RAGAS means, retrieval, chunks seen/used, latency, tokens (Tables 1b, 2a, 3)
+    Table 2e     out-of-scope behaviour per run and oos_group: declined / clarified / answered, the decline rate with a
+                 Wilson 95% CI, and answerable questions wrongly declined or clarified (always written)
     --pair A B   paired comparison on the same questions (Table 2c): win/loss table, exact McNemar test, paired
                  bootstrap CI of the accuracy difference, latency and token ratios, and the plan's wording rule
     --types      accuracy by question type for the given runs (Table 2b)
@@ -30,7 +32,7 @@ import pandas as pd
 from scipy.stats import binomtest
 
 from src.evaluation.rag_eval.rag_eval_approach.results_io import (
-    NON_ANSWERS, OUTPUTS, RESULTS, SCORES, load_dataset, read_jsonl)
+    DECLINED, NON_ANSWERS, OUTPUTS, RESULTS, SCORES, load_dataset, oos_outcome, read_jsonl)
 
 ASSETS = RESULTS / "report_assets"
 RETRIEVAL = RESULTS / "retrieval"
@@ -46,6 +48,15 @@ def bootstrap_ci(values, n_boot=1000, seed=0):
     return tuple(np.percentile(means, [2.5, 97.5]))
 
 
+def wilson_ci(successes, n, z=1.96):
+    """95% interval for a proportion; unlike the bootstrap it stays sensible at 0/n or n/n on small samples."""
+    if n == 0:
+        return float("nan"), float("nan")
+    p = successes / n
+    centre, half = (p + z * z / (2 * n)) / (1 + z * z / n), z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return centre - half, centre + half
+
+
 def base_name(run_id):
     return re.sub(r"_rep\d+$", "", run_id)
 
@@ -58,6 +69,7 @@ def load_run(run_id, dataset):
         latency, tokens = rec.get("latency_s") or {}, rec.get("tokens") or {}
         rows.append({"run_id": run_id, "qid": rec["qid"], "answerable": bool(q.get("answerable")), "type": q["type"],
                      "qtype": q.get("qtype"), "source": q.get("source"), "numeric": bool(q.get("numeric")),
+                     "oos_group": q.get("oos_group"),
                      "status": "error" if rec.get("error") else rec.get("status"),
                      "latency": latency.get("total", rec.get("wall_s")),
                      "tokens": (tokens.get("input") or 0) + (tokens.get("output") or 0)})
@@ -80,13 +92,17 @@ def load_run(run_id, dataset):
         frame = frame.merge(ragas.add_prefix("ragas_").rename(columns={"ragas_qid": "qid"}), on="qid", how="left")
     if "score" in frame:
         frame["correct"] = (frame["score"] == 2).astype(float).where(frame["answerable"])
+    refused = frame["refused"] if "refused" in frame else pd.Series(None, index=frame.index)
+    frame["outcome"] = [None if a else oos_outcome(s, r) for a, s, r in zip(frame["answerable"], frame["status"], refused)]
     return frame
 
 
 def summarise(name, frame):
     ans, oos = frame[frame["answerable"]], frame[~frame["answerable"]]
     row = {"name": name, "runs": frame["run_id"].nunique(), "answerable": ans["qid"].nunique(),
-           "non_answers": int(ans["status"].isin(NON_ANSWERS).sum())}
+           "non_answers": int(ans["status"].isin(NON_ANSWERS).sum()),
+           "declined_answerable": int(ans["status"].isin(DECLINED).sum()),     # false refusals
+           "clarified_answerable": int((ans["status"] == "clarify").sum())}
     if "correct" in frame:
         per_q = ans.groupby("qid")["correct"].mean()
         lo, hi = bootstrap_ci(per_q.values)
@@ -98,6 +114,8 @@ def summarise(name, frame):
                    unscored=int(ans["score"].isna().sum()))   # not judged yet, or judge output unparseable (counted wrong)
     if "refused" in frame and len(oos):
         row["refusals"] = f"{int((oos['refused'] == True).sum())}/{len(oos)}"   # unparseable (None) counts as not refused
+    if len(oos):
+        row.update({f"oos_{k}": int((oos["outcome"] == k).sum()) for k in ("declined", "clarified", "answered")})
     for col in [c for c in frame if c.startswith("ragas_") or c in ("faithfulness", "ctx_precision", "ctx_ap")]:
         row[col] = pd.to_numeric(ans[col], errors="coerce").mean()   # ragas_* only if the optional cross-check was run
     for col in ("r", "hit", "n_seen", "n_used"):
@@ -108,6 +126,30 @@ def summarise(name, frame):
     row.update(latency_median=frame["latency"].median(), latency_p90=frame["latency"].quantile(0.9),
                tokens_mean=frame["tokens"].mean())
     return row
+
+
+def out_of_scope(frames):
+    """Table 2e: per run and per oos_group, what the system did with the out-of-scope questions, next to how often it
+    declined or clarified answerable ones (a system that declines everything would otherwise look perfect)."""
+    rows = []
+    for run_id, frame in frames.items():
+        oos, ans = frame[~frame["answerable"]], frame[frame["answerable"]]
+        if oos.empty:
+            continue
+        groups = [("all", oos)] + [(g, oos[oos["oos_group"] == g]) for g in sorted(oos["oos_group"].dropna().unique())]
+        for group, part in groups:
+            counts = part["outcome"].value_counts()
+            declined = int(counts.get("declined", 0))
+            lo, hi = wilson_ci(declined, len(part))
+            row = {"run_id": run_id, "oos_group": group, "n": len(part), "declined": declined,
+                   "clarified": int(counts.get("clarified", 0)), "answered": int(counts.get("answered", 0)),
+                   "other": int(counts.get("error", 0) + counts.get("unscored", 0)),
+                   "decline_rate": declined / len(part), "ci_low": lo, "ci_high": hi}
+            if group == "all":
+                row.update(answerable_declined=f"{int(ans['status'].isin(DECLINED).sum())}/{len(ans)}",
+                           answerable_clarified=f"{int((ans['status'] == 'clarify').sum())}/{len(ans)}")
+            rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def correctness(frames, name):
@@ -176,7 +218,7 @@ def main():
     for path in sorted(RETRIEVAL.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         s = data["summary"]["all"]
-        ablation.append({"config": data["label"] + (" (paraphrases)" if data.get("paraphrases") else ""),
+        ablation.append({"config": data["label"],
                          "n": s["n"], f"part_recall@{data['k']}": s["r"], f"precision@{data['k']}": s["p"],
                          f"F1@{data['k']}": s["f1"], "MRR": s["rr"], f"hit@{data['k']}": s["hit"],
                          "latency_ms_median": s["ms_median"]})
@@ -196,6 +238,9 @@ def main():
     rows += [summarise(f"{name} (mean of {len(ids)})", pd.concat([frames[i] for i in ids]))
              for name, ids in groups.items() if len(ids) > 1]
     save("runs_summary", pd.DataFrame(rows))
+    oos_table = out_of_scope(frames)
+    if not oos_table.empty:
+        save("table2e_out_of_scope", oos_table)
 
     if args.pair:
         save("paired_comparisons", text="\n\n".join(pair(frames, a, b) for a, b in args.pair))

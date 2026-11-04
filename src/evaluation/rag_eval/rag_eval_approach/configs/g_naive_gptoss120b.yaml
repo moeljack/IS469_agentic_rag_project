@@ -1,0 +1,15 @@
+# Stage 3: N1 with gpt-oss-120b as the generator (Groq, OpenAI-compatible; pip install openai; GROQ_API_KEY).
+# Everything else is N1 (n1_naive.yaml): same retriever, k and answer prompt, so the only change is the answer model.
+# Groq is reached over the internet: run on a machine that has it (not a compute node without outbound access).
+run_id: g_naive_gptoss120b
+system: naive
+retriever:
+  mode: hybrid_rerank
+  k: 5
+  candidates: 10
+generator:
+  provider: groq
+  model: openai/gpt-oss-120b
+  options:
+    temperature: 0         # set to null if the model rejects temperature
+today: "2026-10-28"

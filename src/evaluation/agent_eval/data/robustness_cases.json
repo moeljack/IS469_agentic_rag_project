@@ -1,4 +1,9 @@
 [
+ {"case_id": "P01", "variant_of": "S02", "kind": "paraphrase", "question": "when do i need to submit my company's tax return by this yr?", "round": 1},
+ {"case_id": "P02", "variant_of": "S03", "kind": "paraphrase", "question": "my company made no profit this year, still need to do the ECI thing?", "round": 1},
+ {"case_id": "P03", "variant_of": "S12", "kind": "paraphrase", "question": "max IBNR % for motor policies?", "round": 1},
+ {"case_id": "P04", "variant_of": "M02", "kind": "paraphrase", "question": "we paid our corporate tax late, whats the penalty? and if we go on a GIRO plan whats the smallest monthly amount?", "round": 1},
+ {"case_id": "P05", "variant_of": "M03", "kind": "paraphrase", "question": "we're shutting the company down, do we have to clear our tax first before striking off? and how many yrs do we keep the books after?", "round": 1},
  {"case_id": "R01", "variant_of": "S01", "kind": "colloquial", "question": "whats the company tax rate in sg?", "round": 1},
  {"case_id": "R02", "variant_of": "S01", "kind": "typos", "question": "wat is the corprate tax rate in singapore", "round": 1},
  {"case_id": "R03", "variant_of": "S04", "kind": "verbose", "question": "Our overseas customer's tax office has asked us for a Certificate of Residence before they will apply the treaty rate. What exactly is that document and what is it used for?", "round": 1},
