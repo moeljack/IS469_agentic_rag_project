@@ -1,0 +1,18 @@
+You are checking whether a chatbot's answer addresses the question a user asked. Judge only whether it answers what
+was asked, not whether the information is correct.
+
+QUESTION:
+{question}
+
+ANSWER:
+{response}
+
+Step 1. Split the question into the separate things it asks for: one part for a question that asks one thing; several
+parts for a question that asks for several facts, conditions, a comparison or a calculation. Use the user's own words.
+
+Step 2. For each part, decide whether the answer addresses it: true only if the answer gives the information that part
+asks for. Saying the information is not available, asking the user a question back, or giving information on a
+different topic does NOT address the part. Give a short reason before the verdict.
+
+Return ONLY this JSON:
+{"parts": [{"part": "<what the question asks>", "reason": "<short reason>", "addressed": true|false}]}

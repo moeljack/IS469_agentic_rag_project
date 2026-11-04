@@ -1,10 +1,11 @@
-"""The fixed LLM judge for agent_eval's LLM-graded scores (RAGAS faithfulness and answer relevance).
+"""The fixed LLM judge for agent_eval's LLM-graded scores (task success: faithfulness and answer relevance).
+
+json_judge(cfg) returns call(prompt, schema) -> reply text. For Ollama (the cluster's local judge) it calls the server
+directly with the JSON schema as `format` and thinking off; for an API judge it uses a LangChain chat model.
 
 Copied from rag_eval so agent_eval does not import it:
     load_env, has_key, KEYS   <- rag_eval/rag_eval_approach/env.py
-    chat_model                <- rag_eval/rag_eval_approach/score_ragas.py
-Added here: provider "ollama" in chat_model. rag_eval's judge.yaml names an Ollama model (gemma4:12b), but its
-score_ragas.chat_model has no Ollama branch, so it could not run with that config.
+    chat_model                <- rag_eval/rag_eval_approach/score_ragas.py (API providers only)
 
 The judge config is agent_eval/configs/judge.yaml (a copy of rag_eval's). Keep both on the same model if the two
 reports are compared, and never change it between runs.
@@ -64,7 +65,7 @@ def judge_name(cfg):
 
 # ---------------------------------------------------------------- copied from rag_eval_approach/score_ragas.py
 def chat_model(provider, model, options):
-    """A LangChain chat model for RAGAS."""
+    """A LangChain chat model for an API judge (needs the matching langchain-* package; Ollama does not use this)."""
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
         return ChatAnthropic(model=model, max_tokens=8000)   # no temperature: current Claude models reject it
@@ -74,13 +75,42 @@ def chat_model(provider, model, options):
     if provider == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(model=model, temperature=options.get("temperature", 0))
-    if provider == "ollama":                                  # added in agent_eval (see module docstring)
-        from langchain_ollama import ChatOllama
-        extra = {"base_url": os.environ["OLLAMA_HOST"]} if os.environ.get("OLLAMA_HOST") else {}
-        # optional, from judge.yaml options: reasoning (false turns a thinking model's thinking off, which is much
-        # faster) and num_predict (a cap on output tokens, so one rambling reply cannot use up the job's timeout)
-        extra.update({k: options[k] for k in ("reasoning", "num_predict") if k in options})
-        return ChatOllama(model=model, temperature=options.get("temperature", 0),
-                          num_ctx=options.get("num_ctx", 8192), keep_alive=options.get("keep_alive", "60m"),
-                          **extra)
-    raise ValueError(f"no RAGAS judge for provider {provider!r}")
+    raise ValueError(f"no judge for provider {provider!r}; choose ollama, anthropic, openai or google")
+
+
+# ---------------------------------------------------------------- the judge call
+def json_judge(cfg, timeout=900):
+    """call(prompt, schema) -> raw reply text, for judge prompts that must come back as JSON.
+
+    Ollama: the schema is sent as `format`, so the server constrains decoding to valid JSON of that shape, and thinking
+    is off (as rag_eval's supervisor.default_llm does for its judge). This is what makes a 12B local judge reliable.
+    judge.yaml options used: temperature (0), num_ctx (8192), num_predict (cap on output tokens), reasoning (false),
+    keep_alive (60m). Other providers: the LangChain chat model, with the reply parsed afterwards."""
+    provider, model, options = cfg["provider"], cfg["model"], cfg.get("options") or {}
+    if provider == "ollama":
+        import ollama
+        client = ollama.Client(host=os.environ.get("OLLAMA_HOST") or None, timeout=timeout)
+        opts = {"temperature": options.get("temperature", 0), "num_ctx": options.get("num_ctx", 8192)}
+        if "num_predict" in options:
+            opts["num_predict"] = options["num_predict"]
+        think = options.get("reasoning", False)
+
+        def call(prompt, schema):
+            kw = dict(model=model, messages=[{"role": "user", "content": prompt}], format=schema, options=opts,
+                      keep_alive=options.get("keep_alive", "60m"))
+            try:
+                resp = client.chat(think=think, **kw)
+            except TypeError:                                  # older ollama client without `think`
+                resp = client.chat(**kw)
+            except ollama.ResponseError as e:                  # a model that rejects the thinking flag
+                if "think" not in str(e).lower():
+                    raise
+                resp = client.chat(**kw)
+            return resp["message"]["content"]
+        return call
+
+    llm = chat_model(provider, model, options)
+
+    def call(prompt, schema):
+        return llm.invoke(prompt).content
+    return call

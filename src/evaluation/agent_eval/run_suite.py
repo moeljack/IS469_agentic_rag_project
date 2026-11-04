@@ -1,22 +1,29 @@
-"""Run a system on the agent-eval test suites (Eval Plan: "Robustness and Safety") and save one record per case.
+"""Run a system on the agent-eval test suites (Eval Plan: "Robustness and Safety", "Tool-Call Accuracy") and save one
+record per case.
 
     robustness   data/robustness_cases.json: every rephrased question (P01-P05, the paraphrases that used to live in
                  the dataset, plus colloquial, typo and verbose rewrites of questions the agent answers).
     safety       data/injection_cases.json: prompt injections planted in a retrieved chunk (via injection.py) or
                  written into the user's message
+    toolcalls    the evaluation questions as they are (eval_questions.json, without the paraphrases), run with the
+                 tool-call recorder (tool_trace.py). With --fault empty|error the first search of every question
+                 returns nothing or raises, to measure error recovery. Score with score_tool_calls.py.
 
 Run (on the machine with Ollama and the retriever, like run.py):
     python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite robustness --repeat 1
     python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite safety --repeat 1
+    python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite toolcalls --repeat 1
+    python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite toolcalls --fault empty --repeat 1
     python src/evaluation/agent_eval/run_suite.py n1_naive.yaml --suite safety        (naive baseline, for comparison)
 
 The config is any run.py config (a path, or a file name in rag_eval_approach/configs/); the system is built exactly
-as run.py builds it, only the retriever is wrapped for the safety suite. Output:
-    rag_eval/results/agent_eval/<suite>/<run_id>_<suite>[_repN].jsonl   (+ .meta.json)
+as run.py builds it, only the retriever is wrapped for the safety suite (injection) or a fault run. Output:
+    rag_eval/results/agent_eval/<suite>/<run_id>_<suite>[_<fault>][_repN].jsonl   (+ .meta.json)
 Resumable (cases already in the file are skipped) and never mixes configurations, like run.py. A case that raises
 is saved with status "error". For the agent, the record also holds what the user store saved during the case
-(`profile_facts`, `profile_history`), so the safety scorer can check whether an injection wrote to memory.
-Score with score_robustness.py and score_safety.py (no model needed).
+(`profile_facts`, `profile_history`), so the safety scorer can check whether an injection wrote to memory, and every
+tool call the agent made (`tool_calls`, from tool_trace.py), in every suite.
+Score with score_robustness.py, score_safety.py and score_tool_calls.py (no model needed).
 """
 import argparse
 import datetime as dt
@@ -36,14 +43,18 @@ from src.evaluation.rag_eval.rag_eval_approach.results_io import DATASET, RESULT
 
 HERE = Path(__file__).resolve().parent
 CONFIGS = ROOT / "src" / "evaluation" / "rag_eval" / "rag_eval_approach" / "configs"
-CASE_FILES = {"robustness": HERE / "data" / "robustness_cases.json", "safety": HERE / "data" / "injection_cases.json"}
+CASE_FILES = {"robustness": HERE / "data" / "robustness_cases.json", "safety": HERE / "data" / "injection_cases.json",
+              "toolcalls": None}               # toolcalls: the dataset's own questions, no case file
 SUITE_OUT = RESULTS / "agent_eval"
 
 
 def load_cases(suite, dataset_path=DATASET, case_file=None):
     """[{case_id, question, ...}] for the suite. Robustness cases get variant_of (the original qid) and kind."""
-    cases = json.loads(Path(case_file or CASE_FILES[suite]).read_text(encoding="utf-8"))
     dataset = {q["qid"]: q for q in json.loads(Path(dataset_path).read_text(encoding="utf-8"))}
+    if suite == "toolcalls":                    # every scored question, unchanged (run.py's selection)
+        return [{"case_id": q["qid"], "qid": q["qid"], "question": q["question"]}
+                for q in dataset.values() if "paraphrase_of" not in q]
+    cases = json.loads(Path(case_file or CASE_FILES[suite]).read_text(encoding="utf-8"))
     if suite == "robustness":
         unknown = [c["case_id"] for c in cases if c["variant_of"] not in dataset]
     else:
@@ -56,18 +67,22 @@ def load_cases(suite, dataset_path=DATASET, case_file=None):
     return cases
 
 
-def build(cfg, run_id, suite):
-    """The system run.py would build, with the retriever wrapped for injection in the safety suite."""
+def build(cfg, run_id, suite, fault=None):
+    """The system run.py would build, with the retriever wrapped for injection (safety suite) or a fault run.
+    Returns (system, retriever, faulty): faulty is the FaultyRetriever, or None."""
     from src.evaluation.rag_eval.rag_eval_approach.systems import AgenticSystem, NaiveSystem
     from src.evaluation.rag_eval.rag_eval_retrieval.retrieval_modes import ModeRetriever
-    retriever = ModeRetriever(cfg["retriever"]["mode"])
+    retriever, faulty = ModeRetriever(cfg["retriever"]["mode"]), None
     if suite == "safety":
         from src.evaluation.agent_eval.injection import InjectingRetriever
         retriever = InjectingRetriever(retriever)
+    if fault:
+        from src.evaluation.agent_eval.tool_trace import FaultyRetriever
+        retriever = faulty = FaultyRetriever(retriever, fault)
     if cfg["system"] == "agentic":
-        return AgenticSystem(cfg, retriever, run_id), retriever
+        return AgenticSystem(cfg, retriever, run_id), retriever, faulty
     if cfg["system"] == "naive":
-        return NaiveSystem(cfg, retriever), retriever
+        return NaiveSystem(cfg, retriever), retriever, faulty
     raise SystemExit(f"unknown system {cfg['system']!r}")
 
 
@@ -86,13 +101,18 @@ def memory_written(system, run_id, case_id):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run the robustness or safety suite")
+    parser = argparse.ArgumentParser(description="Run the robustness, safety or tool-call suite")
     parser.add_argument("config", help="run.py config: a path, or a file name in rag_eval_approach/configs/")
     parser.add_argument("--suite", required=True, choices=sorted(CASE_FILES))
     parser.add_argument("--repeat", type=int)
     parser.add_argument("--cases", help="a different case file for the suite")
     parser.add_argument("--only", nargs="+", help="run just these case ids")
+    parser.add_argument("--fault", choices=["empty", "error"],
+                        help="toolcalls suite: the first search of every question returns nothing (empty) or raises "
+                             "(error), to measure error recovery")
     args = parser.parse_args()
+    if args.fault and args.suite != "toolcalls":
+        parser.error("--fault is for --suite toolcalls")
 
     config_path = Path(args.config)
     if not config_path.exists():
@@ -101,7 +121,8 @@ def main():
     from src.evaluation.rag_eval.rag_eval_approach.llm import resolve_model
     cfg["generator"]["model"] = resolve_model(cfg["generator"]["provider"], cfg["generator"]["model"])
     config_hash = hashlib.md5(json.dumps(cfg, sort_keys=True).encode("utf-8")).hexdigest()[:8]
-    run_id = f"{cfg['run_id']}_{args.suite}" + (f"_rep{args.repeat}" if args.repeat else "")
+    run_id = (f"{cfg['run_id']}_{args.suite}" + (f"_{args.fault}" if args.fault else "")
+              + (f"_rep{args.repeat}" if args.repeat else ""))
     today = dt.date.fromisoformat(str(cfg["today"]))
 
     cases = load_cases(args.suite, case_file=args.cases)
@@ -123,12 +144,14 @@ def main():
     if not todo:
         return
 
-    system, retriever = build(cfg, run_id, args.suite)
+    system, retriever, faulty = build(cfg, run_id, args.suite, args.fault)
+    from src.evaluation.agent_eval.tool_trace import ToolCallRecorder
+    recorder = ToolCallRecorder(system, faulty)          # does nothing for the naive system
     if not meta_path.exists():
         meta_path.write_text(json.dumps({"run_id": run_id, "suite": args.suite, "config": cfg,
                                          "config_file": config_path.name, "config_hash": config_hash,
-                                         "case_file": str(args.cases or CASE_FILES[args.suite].name),
-                                         "today": str(today),
+                                         "case_file": str(args.cases or (CASE_FILES[args.suite] or DATASET).name),
+                                         "fault": args.fault, "today": str(today),
                                          "started": dt.datetime.now().isoformat(timespec="seconds")}, indent=1),
                              encoding="utf-8")
     try:
@@ -136,6 +159,7 @@ def main():
             for i, case in enumerate(todo, 1):
                 if hasattr(retriever, "set_case"):
                     retriever.set_case(case)
+                recorder.reset()
                 start = time.perf_counter()
                 try:
                     result, error = system.answer(case["question"], case["case_id"], today), None
@@ -147,6 +171,7 @@ def main():
                           "generator": cfg["generator"]["model"], **result,
                           "injected_ids": list(getattr(retriever, "poisoned_ids", [])),
                           "injections": getattr(retriever, "injections", 0),
+                          "fault": args.fault, "tool_calls": list(recorder.events),
                           "profile_facts": facts, "profile_history": history,
                           "error": error, "wall_s": time.perf_counter() - start}
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
