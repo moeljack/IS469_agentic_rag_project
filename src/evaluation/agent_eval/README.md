@@ -12,8 +12,10 @@ The agent-specific dimensions of the Eval Plan. The RAG metrics (retrieval, corr
 | `configs/judge.yaml` | The judge model (copy of rag_eval's) | - |
 | `requirements-scoring.txt` | What `score_task_success.py` needs (ollama, numpy, pandas, pyyaml: already in `.venv`) | - |
 | `IS469_task_success.sh` | Slurm job: starts Ollama, pulls the judge, runs `score_task_success.py` on the GPU node | - |
+| `score_tool_calls.py` | Tool-call accuracy: schema validity, right tool (route), right arguments (tool-step accuracy), error recovery | No |
+| `tool_trace.py` | Records every tool call the agent makes (used by `run_suite.py`), and injects a failed first search for `--fault` | - |
 | `score_trajectory.py` | Step efficiency: wandering/looping rate, step count, budget hits | No |
-| `run_suite.py` | Runs the agent (or naive RAG) on the robustness or safety cases | Yes (Ollama, retriever) |
+| `run_suite.py` | Runs the agent (or naive RAG) on the robustness, safety or tool-call suite | Yes (Ollama, retriever) |
 | `injection.py` | Plants a malicious chunk in retrieval results (used by `run_suite.py --suite safety`) | - |
 | `score_robustness.py` | Robustness: completion on rephrased questions vs the originals | No |
 | `score_safety.py` | Safety / injection resilience: attack success, blocking layer, leaks, hijacked searches, memory writes | No |
@@ -109,12 +111,56 @@ Judge scores are cached in `results/task_success/<run_id>_judge.csv` per answer,
 rerun only judges new answers (and answers the judge failed on, up to `--attempts` times), and changing the judge or
 a prompt judges everything again rather than mixing scores.
 
+## Tool-call accuracy
+
+The agent's tools are the supervisor's actions: each step the model emits one JSON tool call, the route call at step 1
+(search the question as written, or decompose it) and the decide call after that (search with queries, decompose,
+run_tool, ask_user, answer, give_up). `tool_trace.py` records every call while the agent runs: the model's raw output,
+the queries each step proposed and which the near-duplicate guard dropped, and each executed search (new chunks,
+auditor-approved chunks, errors). It wraps the running supervisor from `run_suite.py`, so nothing outside `agent_eval`
+changes, and it runs on the existing questions in `eval_questions.json` as they are.
+
+| Metric | Computation |
+|---|---|
+| Schema validity rate | route, decide and planner calls whose output parsed and matched the tool's JSON schema / calls attempted |
+| Argument validity rate | schema-valid route/decide calls whose arguments can work (search has queries, run_tool names an available tool, ask_user has a question) |
+| Route agreement (right tool) | step 1 chose decompose for multi-part/multi-step questions and search otherwise (the route prompt's rule, from `qtype`) |
+| Tool-step accuracy (right tool + right arguments) | search/decompose steps whose call was valid, ran, and returned evidence the auditor approved / such steps |
+| Gold step rate | of those steps, the share that retrieved a gold passage for a fact not yet covered |
+| Repeated query rate | queries the model wrote that repeated an earlier search (dropped by the guard) |
+| Error recovery rate | errors after which the model's next call was valid, different, ran and returned new chunks / errors |
+
+Errors are malformed calls, invalid arguments, a step whose every query repeated an earlier search, planner failures,
+searches that returned nothing new, and retrieval exceptions. The natural ones are rare, so `--fault` injects one into
+the first search of every question: `empty` (the search returns nothing) or `error` (it raises). The supervisor does
+not catch retrieval exceptions, so expect every `error` case to crash: that is a finding, not a scorer bug.
+
+On the cluster (the agent needs the GPU node, like the other suites):
+
+```
+sbatch --export=ALL,EVAL_CMD="python3 src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite toolcalls --repeat 1" IS469_eval.sh
+sbatch --export=ALL,EVAL_CMD="python3 src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite toolcalls --fault empty --repeat 1" IS469_eval.sh
+sbatch --export=ALL,EVAL_CMD="python3 src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite toolcalls --fault error --repeat 1" IS469_eval.sh
+```
+
+Then score on the login node (no model needed):
+
+```
+python3 src/evaluation/agent_eval/score_tool_calls.py --all
+```
+
+It prints the invalid calls and the errors the agent did not recover from, and writes
+`results/tool_calls/<run_id>_tool_calls.jsonl` (per question) and `results/tool_calls/tool_calls_toolcalls.{md,csv}`.
+Robustness and safety runs made after this change also record tool calls: score them with `--suite robustness` or
+`--suite safety`.
+
 ## Outputs
 
 - `agent_eval/results/task_success/`: `<run_id>_judge.csv` (judge scores), `<run_id>_judge_details.jsonl` (claims and
   question parts per answer), `<run_id>_task_success.jsonl` (one row per question: status, scores, success, reason),
   `task_success_<suite>.{md,csv}` (summary)
-- `rag_eval/results/agent_eval/robustness/` and `.../safety/`: `<run_id>.jsonl` (one record per case), `.meta.json`,
+- `agent_eval/results/tool_calls/`: `<run_id>_tool_calls.jsonl` (per question), `tool_calls_<suite>.{md,csv}`
+- `rag_eval/results/agent_eval/robustness/`, `.../safety/` and `.../toolcalls/`: `<run_id>.jsonl` (one record per case), `.meta.json`,
   `<run_id>_scores.jsonl`
 - `rag_eval/results/scores/<run_id>_trajectory.jsonl`
 - `rag_eval/results/report_assets/agent_step_efficiency.*`, `agent_robustness.*`, `agent_safety.*`
