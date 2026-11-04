@@ -1,6 +1,6 @@
 """Run the whole RAG evaluation (plan Section 5) in order, one script after another.
 
-    stage 1   retrieval ablation R0-R4 (evaluate_rag.py, on the main questions and on the paraphrases), the plan's
+    stage 1   retrieval ablation R0-R4 (evaluate_rag.py on the answerable questions), the plan's
               selection rule picks the retrieval mode for every later run, then answers with R0 and with that mode (N1)
     stage 2   the agent (A1) --repeats times, then N2 with k = A1's mean chunks in the answer prompt, rounded up
     stage 3   the API generators (configs/g_*.yaml), naive and agentic; a provider is skipped if its SDK is not
@@ -68,7 +68,7 @@ def select_mode():
     part recall is below R0's, or its median latency is more than 3x R0's with no recall gain; otherwise carry the mode
     with the highest part recall, ties broken by MRR."""
     questions = json.loads(DATASET.read_text(encoding="utf-8"))
-    expected = sum(1 for q in questions if q.get("answerable") and "paraphrase_of" not in q)
+    expected = sum(1 for q in questions if q.get("answerable"))
     summary = {}
     for mode in MODES:
         path = RESULTS / "retrieval" / f"{mode}.json"
@@ -124,12 +124,11 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="print the commands without running them")
     args = parser.parse_args()
     py, dry = args.python, args.dry_run
-    scored = len([q for q in json.loads(DATASET.read_text(encoding="utf-8")) if "paraphrase_of" not in q])
+    scored = len(json.loads(DATASET.read_text(encoding="utf-8")))
 
     if 1 in args.stages:
         evaluate = HERE / "rag_eval_retrieval" / "evaluate_rag.py"
         step("Stage 1: retrieval ablation R0-R4", [py, evaluate, "--mode", "all"], dry)
-        step("Stage 1: retrieval ablation on the paraphrases", [py, evaluate, "--mode", "all", "--paraphrases"], dry)
     mode = "hybrid_rerank" if dry and not (RESULTS / "retrieval" / "dense.json").exists() else select_mode()
 
     run = APPROACH / "run.py"

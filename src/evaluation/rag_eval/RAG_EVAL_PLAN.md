@@ -6,7 +6,8 @@ Oct 28, 2026 · @Joel · updated 31 Oct 2026
 
 **Changes to the plan**
 
-- **Question ids say what a question is:** `S01`–`S21` single-fact, `M01`–`M20` multi-part, `O01`–`O04` out-of-scope, `P01`–`P05` retrieval-only paraphrases (`paraphrase_of` names the original). They replace the old `Q01`–`Q64` ids; `src/evaluation/qid_map.json` records old to new, and `db_check/apply_qid_map.py` renames the ids in any older results folder.
+- **3 Nov 2026: paraphrases out, out-of-scope up to 20.** The 5 paraphrases (P01–P05) answered no research question, so they moved to the agentic team's robustness suite (`agent_eval/data/robustness_cases.json`, which already used them), and Stage 1 no longer has a paraphrase pass. Out-of-scope questions grew from 4 to 20 (O05–O20, `needs_review`), tagged `oos_group`: off-topic 6, near-miss 8 (another IRAS tax or a non-IRAS levy the corpus does not cover), not-in-corpus 6 (a year, figure or scheme the documents do not hold). The dataset is now 71 records: 51 answerable + 20 out-of-scope. Out-of-scope outcomes are reported as declined / clarified / answered next to the false-refusal rate on answerable questions (Table 2e, Section 2.3).
+- **Question ids say what a question is:** `S01`–`S21` single-fact, `M01`–`M20` multi-part, `A01`–`A10` multi-step, `O01`–`O20` out-of-scope (`P01`–`P05` were retrieval-only paraphrases until 3 Nov). They replace the old `Q01`–`Q64` ids; `src/evaluation/qid_map.json` records old to new, and `db_check/apply_qid_map.py` renames the ids in any older results folder.
 - **Dataset v2.1: 41 answerable questions** (was 31). 10 questions were added (S17–S21 and M16–M20) to balance the question types and sources and to cover 6 previously untested pages. 45 scored questions in all (41 answerable + 4 out-of-scope) plus 5 retrieval-only paraphrases, 50 records. The 10 new records are flagged `needs_review` and need a teammate's check. See Section 2.3.
 - **RAGAS is replaced** by a two-call judge scorer (`score_grounding.py`): one call for faithfulness and one for context precision per answer (Section 3.2). Answer relevance and context recall are dropped: part recall against the gold passages already measures recall without a judge. RAGAS is kept only as an optional cross-check on about 10 answers.
 - **The Stage 3 "OpenAI" generator is gpt-oss-120b served by Groq** (paid OpenAI avoided). The other Stage 3 generator is Claude.
@@ -95,7 +96,9 @@ Dataset v2 is already tagged on these fields. Have a second member check the tag
 
 ### 2.3 Is the dataset enough? The current test data (v2.1)
 
-The test data (`src/evaluation/eval_questions.json`) has 50 records: 45 scored questions (41 answerable + 4 out-of-scope) and 5 retrieval-only paraphrases. Accuracy is computed over the 41 answerable questions, so one question is worth 2.4 points. The first version had 31 answerable questions, sized as the smallest that fills every table in this plan; 10 more were added to bring the single-fact types to 5–6 each, the two PDF sources to 4 each, the number of multi-part questions to 20, and to cover pages that no question tested (tax computation, liquidation and judicial management, the compliance programmes page, foreign-entity classification and payment difficulties).
+**Current (3 Nov 2026):** 71 records, 51 answerable (S, M and the multi-step A01–A10) + 20 out-of-scope; the paraphrases moved to the robustness suite. Accuracy is computed over the 51 answerable questions (one question is about 2 points). The rest of this section describes v2.1 (41 answerable) as it was built; the composition table below is current.
+
+The v2.1 test data had 50 records: 45 scored questions (41 answerable + 4 out-of-scope) and 5 retrieval-only paraphrases. Accuracy was computed over the 41 answerable questions, so one question was worth 2.4 points. The first version had 31 answerable questions, sized as the smallest that fills every table in this plan; 10 more were added to bring the single-fact types to 5–6 each, the two PDF sources to 4 each, the number of multi-part questions to 20, and to cover pages that no question tested (tax computation, liquidation and judicial management, the compliance programmes page, foreign-entity classification and payment difficulties).
 
 **Composition by group**
 
@@ -103,9 +106,9 @@ The test data (`src/evaluation/eval_questions.json`) has 50 records: 45 scored q
 | --- | --- | --- | --- |
 | Single-fact, answerable | S01–S21 | 21 | Retrieval metrics and the judge |
 | Multi-part, answerable | M01–M20 | 20 | Retrieval metrics and the judge |
-| Out-of-scope | O01–O04 | 4 | Refusal check only (no gold passages) |
-| Paraphrases | P01–P05 | 5 | Retrieval metrics only |
-| **Total** |  | **50** |  |
+| Multi-step, answerable | A01–A10 | 10 | Retrieval metrics and the judge |
+| Out-of-scope | O01–O20 | 20 | Refusal check only (no gold passages): off-topic 6, near-miss 8, not-in-corpus 6 |
+| **Total** |  | **71** |  |
 
 **The 41 answerable questions by tag** (every row adds up to 41)
 
@@ -118,7 +121,12 @@ The test data (`src/evaluation/eval_questions.json`) has 50 records: 45 scored q
 | Numeric flag | true 22 (10 single-fact, 12 multi-part), false 19 |
 | Gold parts | every multi-part question has exactly 2 parts (20 × 2); every single-fact question has 1 |
 
-**The 5 paraphrases:** P01 (of S02), P02 (of S03) and P03 (of S12) are single-part; P04 (of M02) and P05 (of M03) are two-part. Four are web-page questions and one is a PDF question.
+**The 20 out-of-scope questions** (`oos_group`) test negative rejection: whether a system declines a question the corpus cannot answer.
+- off-topic (O05–O10): another country's tax, CPF, ACRA incorporation, work passes, a US filing, bank loans.
+- near-miss (O01, O03, O11–O16): GST, stamp duty, property tax, personal income tax and the foreign worker levy. The corpus mentions these terms (for example, that property tax on a rental property is deductible) but not the rate or rule asked for, so retrieval returns plausible chunks and the system has to notice they don't answer.
+- not-in-corpus (O02, O04, O17–O20): in-domain corporate-tax questions about a year, figure or scheme the documents do not hold (Pillar Two, YA 2027 and YA 2020 rebates, tax collections, Budget 2027, VCCs).
+
+Each was checked against the chunk dump for the rate or rule it asks for. O05–O20 are flagged `needs_review`.
 
 **Targets against the current data**
 
@@ -128,10 +136,11 @@ The test data (`src/evaluation/eval_questions.json`) has 50 records: 45 scored q
 | numeric (flag) | ≥ 10 | 22 | Met |
 | multi-part | ≥ 10 | 20 | Met |
 | single-fact types (number, definition, procedure, edge-case) | 3–5 each | 6, 5, 5, 5 | Met |
-| out-of-scope | 4 | 4 | Four is too few for a precise refusal rate, so report refusals as counts (e.g. 3/4) |
-| paraphrased / colloquial | 5 (retrieval only) | 5 | Met: 3 single-part, 2 multi-part |
+| out-of-scope | 15–20 | 20 | Met. Report counts with Wilson 95% CIs (Table 2e); at n = 20 only a large gap (e.g. 6/20 vs 14/20) is significant |
 
-**Why paraphrases:** the original questions were written from verbatim passages, so they share many words with the text. Dense and BM25 retrieval may both score near-perfectly (a ceiling effect), hiding any difference between configurations. The 5 paraphrases are everyday rewordings (e.g. "my company made no profit this year, still need to do the ECI thing?"), tagged `paraphrase_of: Qxx`. They reuse their original's `facts`, and are scored on retrieval metrics only, so they add no judge cost. Report them separately (`evaluate_rag.py --paraphrases`), and resample by original question in the statistics (Section 7). On a first run they scored lower than the originals (single-part hit@1 67% vs 88%), so they do separate the retrieval configurations.
+**How out-of-scope results are reported (RQ3, RQ4).** Keep them out of the headline accuracy. `score_judge.py` gives each out-of-scope answer an `outcome`: declined (status refused or no_answer, or a naive `INSUFFICIENT_CONTEXT` reply), clarified (asked a question back; neither a refusal nor a hallucination), or answered (a hallucination risk). `analyze.py` writes Table 2e per run and `oos_group`, with the decline rate's Wilson CI next to the answerable questions each system wrongly declined or clarified, since a system that declines everything would otherwise look perfect. In RQ3, say where each system declines: the agent's intake gate before retrieval, or the answer model after it. In RQ4, add the decline rate as a column per generator. Gate-level analysis (adversarial wording, intake classifier errors) belongs to the agentic team's safety and robustness suites.
+
+**Paraphrases (until 3 Nov 2026):** P01–P05 were everyday rewordings scored on retrieval only. On the first run they scored lower than the originals (single-part hit@1 67% vs 88%). Five items answered no research question, and the robustness suite already answers them end to end, so they now live there; the old results are in `results_stale/retrieval_paraphrases/`.
 
 ### 2.4 Labelling gold passages
 
@@ -567,7 +576,7 @@ def bootstrap_ci(scores, n_boot=1000, seed=0):
 
 7. **Don't over-read per-category results.** A category with 6 questions can swing 17 points on one answer. Use per-category tables to describe patterns and pick qualitative cases, not to claim significance.
 
-Paraphrased questions share their answer with an original, so they are not independent observations. When you compute intervals or tests, resample by original question (a cluster bootstrap) so each original and its paraphrases count as one unit.
+Out-of-scope rates are small proportions (n = 20, often near 0% or 100%), so use Wilson intervals for them rather than the bootstrap, which collapses to a single point at 20/20.
 
 ## 8. Trade-off discussion framework
 

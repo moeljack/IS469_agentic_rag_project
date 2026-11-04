@@ -1659,7 +1659,8 @@
   "key_facts": [],
   "facts": [],
   "gold_passages": [],
-  "needs_review": false
+  "needs_review": false,
+  "oos_group": "near-miss"
  },
  {
   "qid": "O02",
@@ -1675,7 +1676,8 @@
   "key_facts": [],
   "facts": [],
   "gold_passages": [],
-  "needs_review": false
+  "needs_review": false,
+  "oos_group": "not-in-corpus"
  },
  {
   "qid": "O03",
@@ -1691,7 +1693,8 @@
   "key_facts": [],
   "facts": [],
   "gold_passages": [],
-  "needs_review": false
+  "needs_review": false,
+  "oos_group": "near-miss"
  },
  {
   "qid": "O04",
@@ -1707,158 +1710,279 @@
   "key_facts": [],
   "facts": [],
   "gold_passages": [],
-  "needs_review": false
+  "needs_review": false,
+  "oos_group": "not-in-corpus"
  },
  {
-  "qid": "P01",
+  "qid": "O05",
   "type": "simple",
-  "tier": "webpage",
-  "qtype": "procedure",
-  "source": "online_guide",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
   "difficulty": "easy",
-  "numeric": true,
-  "answerable": true,
-  "paraphrase_of": "S02",
-  "question": "when do i need to submit my company's tax return by this yr?",
-  "reference_answer": "The deadline to file the YA 2026 Corporate Income Tax Return is 30 Nov 2026 at mytax.iras.gov.sg. This includes companies that did not carry on business or incurred a loss in the financial year 2025.",
-  "key_facts": [
-   "30 Nov 2026"
-  ],
-  "facts": [
-   [
-    "deadline of 30 Nov 2026"
-   ]
-  ],
-  "gold_passages": [
-   [
-    "web:6c658c1ab3:0"
-   ]
-  ],
-  "needs_review": false
+  "numeric": false,
+  "answerable": false,
+  "question": "Our subsidiary in Malaysia made a profit this year. What corporate income tax rate does it pay there?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "off-topic"
  },
  {
-  "qid": "P02",
+  "qid": "O06",
   "type": "simple",
-  "tier": "webpage",
-  "qtype": "edge-case",
-  "source": "online_guide",
-  "difficulty": "hard",
-  "numeric": true,
-  "answerable": true,
-  "paraphrase_of": "S03",
-  "question": "my company made no profit this year, still need to do the ECI thing?",
-  "reference_answer": "A company does not need to file the ECI if its ECI is nil and its annual revenue is $5 million or below. If the ECI is nil but annual revenue is more than $5 million, it must still file (the ECI to be taxed can be entered as 0).",
-  "key_facts": [
-   "nil ECI",
-   "$5 million"
-  ],
-  "facts": [
-   [
-    "You do not need to file the ECI for your company if it is nil",
-    "$5 million | Nil | No"
-   ]
-  ],
-  "gold_passages": [
-   [
-    "web:b20dcc6490:2",
-    "web:b20dcc6490:3"
-   ]
-  ],
-  "needs_review": false
- },
- {
-  "qid": "P03",
-  "type": "simple",
-  "tier": "pdf",
-  "qtype": "number",
-  "source": "insurer_guide",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
   "difficulty": "easy",
-  "numeric": true,
-  "answerable": true,
-  "paraphrase_of": "S12",
-  "question": "max IBNR % for motor policies?",
-  "reference_answer": "The maximum IBNR factor for motor insurance is 20% of net written premium.",
-  "key_facts": [
-   "20%"
-  ],
-  "facts": [
-   [
-    "Motor | 20"
-   ]
-  ],
-  "gold_passages": [
-   [
-    "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16"
-   ]
-  ],
-  "needs_review": false
+  "numeric": false,
+  "answerable": false,
+  "question": "What is the employer CPF contribution rate for a 35-year-old employee earning $5,000 a month?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "off-topic"
  },
  {
-  "qid": "P04",
-  "type": "multi",
-  "tier": "webpage",
-  "qtype": "multi-part",
-  "source": "online_guide",
-  "difficulty": "hard",
-  "numeric": true,
-  "answerable": true,
-  "paraphrase_of": "M02",
-  "question": "we paid our corporate tax late, whats the penalty? and if we go on a GIRO plan whats the smallest monthly amount?",
-  "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax if full payment is not received by the due date. Under a GIRO instalment plan the minimum monthly deduction is $50.",
-  "key_facts": [
-   "5%",
-   "$50"
-  ],
-  "facts": [
-   [
-    "A 5% late payment penalty will be imposed on the unpaid tax"
-   ],
-   [
-    "minimum monthly GIRO deduction amount of $50"
-   ]
-  ],
-  "gold_passages": [
-   [
-    "web:054b24831c:0"
-   ],
-   [
-    "web:b20dcc6490:6"
-   ]
-  ],
-  "needs_review": false
+  "qid": "O07",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "What is the minimum paid-up capital needed to incorporate a private limited company in Singapore?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "off-topic"
  },
  {
-  "qid": "P05",
-  "type": "multi",
-  "tier": "webpage",
-  "qtype": "multi-part",
-  "source": "online_guide",
-  "difficulty": "hard",
-  "numeric": true,
-  "answerable": true,
-  "paraphrase_of": "M03",
-  "question": "we're shutting the company down, do we have to clear our tax first before striking off? and how many yrs do we keep the books after?",
-  "reference_answer": "Companies must settle all outstanding tax liabilities and obligations with IRAS before applying to ACRA for strike-off, otherwise IRAS will object to the application. After the company has been struck off and dissolved, its books and papers must be retained for at least 5 years from the date of dissolution.",
-  "key_facts": [
-   "settle outstanding tax before strike-off",
-   "5 years"
-  ],
-  "facts": [
-   [
-    "settle all outstanding tax liabilities and obligations with IRAS before applying for strike off"
-   ],
-   [
-    "must ensure that all books and papers of the company are retained for at least 5 years after the date on which the company was dissolved"
-   ]
-  ],
-  "gold_passages": [
-   [
-    "web:584d6034e5:0"
-   ],
-   [
-    "web:50424a296b:6"
-   ]
-  ],
-  "needs_review": false
+  "qid": "O08",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "How do we apply for an Employment Pass for a foreign manager we are hiring?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "off-topic"
+ },
+ {
+  "qid": "O09",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "We sell online to customers in the United States. Does our company need to file a US federal tax return?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "off-topic"
+ },
+ {
+  "qid": "O10",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "Which bank offers the lowest interest rate on a working capital loan for an SME?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "off-topic"
+ },
+ {
+  "qid": "O11",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "How much stamp duty do we pay when an existing shareholder transfers shares in our company to a new investor?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "near-miss"
+ },
+ {
+  "qid": "O12",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "What property tax rate applies to the office unit our company owns and uses for its own business?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "near-miss"
+ },
+ {
+  "qid": "O13",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "Can our company claim back the GST it paid when buying a company car?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "near-miss"
+ },
+ {
+  "qid": "O14",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "I am a Singapore-resident director. What personal income tax rate applies to the director's fees I receive?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "near-miss"
+ },
+ {
+  "qid": "O15",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "Our company is GST-registered. When is each quarterly GST return due?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "near-miss"
+ },
+ {
+  "qid": "O16",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "What is the foreign worker levy rate for a Work Permit holder in the construction sector?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "near-miss"
+ },
+ {
+  "qid": "O17",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "We are amending our YA 2020 return. What CIT Rebate rate and cap applied for that year?",
+  "reference_answer": "The sources only give the CIT Rebate for YA 2026; nothing is stated for YA 2020, so the system should say it cannot answer rather than reuse the YA 2026 figures.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "not-in-corpus"
+ },
+ {
+  "qid": "O18",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "How much corporate income tax did IRAS collect in the last financial year?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "not-in-corpus"
+ },
+ {
+  "qid": "O19",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "Will the corporate income tax rate change in Budget 2027?",
+  "reference_answer": "The sources do not say whether the rate will change in a future Budget, so the system should say it cannot answer rather than predict one (stating the current 17% rate as context is fine).",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "not-in-corpus"
+ },
+ {
+  "qid": "O20",
+  "type": "simple",
+  "tier": "none",
+  "qtype": "out-of-scope",
+  "source": "none",
+  "difficulty": "easy",
+  "numeric": false,
+  "answerable": false,
+  "question": "We are setting up a Variable Capital Company (VCC) fund. What tax incentives can it get?",
+  "reference_answer": "The IRAS corporate income tax sources do not cover this; the system should say it cannot answer from the documents instead of giving an answer.",
+  "key_facts": [],
+  "facts": [],
+  "gold_passages": [],
+  "needs_review": true,
+  "oos_group": "not-in-corpus"
  }
 ]
