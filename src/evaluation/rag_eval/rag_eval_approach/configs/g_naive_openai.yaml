@@ -10,4 +10,4 @@ generator:
   model: openai/gpt-oss-120b
   options:
     temperature: 0         # set to null if the model rejects temperature
-today: "2026-10-28"
+today: "2026-11-03"
