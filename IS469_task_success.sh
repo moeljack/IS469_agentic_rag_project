@@ -9,7 +9,9 @@
 # Submit from the project directory, after the runs to score exist:
 #     sbatch src/evaluation/agent_eval/IS469_task_success.sh
 #     sbatch --export=ALL,TASK_ARGS="a1_agentic_qwen_robustness --suite robustness --workers 1" src/evaluation/agent_eval/IS469_task_success.sh
-# TASK_ARGS are the arguments of score_task_success.py (default below). sbatch --export splits on commas, so keep
+#     sbatch --export=ALL,SCORER=score_consistency.py src/evaluation/agent_eval/IS469_task_success.sh   (answer consistency)
+# SCORER picks the judge scorer (default score_task_success.py). TASK_ARGS are its arguments (defaults below).
+# sbatch --export splits on commas, so keep
 # commas out of TASK_ARGS. Judge scores are saved every --batch-size answers: if the job hits the time limit, submit the
 # same command again and it continues. Afterwards, re-summarise on the login node with --no-judge (no GPU needed).
 # Edit PROJECT_DIR / SCRATCH_DIR / SCORING_VENV below (or export them) if your cluster paths differ.
@@ -38,7 +40,12 @@ PROJECT_DIR="${PROJECT_DIR:-/common/home/users/z/ziyi.lim.2022/IS469/IS469_agent
 export SCRATCH_DIR="${SCRATCH_DIR:-/common/scratch/users/z/ziyi.lim.2022}"
 SCORING_VENV="${SCORING_VENV:-$PROJECT_DIR/.venv}"   # any environment with requirements-scoring.txt installed
 echo "Scoring environment: $SCORING_VENV"
-TASK_ARGS="${TASK_ARGS:-a1_agentic_qwen --by-type --workers 1}"
+SCORER="${SCORER:-score_task_success.py}"           # or score_consistency.py (both use the judge)
+case "$SCORER" in
+    score_task_success.py) TASK_ARGS="${TASK_ARGS:-a1_agentic_qwen --by-type --workers 1}" ;;
+    score_consistency.py)  TASK_ARGS="${TASK_ARGS:-a1_agentic_qwen_robustness --baseline a1_agentic_qwen}" ;;
+    *) echo "ERROR: SCORER must be score_task_success.py or score_consistency.py, not $SCORER"; exit 1 ;;
+esac
 export OLLAMA_MODELS="$SCRATCH_DIR/.ollama/models"
 export HF_HOME="$SCRATCH_DIR/.cache/huggingface"
 export TORCH_HOME="$SCRATCH_DIR/.cache/torch"
@@ -113,8 +120,8 @@ ollama ps
 ##            SCORE TASK SUCCESS               ##
 #################################################
 
-echo "Running: python3 src/evaluation/agent_eval/score_task_success.py $TASK_ARGS"
-python3 src/evaluation/agent_eval/score_task_success.py $TASK_ARGS
+echo "Running: python3 src/evaluation/agent_eval/$SCORER $TASK_ARGS"
+python3 "src/evaluation/agent_eval/$SCORER" $TASK_ARGS
 STATUS=$?
 echo "Finished with status $STATUS. Scores are in src/evaluation/agent_eval/results/task_success/"
 exit $STATUS

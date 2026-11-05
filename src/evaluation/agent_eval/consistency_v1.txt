@@ -1,0 +1,28 @@
+You are comparing two answers a tax assistant gave to the same question, asked in two different wordings. Decide
+whether a user would get the same information from either answer.
+
+QUESTION (original wording):
+{question}
+
+QUESTION (rephrased):
+{variant_question}
+
+ANSWER A (to the original wording):
+{answer_a}
+
+ANSWER B (to the rephrased question):
+{answer_b}
+
+Step 1. List each point where the answers differ: a fact, number, date, condition or conclusion that one answer states
+and the other states differently or leaves out. Ignore wording, order, length, formatting, citation markers such as
+[Doc 1], and polite phrases. If the answers do not differ, return an empty list.
+
+Step 2. For each difference, set "contradiction" to true if both answers cannot be right at once (for example
+different rates, amounts or deadlines, or opposite conclusions), and false if one answer only adds or leaves out a
+detail.
+
+Step 3. Set "same_answer" to true if a user would come away with the same answer to their question from either one,
+even if one gives more detail; false if the answers disagree or one leaves out something the question asked for.
+
+Return ONLY this JSON:
+{"differences": [{"point": "<what differs>", "answer_a": "<what A says>", "answer_b": "<what B says>", "contradiction": true|false}], "same_answer": true|false}

@@ -11,13 +11,15 @@ The agent-specific dimensions of the Eval Plan. The RAG metrics (retrieval, corr
 | `prompts/relevancy_v1.txt` | Answer relevance judge prompt | - |
 | `configs/judge.yaml` | The judge model (copy of rag_eval's) | - |
 | `requirements-scoring.txt` | What `score_task_success.py` needs (ollama, numpy, pandas, pyyaml: already in `.venv`) | - |
-| `IS469_task_success.sh` | Slurm job: starts Ollama, pulls the judge, runs `score_task_success.py` on the GPU node | - |
+| `IS469_task_success.sh` | Slurm job: starts Ollama, pulls the judge, runs `score_task_success.py` (or `SCORER=score_consistency.py`) on the GPU node | - |
 | `score_tool_calls.py` | Tool-call accuracy: schema validity, right tool (route), right arguments (tool-step accuracy), error recovery | No |
 | `tool_trace.py` | Records every tool call the agent makes (used by `run_suite.py`), and injects a failed first search for `--fault` | - |
 | `score_trajectory.py` | Step efficiency: wandering/looping rate, step count, budget hits | No |
 | `run_suite.py` | Runs the agent (or naive RAG) on the robustness, safety or tool-call suite | Yes (Ollama, retriever) |
 | `injection.py` | Plants a malicious chunk in retrieval results (used by `run_suite.py --suite safety`) | - |
-| `score_robustness.py` | Robustness: completion on rephrased questions vs the originals | No |
+| `score_robustness.py` | Robustness: completion on rephrased questions vs the originals, and judge-free answer consistency (same numbers, same source chunks) | No |
+| `score_consistency.py` | Answer consistency: the judge compares each rephrased question's answer with the original's (same answer? contradictions?) | Yes (judge) |
+| `prompts/consistency_v1.txt` | The consistency judge prompt | - |
 | `score_safety.py` | Safety / injection resilience: attack success, blocking layer, leaks, hijacked searches, memory writes | No |
 | `common.py` | Shared helpers for the scorers | - |
 | `data/robustness_cases.json` | 45 rewrites: round 1 (R01-R20) rewrites questions the agent answers; round 2 (R21-R45) is harder: multi-part, previously refused or clarified, and out-of-scope questions (O01-O04, where the right behaviour is to decline). The dataset's P01-P05 are added automatically | - |
@@ -111,6 +113,31 @@ Judge scores are cached in `results/task_success/<run_id>_judge.csv` per answer,
 rerun only judges new answers (and answers the judge failed on, up to `--attempts` times), and changing the judge or
 a prompt judges everything again rather than mixing scores.
 
+## Answer consistency
+
+The Robustness Score asks whether the agent still answers when a question is rephrased. Consistency asks whether it
+gives the same answer. Only answerable pairs where both the original (from `--baseline`) and the rephrased question
+were answered are compared.
+
+- **Without a judge**, in `score_robustness.py`'s table: `number_agreement` (overlap of the numbers the two answers
+  state; a full date or a YA counts as one value), `number_conflicts` (pairs that state numbers but share none) and
+  `context_overlap` (overlap of the chunks each answer was written from). The scorer lists the pairs whose numbers
+  differ, with the numbers found only in each answer.
+- **With the judge**, `score_consistency.py` shows the judge both answers and asks where they differ, whether any
+  difference is a contradiction (both cannot be right), and whether a user would get the same answer from either
+  (`prompts/consistency_v1.txt`). It reports `consistency_rate` (same answer, no contradiction),
+  `contradiction_rate` and the differing pairs. It runs on the GPU node, like task success:
+
+```
+sbatch --export=ALL,SCORER=score_consistency.py src/evaluation/agent_eval/IS469_task_success.sh
+sbatch --export=ALL,SCORER=score_consistency.py,TASK_ARGS="a1_agentic_qwen_robustness --baseline a1_agentic_qwen" src/evaluation/agent_eval/IS469_task_success.sh
+python3 src/evaluation/agent_eval/score_consistency.py a1_agentic_qwen_robustness --baseline a1_agentic_qwen --no-judge
+```
+
+The first two are the same (the second spells out the default). The third re-summarises the cached verdicts on the
+login node. Each rephrased answer is compared with the original's first answered repeat, so every pair compares
+against the same original. Verdicts are saved every 10 pairs and failed pairs are retried on the next run.
+
 ## Tool-call accuracy
 
 The agent's tools are the supervisor's actions: each step the model emits one JSON tool call, the route call at step 1
@@ -159,6 +186,7 @@ Robustness and safety runs made after this change also record tool calls: score 
 - `agent_eval/results/task_success/`: `<run_id>_judge.csv` (judge scores), `<run_id>_judge_details.jsonl` (claims and
   question parts per answer), `<run_id>_task_success.jsonl` (one row per question: status, scores, success, reason),
   `task_success_<suite>.{md,csv}` (summary)
+- `agent_eval/results/consistency/`: `<run_id>_consistency.jsonl` (judge verdicts per pair), `consistency.{md,csv}`
 - `agent_eval/results/tool_calls/`: `<run_id>_tool_calls.jsonl` (per question), `tool_calls_<suite>.{md,csv}`
 - `agent_eval/results/robustness/`, `.../safety/` and `.../toolcalls/`: `<run_id>.jsonl` (one record per case, from
   `run_suite.py`), `.meta.json`, `<run_id>_scores.jsonl`. Runs made before this move are in
