@@ -9,7 +9,8 @@ sys.path.insert(0, str(ROOT))
 
 from src.evaluation.rag_eval.rag_eval_approach.results_io import OUTPUTS, RESULTS, read_jsonl  # noqa: E402
 
-SUITE_OUT = RESULTS / "agent_eval"
+SUITE_OUT = Path(__file__).resolve().parent / "results"   # agent_eval/results/<suite>/ (run_suite.py writes here)
+OLD_SUITE_OUT = RESULTS / "agent_eval"                     # where suite outputs went before; still read
 ASSETS = RESULTS / "report_assets"
 
 _MONTHS = {"january": "jan", "february": "feb", "march": "mar", "april": "apr", "june": "jun", "july": "jul",
@@ -50,21 +51,35 @@ def part_recall(retrieved_ids, gold_parts):
     return sum(covered) / len(covered), int(all(covered))
 
 
+def suite_files(suite):
+    """{run_id: path} of a suite's run files, from agent_eval/results/<suite>/ and the old
+    rag_eval/results/agent_eval/<suite>/. A run in both is read from the new folder."""
+    found = {}
+    for folder in (OLD_SUITE_OUT / suite, SUITE_OUT / suite):          # new folder last, so it wins
+        for p in sorted(folder.glob("*.jsonl")):
+            if not p.stem.endswith(("_scores", "_judge", "_tool_calls", "_task_success")):
+                found[p.stem] = p
+    return found
+
+
 def suite_runs(suite, names=(), every=False):
     """{run_id: [records]} for a suite. A name without _repN takes all its repeats."""
-    folder = SUITE_OUT / suite
-    files = sorted(folder.glob("*.jsonl"))
+    (SUITE_OUT / suite).mkdir(parents=True, exist_ok=True)              # the scorers write their scores here
+    files = suite_files(suite)
     if not every:
-        files = [p for p in files if p.stem in names or re.sub(r"_rep\d+$", "", p.stem) in names]
+        files = {r: p for r, p in files.items() if r in names or re.sub(r"_rep\d+$", "", r) in names}
         if not files:
-            raise SystemExit(f"no {suite} outputs for {list(names)} in {folder} (run run_suite.py first)")
-    files = [p for p in files if not p.stem.endswith(("_scores", "_judge"))]
-    return {p.stem: read_jsonl(p) for p in files}
+            raise SystemExit(f"no {suite} outputs for {list(names)} in {SUITE_OUT / suite} or "
+                             f"{OLD_SUITE_OUT / suite} (run run_suite.py first)")
+    return {r: read_jsonl(p) for r, p in sorted(files.items())}
 
 
 def suite_meta(suite, run_id):
-    path = SUITE_OUT / suite / f"{run_id}.meta.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    for folder in (SUITE_OUT / suite, OLD_SUITE_OUT / suite):
+        path = folder / f"{run_id}.meta.json"
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    return {}
 
 
 def baseline_records(name):
@@ -94,7 +109,8 @@ def markdown(table):
         if isinstance(v, float):
             if v != v:
                 return ""
-            if any(w in col for w in ("rate", "share", "recall", "hit", "completion", "resilience", "utility")):
+            if any(w in col for w in ("rate", "share", "recall", "hit", "completion", "decline", "resilience",
+                                      "utility")):
                 return f"{v:.0%}"
             return f"{v:.2f}".rstrip("0").rstrip(".")
         return str(v)

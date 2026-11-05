@@ -1,50 +1,146 @@
-# IS469 RAG Evaluation Plan (revised for the current codebase)
+# IS469 RAG Evaluation Plan
 
-Oct 28, 2026 · @Joel · updated 31 Oct 2026
+Oct 28, 2026 · @Joel · updated 5 Nov 2026 (checked against the code at commit `9df16fd`)
 
-## Status (31 Oct 2026): what changed since the first draft, and what has been run
+## Status (5 Nov 2026)
 
-**Changes to the plan**
+**Where things stand**
 
-- **Question ids say what a question is:** `S01`–`S21` single-fact, `M01`–`M20` multi-part, `O01`–`O04` out-of-scope, `P01`–`P05` retrieval-only paraphrases (`paraphrase_of` names the original). They replace the old `Q01`–`Q64` ids; `src/evaluation/qid_map.json` records old to new, and `db_check/apply_qid_map.py` renames the ids in any older results folder.
-- **Dataset v2.1: 41 answerable questions** (was 31). 10 questions were added (S17–S21 and M16–M20) to balance the question types and sources and to cover 6 previously untested pages. 45 scored questions in all (41 answerable + 4 out-of-scope) plus 5 retrieval-only paraphrases, 50 records. The 10 new records are flagged `needs_review` and need a teammate's check. See Section 2.3.
-- **RAGAS is replaced** by a two-call judge scorer (`score_grounding.py`): one call for faithfulness and one for context precision per answer (Section 3.2). Answer relevance and context recall are dropped: part recall against the gold passages already measures recall without a judge. RAGAS is kept only as an optional cross-check on about 10 answers.
-- **The Stage 3 "OpenAI" generator is gpt-oss-120b served by Groq** (paid OpenAI avoided). The other Stage 3 generator is Claude.
-- **Local model names are set in one place**, `src/config.py` (`INTAKE_MODEL`, `PLANNER_MODEL`, `SUPERVISOR_MODEL`, `AUDITOR_MODEL`; each can still be overridden by its environment variable). An evaluation YAML with `generator.model: default` follows `SUPERVISOR_MODEL`, and every run's metadata records the models used.
-- **Cluster job:** `IS469_eval.sh` runs Stages 1–2 on the GPU node (resumable; resubmit after a time-limit stop).
-- **Judge:** not final. Gemini's free tier gave only 20 requests a day on the Flash model, so the final choice is open. Candidates are a Gemini Flash-Lite model, an Ollama cloud or Groq model, or `gemma4:12b` run locally on the cluster GPU (it passed the five canned cases in `check_judge.py`; it is slow on a CPU). Whichever is chosen must be validated on 30 human-labelled pairs (Section 4.3) before its scores are used.
+| Item | State |
+| --- | --- |
+| Dataset | 80 records: 60 answerable (S01–S21 without S20, M01–M20, A01–A10, C01–C10) + 20 out-of-scope (O01–O20). Gold labels regenerated and reviewed; 45 records still carry `needs_review` (Section 2.3) |
+| Stage 1 retrieval (R0–R4) | Run on the 51-question set. **Rerun needed** for the current set: `run_all.py` refuses to select a mode until the retrieval files cover all 60 answerable questions |
+| Stage 1–2 answers (R0, N1, N2, A1) | Done on the cluster GPU for the earlier set. **To resume:** S10 (reworded) and C01–C10 (new). Delete S10's rows and the M02/M12 judge rows first (Section 9.3) |
+| Judge | `gemma4:12b` via Ollama on the cluster GPU (`configs/judge.yaml`). It passed `check_judge.py`. **The 30-pair human validation (Section 4.3) is not done yet**; there are no labels or kappa script in the repo |
+| Stage 3 (API generators) | Not run. Check the config mismatch in Section 5, Stage 3 before running |
+| Failure coding, qualitative cases | Not started |
 
-**Results so far** (no judge scores yet, so no accuracy numbers; retrieval figures use the first 31 answerable questions and must be recomputed with the 10 new ones)
+**Provisional results** (the 50 primary questions; not final until the reruns above are done)
 
-| Config | Part recall@5 | Hit@5 | MRR | Median retrieval latency (laptop CPU) |
-| --- | --- | --- | --- | --- |
-| R0 dense | 85% | 77% | 0.84 | 0.4 s |
-| R1 BM25 | 85% | 74% | 0.79 | 4 ms |
-| R2 hybrid | 85% | 74% | 0.88 | 0.4 s |
-| R3 dense + rerank | 97% | 94% | 0.94 | 17 s |
-| R4 hybrid + rerank | 97% | 94% | 0.94 | 17 s |
+| Config | Part recall@5 | P@5 | Hit@5 | MRR | Median retrieval latency (cluster GPU) |
+| --- | --- | --- | --- | --- | --- |
+| R0 dense | 74.7% | 0.30 | 60% | 0.81 | 57 ms |
+| R1 BM25 | 71.3% | 0.26 | 60% | 0.68 | 3 ms |
+| R2 hybrid | 77.0% | 0.31 | 62% | 0.80 | 62 ms |
+| R3 dense + rerank | 88.3% | 0.37 | 80% | 0.90 | 653 ms |
+| R4 hybrid + rerank | 85.3% | 0.35 | 76% | 0.88 | 668 ms |
 
-- The reranker accounts for the whole retrieval gain (+12 points recall, +17 points Hit@5). Hybrid search adds almost nothing, and R3 equals R4. On the 5 paraphrases, hybrid and both reranked modes reach 90% recall against 70% for dense and BM25. The rule in Stage 1 selected R4.
-- **Agent (A1, 3 repeats, cluster GPU):** it answered 22–24 of 35 scored questions; the rest were refusals, clarification questions or `no_answer`. All of the agent's non-answers happen before retrieval, in the intake gate: it refused in-scope questions (S08, S12, S13, M14, S16) and asked for information the answer does not need (S10, M15, O04). Its part recall is about 68% overall but 90% on the questions it actually ran, against 97% for naive RAG at k = 5. A trial with a tightened intake prompt recovered 5 of those 8 questions (unjudged, tuned on the evaluation questions, so a diagnostic only).
-- **The three A1 repeats are nearly the same run** (repeats 2 and 3 are identical on all 35 answers), so do not treat them as independent samples.
-- **N2's matched k came out at 4**, below N1's 5, because the agent uses only about 2.9 chunks per question.
-- **Machines are mixed:** R0 and N1 answers came from a laptop CPU and A1 and N2 from the cluster GPU. Rerun R0 and N1 on the cluster before comparing latency.
-- **Not yet done:** judge selection and validation, scoring of all runs, the 10 new questions' reviews and runs, Stage 3 runs, failure coding and the qualitative cases.
+These are the saved Stage 1 rankings rescored against the current gold labels, for the 50 primary questions.
+
+- **The reranker gives almost all of the gain:** about +11 to +14 points of recall and +16 to +20 points of Hit@5.
+- **Hybrid adds little:** about +2 points without the reranker, and −3 points with it.
+- **The rule still selects R4:** its recall is not below R0's (Section 5, Stage 1), although R3 is slightly higher. Report that as a finding; a 3-point gap is about 1–2 facts.
+
+| Run | Correct (score 2) on 49 primary questions | Note |
+| --- | --- | --- |
+| R0 naive (s1_naive_r0_dense) | 32 | |
+| N1 naive, R4, k = 5 | 37 | |
+| N2 naive, R4, k = 6 | 38 | k = ceil(A1's mean 5.26 chunks in the answer prompt) |
+| A1 agentic | 42 | Answered all 49 (no clarify or refusal). Median latency about 35 s against about 10 s for N1 |
+
+S10 is missing from these 49 (it was reworded). The M02 and M12 judge scores predate their reference fixes. No CIs yet.
+
+**Changes since the 31 Oct draft**
+
+- **5 Nov: intake-safe wording.** The real intake gate was run on all 60 answerable questions. 4 would have drawn a clarifying question (S10, C03, C04, C06) and were reworded to state the fact the gate requires (Section 2.3). All 60 now pass the gate.
+- **5 Nov: calculation questions.** C01–C10 added (6 single-rule, 4 multi-step), and S20 dropped, since it repeated A06 part 1. They are reported as a separate group, outside the headline (Section 2.3).
+- **4–5 Nov: gold review.** 17 question parts gained gold chunks, and some references were corrected (M02, M12) and O17 replaced. Gold is regenerated with `label_gold.py --write`; M09's hand-added part-1 chunk `web:e045f8905e:1` must be re-added after every run.
+- **3 Nov: paraphrases out, out-of-scope up to 20.** P01–P05 moved to the agentic team's robustness suite (`agent_eval/data/robustness_cases.json`). Their old results are in `results_stale/retrieval_paraphrases/`. O05–O20 were added, tagged `oos_group`.
+- **Earlier:** Question ids changed from `Q01`–`Q64` to S/M/A/C/O; `qid_map.json` and `db_check/apply_qid_map.py` convert old results. RAGAS was replaced by the two-call judge scorer `score_grounding.py`. The answer step's chunk cut went from 1,200 to 2,000 characters, with an excerpt matched to the question. The Stage 3 "OpenAI" generator is gpt-oss-120b on Groq. Model names now live in `src/config.py`.
 
 ## Summary and key decisions
 
-Evaluate the RAG part in three stages: a retrieval ablation, then naive vs agentic RAG, then a generator LLM comparison. Each stage carries its winner forward, so the team runs about 10 generation runs instead of a full grid. Stage 2 includes a naive baseline given the same amount of context as the agent, so agentic RAG isn't credited merely for seeing more chunks. One primary metric, accuracy (correctness = 2), carries the headline claims; all other metrics are diagnostic.
+Evaluate the RAG system in three stages, plus a scoring stage:
 
-**Should we add retrieval methods one by one? Yes.** Do it as Stage 1, as a 2×2 design: dense vs hybrid, each with and without the cross-encoder reranker. Dense-only with no reranker is the naive baseline. Retrieval metrics need no LLM, so all configurations are cheap to score. This answers the slides' point that each technique must earn its place.
+1. A retrieval ablation.
+2. Naive vs agentic RAG.
+3. A generator LLM comparison.
 
-**Is the dataset big enough? Just enough, with caveats.** Dataset v2.1 (`src/evaluation/eval_questions.json`) has 45 scored questions: 21 single-fact, 20 multi-part and 4 out-of-scope (41 answerable in all), plus 5 retrieval-only paraphrases (50 records). One answerable question moves accuracy by about 2.4 points (1 in 41), so gaps under about 10 points (4 questions) are likely noise, and only gaps of about 23 points or more can be shown reliably. Use all 45 as the test set. The 5 paraphrases give retrieval something to discriminate (Section 2.3).
+Each stage carries its winner forward, so the team runs about 8 generation runs instead of a full grid. Stage 2 includes a naive baseline given the same amount of context as the agent, so agentic RAG isn't credited merely for seeing more chunks.
 
-**Gold passages: auto-labelled, then audited.** `label_gold.py` marks the chunks that contain each verbatim fact and stores their ids. The corpus will not be re-ingested, so the ids stay valid. You need them for retrieval Precision/Recall/F1 and for the Stage 2 stratification. Verify the 11 `needs_review` reference answers first, then hand-check about 15 questions' labels (Section 2.4).
+**One primary metric, accuracy (correctness = 2) on the 50 primary questions, carries the headline claims.** All other metrics are diagnostic. Calculation questions and out-of-scope questions are reported as their own groups (Section 2.3).
 
-**Three fixes from checking the plan against the code.** These are explained in Section 9.1:
-1. The existing naive generator (`src/inference/inference.py`) is not comparable to the agent's answer step. Both systems must share one answer function.
-2. "Agentic RAG" in this repo is the whole supervisor stack (decomposer, auditor, supervisor loop, user profile), not retrieval as a single tool. The report must say so, and the harness must handle clarify, refuse and profile effects.
-3. The retriever has no dense-only, BM25-only or no-rerank modes, which Stage 1 needs.
+**Is the dataset big enough? Just enough, with caveats.** One primary question moves accuracy by 2 points (1 in 50). Per-question paired comparisons (Section 7) are the main evidence; averages alone are not.
+
+**Gold passages are auto-labelled from verbatim facts, then audited** (Section 2.4). The corpus is not re-ingested, so chunk ids stay valid.
+
+**What "agentic RAG" means here** is the whole supervisor stack described in Section 0, not retrieval as a single tool. The report must say so.
+
+## 0. System architecture
+
+The chatbot answers Singapore corporate income tax (CIT) questions from IRAS material. Every LLM in the system is `qwen3.5:4b` run through Ollama, at temperature 0 with thinking off (`src/config.py`: `INTAKE_MODEL`, `PLANNER_MODEL`, `SUPERVISOR_MODEL`, `AUDITOR_MODEL`).
+
+### 0.1 Corpus and index
+
+| Part | Detail | Code |
+| --- | --- | --- |
+| Sources | 56 IRAS corporate-tax web pages, scraped 14 Oct 2026 (`data/raw/iras_corporate_tax.jsonl`). Two IRAS e-Tax guide PDFs (`data/manual/`): the REIT ETF guide and the general insurers' IBNR reserves guide | `src/ingest/ingest_web.py`, `ingest.py` |
+| Chunking | Web pages: section-aware chunks, with headings recovered from Markdown or Title-Case lines. PDFs: Docling `HybridChunker`, with tables kept as Markdown rows and two heading fixes. At most 512 tokens per chunk (`MAX_TOKENS`) | `web_chunking.py`, `chunking.py` |
+| Store | One ChromaDB collection, `manuals` (546 chunks), in the git-tracked `chroma_db/`. Each chunk has `source`, `headings` (the heading path), `pages`, `source_type` and `title`. Ids are positional: `web:<10 hex>:<n>` or `<pdf name>:<n>` | `src/ingest/store.py` |
+| Embedder | `Qwen/Qwen3-Embedding-0.6B`, with the query prompt for queries; normalised, cosine similarity | `src/config.py` |
+
+### 0.2 Retrieval (`src/retrieval/retriever.py`)
+
+`Retriever.search(query, k, candidates=10)` runs three stages:
+
+1. **Candidates.** Vector search and BM25 each return their top `candidates` (10) chunks. BM25 runs over heading path + text, so exact terms such as "section 45G" or "Annex 2B" match. The two lists are merged by reciprocal rank fusion (constant 60).
+2. **Rerank.** The cross-encoder `BAAI/bge-reranker-v2-m3` scores each candidate against the query. It reads heading path + text, up to 1,024 tokens, and gives a 0–1 relevance.
+3. **Top k** by reranker score.
+
+The evaluation's `ModeRetriever` (`rag_eval_retrieval/retrieval_modes.py`) builds R0–R3 from these stage methods. R4 is `search()` unchanged.
+
+### 0.3 The agent (`src/supervisor/`, `src/decomposer/`, `src/auditor/`)
+
+```text
+question
+  |
+  v
+UserStore profile -> saved company facts become the intake's "prior"
+  |
+  v
+Intake gate  decomposer.intake_and_plan: 1 LLM call extracts domain, intent, entities; resolve() then applies rules
+  |- domain or intent out_of_scope ........................................ REFUSE  (status refused)
+  |- a mandatory fact is missing AND the question contains a digit ........ CLARIFY (status clarify)
+  |     (CIT computation needs chargeable_income; CIT deadline needs fye; SUTE eligibility needs the incorporation year)
+  |- otherwise: one query = the question (a missing fact without digits only adds an "answered in general terms" note)
+  v
+Supervisor loop, at most max_steps = 4 actions
+  step 1   route: "search" the question as written, or "decompose": the planner writes one query per fact
+  step 2+  decide: search | decompose | run_tool | ask_user | answer | give_up
+  every search:
+     RetrievalAgent: Retriever.search() per query (k each) -> drop chunks already judged -> rescore against the
+                     question with the reranker -> keep the best max_chunks
+     reranker cutoff: below audit_min_score (0.5) is rejected unaudited, except the top 3, which are always audited
+     Auditor LLM:    approves or rejects each chunk; says whether the approved set suffices, what is missing, and a
+                     follow-up query
+  guard rails in code, e.g. answer at once when the auditor says "sufficient"; stop on repeated queries or no progress
+  v
+Answer  ANSWER_SYSTEM prompt; up to 8 approved chunks (MAX_DOCS), each shown as a 2,000-character excerpt that best
+        matches the question (DOC_CHARS, supervisor.excerpt); cite [Doc n]; no number that is not in the documents
+  |- reply starts with INSUFFICIENT_CONTEXT, or nothing approved ............... status no_answer
+  |- otherwise .............................................................. status answered (+ assumptions, sources)
+```
+
+- **Statuses.** `handle_turn()` returns one of `answered`, `clarify`, `refused` or `no_answer`, with a `stop_reason` such as `auditor_sufficient`, `max_steps` or `no_progress`.
+- **The gate is code, not the LLM.** Refuse and clarify decisions at intake are deterministic, made on what the intake call extracted. The supervisor can also choose `ask_user` later. It never did in the earlier A1 run.
+- **Tools.** A tool such as a tax calculator is offered only for computation questions. The evaluation registers none.
+
+### 0.4 The naive baseline
+
+One `search()` call returns the top k chunks; then one answer call. That call uses the same `ANSWER_SYSTEM` prompt, `[Doc n]` layout, 2,000-character excerpts and settings as the agent, with `USER FACTS: none` (`rag_eval_approach/answer.py`). A reply that is empty or starts with `INSUFFICIENT_CONTEXT` is a `no_answer`. So naive RAG can decline too.
+
+### 0.5 How the evaluation runs each system
+
+The code is `rag_eval_approach/systems.py`, driven by `run.py`.
+
+| | Naive (`NaiveSystem`) | Agentic (`AgenticSystem`) |
+| --- | --- | --- |
+| Built from | `ModeRetriever(mode)` + `make_llm(provider, model)` | `harness.build_supervisor(...)` with the eval config's limits, `tools=None`, a temporary `UserStore` and the same `ModeRetriever` |
+| Per question | One search, then one answer | `handle_turn("eval-<run>-<qid>", [question], today=2026-10-28)`: a fresh user each question and a fixed date |
+| Logged | Top-k chunks (`retrieved_seen` = `context_used`), latency, tokens | Retrieval, the auditor and the answer prompt are wrapped. They log every chunk seen, the chunks put in the prompt, a per-search log (queries, new ids, audited and approved ids), per-stage latency and tokens summed over every Ollama call |
+| What a generator swap changes (Stage 3) | The answer call | Only the supervisor's `llm` (route, decide, answer). The intake, planner and auditor stay on local Qwen |
+
+The eval's agent limits differ from the CLI harness defaults: k = 5 per query (harness default 3), pool 10 (6), and `max_chunks` 8 (6). They match the naive systems' k and pool.
 
 ## 1. Objectives and research questions
 
@@ -52,157 +148,172 @@ The RAG evaluation answers four questions. Each maps to one stage and one table 
 
 | ID | Research question | Stage | Primary metric |
 | --- | --- | --- | --- |
-| RQ1 | Which retrieval configuration finds the right IRAS passages most reliably? | 1 | Recall@5, MRR |
-| RQ2 | Do hybrid search and reranking improve final answers, not just retrieval scores? | 1 | Correctness, faithfulness |
-| RQ3 | Does agentic RAG give better answers than naive RAG, including a naive baseline given the same amount of context, and is the gain worth the extra latency and tokens? | 2 | Correctness, latency |
-| RQ4 | How much does the supervisor/generator LLM matter, and does agentic RAG help a small model (Qwen 3.5 4B) more than larger ones? | 3 | Correctness, faithfulness |
+| RQ1 | Which retrieval configuration finds the right IRAS passages most reliably? | 1 | Part recall@5, MRR |
+| RQ2 | Do hybrid search and reranking improve final answers, not just retrieval scores? | 1 | Accuracy, faithfulness |
+| RQ3 | Does agentic RAG give better answers than naive RAG, including a naive baseline given the same amount of context, and is the gain worth the extra latency and tokens? | 2 | Accuracy, latency |
+| RQ4 | How much does the supervisor/generator LLM matter, and does agentic RAG help a small model (Qwen 3.5 4B) more than larger ones? | 3 | Accuracy, faithfulness |
 
 A secondary objective is to find *where* each system fails, by question type and source, through the qualitative analysis (Section 6).
 
 ## 2. Dataset preparation
 
-Dataset v2.1 is `src/evaluation/eval_questions.json` (50 records: 45 scored + 5 paraphrases). It was built from the original 40 questions, with the unnatural ones reworded, duplicates removed, four new gap questions and four out-of-scope questions added, and tags, reference answers and key facts for every record. Its `facts` field keeps the original format (a list of parts, each a list of alternative verbatim strings). Commit it and freeze it before any comparison run.
+The dataset is `src/evaluation/eval_questions.json`: 80 records, written with CRLF line endings, `indent=1` and `ensure_ascii=False`. `db_check/check_dataset.py` validates it against the corpus and writes nothing. Freeze the dataset before the final comparison runs.
 
 ### 2.1 Record format
 
-Each record is one question. `facts` is a list of parts: each part is one fact the answer needs, written as one or more alternative verbatim strings from the corpus. `gold_passages` is filled by `label_gold.py` with one list of chunk ids per part (the ids below are illustrative; real ids look like `web:<10 hex characters>:<n>` or `<pdf name>:<n>`).
+Each record is one question. `facts` is a list of parts: each part is one fact the answer needs, written as one or more alternative verbatim strings from the corpus. `gold_passages` is filled by `label_gold.py` with one list of chunk ids per part.
 
 ```json
 {"qid": "M02", "type": "multi", "tier": "webpage",
  "qtype": "multi-part", "source": "online_guide", "difficulty": "hard", "numeric": true,
  "answerable": true,
  "question": "What penalty applies if my company pays its tax after the due date, and what is the minimum monthly GIRO amount if it spreads payment under the instalment plan?",
- "reference_answer": "A 5% late payment penalty is imposed on the unpaid tax. Under a GIRO instalment plan, the minimum monthly deduction is $50.",
+ "reference_answer": "...",
  "key_facts": ["5%", "$50"],
  "facts": [["A 5% late payment penalty will be imposed on the unpaid tax"],
            ["minimum monthly GIRO deduction amount of $50"]],
- "gold_passages": [["web:3fa9c1d27b:4"], ["web:3fa9c1d27b:9"]],
+ "gold_passages": [["web:<id>:<n>"], ["web:<id>:<n>"]],
  "needs_review": false}
 ```
 
-`key_facts` lists the numbers, dates or terms a correct answer must contain. The judge uses it for the numeric check.
+- `key_facts` lists the numbers, dates or terms a correct answer must contain. The judge uses it for the numeric check.
+- Out-of-scope records have `answerable: false`, empty `facts` and `gold_passages`, and an `oos_group`.
 
 ### 2.2 Tags
 
-Dataset v2 is already tagged on these fields. Have a second member check the tags independently and settle disagreements together (about 30 minutes).
-
 | Field | Values | Rule |
 | --- | --- | --- |
-| qtype | definition, number, procedure, multi-part, edge-case, out-of-scope | `number` = a single fact hinging on a rate, threshold, date or amount. `multi-part` = needs facts from 2+ passages. `out-of-scope` = not answerable from the corpus |
-| source | online\_guide, reit\_etf\_guide, insurer\_guide, multiple, none | Where the answer lives. The corpus is the scraped IRAS web pages (`data/raw/iras_corporate_tax.jsonl`) plus two PDFs in `data/manual/`: the REIT ETF guide and the general insurers' IBNR guide |
-| difficulty | easy, hard | `hard` = multi-part, needs reasoning across sections, or has a tricky condition |
-| numeric | true, false | `true` if the answer hinges on a number, rate, threshold or date, whatever the qtype. Drives numeric accuracy across all questions |
+| type | simple, multi | `simple` = exactly 1 fact; `multi` = 2+ facts, not all in one chunk (enforced by `check_dataset.py`) |
+| qtype | definition, number, procedure, edge-case, multi-part, multi-step, computation, out-of-scope | `number` = a single fact that hinges on a rate, threshold, date or amount. `multi-part` = 2 independent facts. `multi-step` = 2–3 facts where one fact or condition leads to the next. `computation` = apply retrieved rules to the user's figures |
+| source | online\_guide, reit\_etf\_guide, insurer\_guide, none | Where the answer lives |
+| tier | webpage, pdf | Document type of the source |
+| difficulty | easy, hard | `hard` = multi-fact, reasoning across sections, or a tricky condition |
+| numeric | true, false | `true` if the answer hinges on a number, rate, threshold or date. Drives numeric accuracy |
+| oos\_group | off-topic, near-miss, not-in-corpus | Out-of-scope records only (Section 2.3) |
 
-### 2.3 Is the dataset enough? The current test data (v2.1)
-
-The test data (`src/evaluation/eval_questions.json`) has 50 records: 45 scored questions (41 answerable + 4 out-of-scope) and 5 retrieval-only paraphrases. Accuracy is computed over the 41 answerable questions, so one question is worth 2.4 points. The first version had 31 answerable questions, sized as the smallest that fills every table in this plan; 10 more were added to bring the single-fact types to 5–6 each, the two PDF sources to 4 each, the number of multi-part questions to 20, and to cover pages that no question tested (tax computation, liquidation and judicial management, the compliance programmes page, foreign-entity classification and payment difficulties).
+### 2.3 The current test data
 
 **Composition by group**
 
-| Group | Ids | n | Used for |
-| --- | --- | --- | --- |
-| Single-fact, answerable | S01–S21 | 21 | Retrieval metrics and the judge |
-| Multi-part, answerable | M01–M20 | 20 | Retrieval metrics and the judge |
-| Out-of-scope | O01–O04 | 4 | Refusal check only (no gold passages) |
-| Paraphrases | P01–P05 | 5 | Retrieval metrics only |
-| **Total** |  | **50** |  |
+| Group | Ids | n | Analysis group | Notes |
+| --- | --- | --- | --- | --- |
+| Single-fact | S01–S21 (no S20) | 20 | Primary | definition, number, procedure and edge-case: 5 each |
+| Multi-part | M01–M20 | 20 | Primary | 2 facts each |
+| Multi-step | A01–A10 | 10 | Primary | 2–3 facts (6 with 3 facts) |
+| Calculation | C01–C10 | 10 | Secondary (qtype `computation`) | 6 single-rule (C01–C06), 4 multi-step (C07–C10). The answer LLM does the arithmetic (no tools) and the judge needs exact figures |
+| Out-of-scope | O01–O20 | 20 | Separate (Table 2e) | Refusal check only: off-topic 6, near-miss 8, not-in-corpus 6 |
+| **Total** | | **80** | | 60 answerable |
 
-**The 41 answerable questions by tag** (every row adds up to 41)
+**The 50 primary questions by tag**
 
 | Tag | Breakdown |
 | --- | --- |
-| Question type | multi-part 20, number 6, definition 5, procedure 5, edge-case 5 |
-| Source | online guide 33 (17 single-fact, 16 multi-part), REIT ETF guide 4 (1 + 3), insurer guide 4 (3 + 1) |
-| Tier | web page 33, PDF 8 |
-| Difficulty | hard 26, easy 15 |
-| Numeric flag | true 22 (10 single-fact, 12 multi-part), false 19 |
-| Gold parts | every multi-part question has exactly 2 parts (20 × 2); every single-fact question has 1 |
+| Question type | multi-part 20, multi-step 10, definition 5, number 5, procedure 5, edge-case 5 |
+| Source | online guide 42, REIT ETF guide 4, insurer guide 4 |
+| Tier | web page 42, PDF 8 |
+| Difficulty | hard 36, easy 14 |
+| Numeric flag | true 31, false 19 |
+| Facts | 20 single-fact, 24 with 2 facts, 6 with 3 facts |
 
-**The 5 paraphrases:** P01 (of S02), P02 (of S03) and P03 (of S12) are single-part; P04 (of M02) and P05 (of M03) are two-part. Four are web-page questions and one is a PDF question.
+**Why three analysis groups** (`results_io.is_core`, `SECONDARY_QTYPES`):
 
-**Targets against the current data**
+- **Primary (50).** The answerable lookup questions; every headline number uses these.
+- **Calculation (10).** Reported on their own, in Table 1a's extra row per mode, Table 2b's own row and the `accuracy_computation` column. They test applying a rule to figures, a different skill, and 10 questions are too few to move or support the headline. Their gold chunks hold the rule, not the result.
+- **Out-of-scope (20).** Kept out of accuracy (below).
+- **All 60 answerable together** are reported once as a robustness check (`accuracy_all_answerable`, the `all` group in `--pair`).
 
-| Bucket | Target | Current data | Note |
-| --- | --- | --- | --- |
-| Each of the 3 sources | ≥ 3 (descriptive only, no significance claims) | online guide 33, REIT ETF guide 4, insurer guide 4 | Met |
-| numeric (flag) | ≥ 10 | 22 | Met |
-| multi-part | ≥ 10 | 20 | Met |
-| single-fact types (number, definition, procedure, edge-case) | 3–5 each | 6, 5, 5, 5 | Met |
-| out-of-scope | 4 | 4 | Four is too few for a precise refusal rate, so report refusals as counts (e.g. 3/4) |
-| paraphrased / colloquial | 5 (retrieval only) | 5 | Met: 3 single-part, 2 multi-part |
+**Intake-safe wording (5 Nov).** The research questions compare answer quality, so every answerable question must reach retrieval and answering. A clarifying question would score 0 and leave nothing to compare. The agent's intake gate clarifies when a mandatory fact is missing and the question contains a digit (Section 0.3). So the questions state the facts the gate needs; for example, a calculation question gives the chargeable income.
 
-**Why paraphrases:** the original questions were written from verbatim passages, so they share many words with the text. Dense and BM25 retrieval may both score near-perfectly (a ceiling effect), hiding any difference between configurations. The 5 paraphrases are everyday rewordings (e.g. "my company made no profit this year, still need to do the ECI thing?"), tagged `paraphrase_of: Qxx`. They reuse their original's `facts`, and are scored on retrieval metrics only, so they add no judge cost. Report them separately (`evaluate_rag.py --paraphrases`), and resample by original question in the statistics (Section 7). On a first run they scored lower than the originals (single-part hit@1 67% vs 88%), so they do separate the retrieval configurations.
+- A one-off probe ran the real `intake_and_plan` (qwen3.5:4b, today = 2026-10-28, no prior) on all 60. S10, C03, C04 and C06 would have clarified; their rewordings pass, and none of the 60 is refused.
+- Remaining risk: the supervisor's own `ask_user` action is an LLM choice and was not probed. It never occurred in the earlier A1 run. `clarified_answerable` and `clarified_computation` in `runs_summary` will show any cases.
+- **Say this in the report's method:** "Questions state the facts the intake gate requires (e.g. chargeable income), so every question reaches retrieval and answering; clarification behaviour is evaluated in the agentic team's suites."
+
+**The 20 out-of-scope questions** (`oos_group`) test negative rejection: does a system decline a question the corpus cannot answer?
+
+- **off-topic** (O05–O10): another country's tax, CPF, ACRA incorporation, work passes, a US filing, bank loans.
+- **near-miss** (O01, O03, O11–O16): GST, stamp duty, property tax, personal income tax and the foreign worker levy. The corpus mentions these terms but not the rate or rule asked for. Retrieval returns plausible chunks, and the system has to notice they don't answer.
+- **not-in-corpus** (O02, O04, O17–O20): in-domain CIT questions about a year, figure or scheme the documents do not hold, e.g. Pillar Two, a YA 2027 rebate, the YA 2008 rate, tax collections, Budget 2027 and VCCs.
+
+**How out-of-scope results are reported (RQ3, RQ4).**
+
+- `score_judge.py` gives each out-of-scope answer an `outcome`:
+  - declined: status refused or no_answer, or an `INSUFFICIENT_CONTEXT` reply;
+  - clarified: asked a question back;
+  - answered: a hallucination risk;
+  - error, or unscored.
+- `analyze.py` writes Table 2e per run and per `oos_group`. It shows the decline rate with a Wilson 95% CI next to the answerable questions each system wrongly declined or clarified, since a system that declines everything would otherwise look perfect.
+- In RQ3, say *where* each system declines: the agent's intake gate before retrieval, or the answer model after it.
+- In RQ4, add the decline rate as a column per generator.
+- At n = 20 only a large gap (e.g. 6/20 vs 14/20) is significant.
+- Gate-level testing (adversarial wording, intake classifier errors) belongs to the agentic team's safety and robustness suites.
+
+**Review status.** 45 records still carry `needs_review`: S 4, M 5, A 10, C 10, O 16. The C reference figures were recomputed in Python from the rule parameters, and the rule text checked against the gold chunks (Section 2.4). A teammate should still check the flagged references and key facts before the final scoring.
 
 ### 2.4 Labelling gold passages
 
-Label gold passages automatically from the verbatim `facts`. `label_gold.py` scans every chunk in ChromaDB and, for each part of each question, records the ids of the chunks whose text contains any of that part's alternative strings. It matches on heading path plus text, ignoring case, whitespace and apostrophe style, as `fact_ranks()` in `evaluate.py` does. Chunk ids (`web:<10 hex characters>:<n>` and `<pdf name>:<n>`) stay valid because the corpus will not be re-ingested; if it ever is, re-run the script. The script also flags facts that match no chunk, or more than 5.
+`db_check/label_gold.py` scans every chunk in ChromaDB. For each part of each question, it records the ids of the chunks whose heading path + text contains any of that part's alternative strings. Matching ignores case, whitespace and apostrophe style (`db_check/facts.py: norm`). Facts that match no chunk, or more than 5, are flagged for a hand fix.
 
-Steps:
+1. Run `python src/evaluation/rag_eval/db_check/label_gold.py` (a report only), fix flagged facts, then run it again with `--write`.
+2. Re-add M09's hand-added gold chunk (`web:e045f8905e:1`, part 1); `--write` drops it.
+3. Run `check_dataset.py`. Then `git restore -- chroma_db`, because opening the collection rewrites files in the tracked `chroma_db/`.
+4. Audit: open the matching chunks of a sample of questions (at least 3 per source, mostly multi-fact). Confirm each holds the information, not just a heading or a generic phrase. The 4–5 Nov review covered all answerable questions and added gold to 17 parts.
 
-1. Run `python label_gold.py --db <path> --collection <name> --data src/evaluation/eval_questions.json`.
-2. Fix every flagged fact by hand: replace fragments with fuller sentences from the corpus. Also verify the 11 records marked `needs_review` (reference answers and key facts) against the source chunks.
-3. Audit: hand-check about 15 questions (at least 3 per source, mostly multi-part). Open each matching chunk and confirm it contains the information, not just a heading or a generic phrase like "continues to be dormant". If more than 3 of the 15 are wrong, tighten the fact strings.
-4. Out-of-scope questions keep empty gold lists. Record the corpus snapshot (git commit of `chroma_db/`, scrape date) with the dataset.
-
-Estimate: 2–3 hours split across the team for the flagged questions and the audit. Freeze the dataset before the first comparison run.
+Out-of-scope questions keep empty gold lists. Chunk ids are positional, so re-run the labelling after any re-ingest.
 
 ## 3. Metrics
 
-Use four groups of metrics: retrieval (no LLM needed), faithfulness and context precision (LLM-graded), a custom correctness rubric, and efficiency. Skip BLEU/ROUGE, since the slides note they reward word overlap rather than correctness.
+There are four groups of metrics:
 
-**Primary metric: accuracy**, the % of questions with correctness = 2 (Section 3.3). All headline claims about which system or configuration is better rest on this one number. Everything else is diagnostic: it explains *why* accuracy differs and is not used to declare a winner, which avoids cherry-picking among many scores.
+- retrieval, which needs no LLM;
+- faithfulness and context precision, graded by the judge;
+- a correctness rubric;
+- efficiency.
+
+BLEU and ROUGE are skipped, because they reward word overlap rather than correctness.
+
+**The primary metric is accuracy: the % of primary questions with correctness = 2** (Section 3.3). Every headline claim about which system or configuration is better rests on this one number. Everything else is diagnostic: it explains *why* accuracy differs, and is not used to declare a winner.
 
 ### 3.1 Retrieval metrics (vs gold passages)
 
-Compute on the top-k chunks passed to the generator (k = 5 unless you use another value), for answerable questions only. Gold is stored as **parts**: each part is one fact the answer needs, and a part is covered if the retrieved chunks include any chunk id listed for it. Part-level scoring avoids penalising a system that retrieves a duplicate or equivalent chunk.
+These are computed on the top k chunks (k = 5) for answerable questions only (`rag_eval_retrieval/metrics.py`). Gold is stored as **parts**: a part is covered if any of its chunk ids is retrieved, so a duplicate or equivalent chunk is not penalised.
 
 ```text
-Recall@k    = parts covered / parts            (= cov@k in evaluate.py)
-Hit@k       = 1 if every part is covered       (= all@k in evaluate.py)
-Precision@k = gold chunks among the top k / k
-F1@k        = 2 * P * R / (P + R)
-MRR         = mean over questions of 1 / (rank of the first gold chunk)
+Part recall@k = parts covered / parts
+Hit@k         = 1 if every part is covered
+Precision@k   = gold chunks among the top k / k
+F1@k          = 2 * P * R / (P + R)
+MRR           = 1 / rank of the first gold chunk, over the full retrieved list (depth 10 in Stage 1)
 ```
 
 | Metric | What it tells you | Note |
 | --- | --- | --- |
 | Part recall@5 | Did the retrieved chunks cover each fact the answer needs? | The most important retrieval number. A missed part can't be recovered by the generator |
-| Precision@5 | How much of the context is relevant? | Low by design when a part has 1 gold chunk (max 0.2 at k = 5). Compare across configs, not against 1.0 |
-| F1@5 | Balance of the two | Report as the slides ask |
-| MRR | Is the first gold chunk near the top? | Shows the reranker's effect, which P/R at fixed k can miss. `evaluate.py` currently computes it for simple questions only; extend it to all |
-| Hit@5 | % of questions where every part is covered | Strict; multi-part questions are the hardest to pass |
+| Precision@5 | How much of the context is relevant? | Low by design when a part has one gold chunk (at most 0.2 at k = 5). Compare across configs, not against 1.0 |
+| F1@5 | Balance of the two | |
+| MRR | Is the first gold chunk near the top? | Shows the reranker's effect, which P/R at a fixed k can miss |
+| Hit@5 | % of questions where every part is covered | Strict; multi-fact questions are the hardest to pass |
 
-For agentic RAG, the retrieved set is the **union of unique chunks returned across all retrieval calls** (before the auditor filters them). This set is usually larger than naive RAG's fixed 5, so agentic recall is inflated by volume. Always report **chunks seen per question** (mean and p90) beside the retrieval metrics, and compare agentic RAG against the matched-context naive baseline N2 (Section 5, Stage 2), not only against the k = 5 baseline. Also log the chunks that actually went into the answer prompt (Section 9.3).
+**Two sources of these numbers:**
 
-```python
-def retrieval_metrics(retrieved_ids, gold_parts, k=5):
-    """gold_parts: one list of chunk IDs per part (each part = one fact the answer needs)."""
-    top = retrieved_ids[:k]
-    covered = [bool(set(top) & set(part)) for part in gold_parts]
-    gold_all = {c for part in gold_parts for c in part}
-    r = sum(covered) / len(gold_parts)
-    p = len(set(top) & gold_all) / k
-    f1 = 2 * p * r / (p + r) if p + r else 0.0
-    rr = next((1 / (i + 1) for i, c in enumerate(retrieved_ids) if c in gold_all), 0.0)
-    return {"p": p, "r": r, "f1": f1, "rr": rr, "hit": int(all(covered))}
-```
+- `evaluate_rag.py` (Stage 1) retrieves with each mode directly.
+- `score_retrieval.py` scores what each generated run actually retrieved (`retrieved_seen`). For the agent, that is the **union of unique chunks across all searches**, scored without a cutoff. The agent's set is usually larger, so `score_retrieval.py` reports chunks seen and chunks used (mean, p90) beside the metrics. Compare A1 with the matched-context baseline N2, not only with k = 5.
 
 ### 3.2 Faithfulness and context precision (judge-based)
 
-These are RAGAS-style scores computed with the fixed judge (Section 4) in two calls per answer, by `score_grounding.py`. Call them "RAGAS-style" in the report, not RAGAS. The contexts are the chunk texts **exactly as they appeared in the answer prompt** (`context_used`, including the 1,200-character cut). Scoring faithfulness against text the generator never saw would be wrong.
+`score_grounding.py` makes two judge calls per answer. Call these scores "RAGAS-style" in the report, not RAGAS. The contexts are the chunks **exactly as they appeared in the answer prompt** (`context_used`: the 2,000-character excerpts).
 
 | Metric | What it checks | How it is computed |
 | --- | --- | --- |
-| Faithfulness | Every claim in the answer is supported by the retrieved context | Call 1: the judge lists the answer's factual claims and marks each supported or not, **without seeing the reference answer**. Score = supported claims / claims |
-| Context precision | Retrieved chunks are relevant, and relevant ones rank high | Call 2: the judge marks each numbered chunk relevant or not, using the reference answer. `ctx_precision` = share of relevant chunks; `ctx_ap` = average precision (relevant chunks near the top score higher), the quantity RAGAS's `LLMContextPrecisionWithReference` computes |
+| Faithfulness | Every claim in the answer is supported by the context | Call 1: the judge lists the answer's factual claims and marks each supported or not, **without seeing the reference answer**. Score = supported / claims |
+| Context precision | The chunks are relevant, and relevant ones rank high | Call 2: the judge marks each numbered chunk relevant or not, using the reference. `ctx_precision` = share relevant; `ctx_ap` = average precision (the quantity RAGAS's `LLMContextPrecisionWithReference` computes) |
 
-Answer relevance and context recall are not computed: part recall against the gold passages (Section 3.1) already measures recall with no judge, and the correctness rubric measures whether the answer is right.
-
-Run it only on answerable questions with a real answer: a refusal, clarification or failed run has nothing to ground. It costs 2 judge calls per answer. Raw judge output is cached with every score. Cross-check about 10 answers with the real RAGAS (`score_ragas.py`, separate environment) to show the scores agree.
+- Answer relevance and context recall are not computed: part recall against gold already measures recall, and the rubric measures rightness.
+- Only answerable questions with a real answer are scored. Raw judge output is cached with every score.
+- `score_ragas.py`, in a separate environment, is an optional cross-check on about 10 answers.
 
 ### 3.3 Custom correctness rubric (LLM-as-judge)
 
-The grounding metrics check support and relevance, but not whether the answer is *right*. A faithful answer built on the wrong chunk is still wrong. Add a correctness score against the reference answer:
+`score_judge.py`, with the prompt `prompts/judge_correctness_v1.txt`:
 
 | Score | Label | Rule |
 | --- | --- | --- |
@@ -210,260 +321,189 @@ The grounding metrics check support and relevance, but not whether the answer is
 | 1 | Partial | Main point right, but a key fact missing or a condition left out |
 | 0 | Incorrect | Wrong main answer, any wrong number from `key_facts`, or a refusal on an answerable question |
 
-Plus one binary flag, **numeric\_ok**: every number, rate, threshold and date in `key_facts` appears correctly. A wrong number forces a score of 0, because a wrong tax rate is a wrong answer.
+Plus **numeric\_ok**: every number, rate, threshold and date in `key_facts` is correct. A wrong number forces a 0.
 
-For out-of-scope questions, score **refusal correctness** instead: 1 if the system declines or says the corpus does not cover it, 0 if it answers anyway. This can be detected without the judge: the supervisor returns status `no_answer` (or `refused`), and the naive answer starts with `INSUFFICIENT_CONTEXT`.
-
-Report: **accuracy** (% scored 2) as the primary metric, mean correctness (0–2), numeric accuracy (% numeric\_ok on questions with `numeric` = true), and refusal accuracy.
-
-**Failed runs and non-answers count as wrong.** Give correctness 0 and keep in the denominator when:
-- a run errors (tool-call failure, step-limit hit, timeout) or returns an empty answer;
-- the agent returns status `clarify` (it asks the user a question instead of answering) or `refused` on an answerable question;
-- the agent returns `no_answer` on an answerable question (this is also an incorrect refusal, code F7 in Section 6.2).
-
-Report the count of each per system. Dropping these would flatter the weaker generator, and Qwen 3.5 4B will likely fail more often as an agent.
+- **Out-of-scope questions** get a refusal check instead, scored correct when the system declines:
+  - Status `refused` or `no_answer`, or an answer starting with `INSUFFICIENT_CONTEXT`, counts as declined without the judge.
+  - `clarify` and run errors count as not declined.
+  - Any other answer goes to the judge's short refusal prompt (`judge_refusal_v1.txt`).
+- **Failed runs and non-answers count as wrong.** They score 0 without a judge call and stay in the denominator: a run error, an empty answer, or status `clarify`, `refused` or `no_answer` on an answerable question.
+- **Report:** accuracy, mean correctness (0–2), numeric accuracy (on `numeric` = true), false refusals and clarifications on answerable questions, and the out-of-scope outcomes.
 
 ### 3.4 Efficiency
 
-| Metric | How to measure |
+| Metric | How it is measured |
 | --- | --- |
-| Latency | Wall-clock seconds per question with `time.perf_counter()`. For the agent, `SupervisorResult.timings` already splits intake, retrieval, audit, decide and answer; log the naive system's retrieval and generation the same way. Report median and p90 |
-| Tokens | Input and output tokens per question, summed over every LLM call (intake, audit, decide, answer). Ollama returns `prompt_eval_count` and `eval_count`; API models return usage fields (Section 9.3) |
-| Cost | Tokens × the provider's listed price (note the date of the price list). For local Qwen, report tokens and latency, and note the hardware |
+| Latency | Wall-clock seconds per question. For the agent, `SupervisorResult.timings` splits intake, route, plan, retrieval, audit, decide and answer; the naive record splits retrieval and generation. Report median and p90 |
+| Tokens | Input and output tokens per question, summed over every LLM call (`tracking.py` patches `ollama.chat` and `ollama.Client.chat`; API adapters add their usage fields) |
+| Cost | Tokens × the provider's listed price (note the date of the price list). Local Qwen: tokens and latency only, plus the hardware |
 
-Latency for local Qwen and for API models isn't directly comparable (different hardware and network). Compare naive vs agentic within each generator, and note the hardware (laptop CPU, or the cluster GPU).
+Compare latency within one machine. Every current run is on the cluster GPU (GTX 1080 Ti, node `bat`), so compare naive with agentic per generator.
 
 ## 4. LLM-as-judge design
 
-Use one strong judge model, at temperature 0, for every LLM-graded score (faithfulness, context precision and the correctness rubric) across every run.
+One judge model, fixed across every run, gives every LLM-graded score: correctness, refusal checks, faithfulness and context precision.
 
 ### 4.1 Choosing the judge
 
-- **Fixed across all runs.** If the judge changes, score differences mix judge behaviour with system behaviour, and the comparison breaks.
-- **Not one of the compared generators.** LLM judges tend to rate their own outputs higher (self-preference bias). Since Stage 3 compares an Anthropic and an OpenAI model, the cleanest choice is a strong model from a third provider (e.g. a Gemini model). If you only have Anthropic and OpenAI access, use a model from one family that is *not* in your comparison, and name this as a limitation.
-- **Strong enough.** Qwen 3.5 4B is too weak to judge faithfulness reliably. Don't use it as the judge.
-- Record the exact model ID and date in the run config.
-- **Free-tier choices (Oct 2026).** A Gemini Flash model allows only about 20 requests a day free; a Flash-Lite model allows more. Ollama cloud models are pay-per-token with no published daily cap. Groq's free tier is limited by tokens per day. A model that fits the cluster GPU (about 12B parameters, such as `gemma4:12b`) is free but weaker and slow. Small judges miss subtle numeric errors, so the 30-pair validation in 4.3 decides, not the model size. Scoring is cached and resumable, so a daily quota only slows it down.
+- **Chosen judge:** `gemma4:12b` via Ollama (`configs/judge.yaml`, `provider: ollama`), run on the cluster GPU by `IS469_score.sh` after the generation job, so it has the card to itself.
+- **Fixed across all runs.** If the judge changes, score differences mix judge behaviour with system behaviour. Re-judge everything if it ever changes: delete the `_judge` and `_grounding` score files, never the outputs.
+- **Not one of the compared generators.** The generators are Qwen 3.5 4B, Claude Sonnet and gpt-oss-120b, which avoids self-preference bias. Gemma is a third family.
+- **The limitation to state:** a 12B judge is weaker than the API generators it grades in Stage 3, and small judges can miss subtle numeric errors. The 30-pair validation in 4.3 decides whether its scores can be trusted.
+- Record the model id in the report. Every score row stores `judge: "ollama:gemma4:12b"`.
 
-### 4.2 Sample correctness judge prompt
+### 4.2 Correctness judge prompt
 
-```text
-You are grading answers from a Singapore corporate tax chatbot against a reference answer.
+The prompt is in `prompts/judge_correctness_v1.txt`. It gives the judge the question, the reference answer, the key facts and the candidate answer, plus the rubric in 3.3. It also has these rules:
 
-QUESTION:
-{question}
-
-REFERENCE ANSWER:
-{reference_answer}
-
-KEY FACTS (each must appear correctly for full marks):
-{key_facts}
-
-CANDIDATE ANSWER:
-{response}
-
-Grade the candidate on correctness only. Ignore style, length and citations.
-
-Rubric:
-2 = Correct: all key facts present and correct; no claim contradicts the reference.
-1 = Partial: main point correct, but a key fact or condition is missing.
-0 = Incorrect: main answer wrong, ANY number/rate/threshold/date wrong, or the candidate refuses although the reference gives an answer.
-
-Rules:
-- A wrong number always gives 0, even if the rest is correct.
-- Extra correct information is fine. Extra incorrect information that contradicts the reference gives 0.
+- A wrong number always gives 0.
+- Extra correct information is fine.
+- Extra incorrect information that contradicts the reference gives 0.
 - Judge meaning, not wording.
 
-Return ONLY this JSON:
-{"reasoning": "<one or two sentences>", "numeric_ok": true|false, "score": 0|1|2}
-```
+It asks for `{"reasoning", "numeric_ok", "score"}`, with the reasoning first, so the model reasons before it commits. The reply must match a JSON schema. Provider errors are retried with a pause. An unparseable reply leaves the row unscored, which counts as wrong; the raw output is kept on every row.
 
-Put `reasoning` before `score` so the model reasons before it commits. Parse the JSON and retry once on a parse failure. Log the raw judge output.
+**The judge sees only text.** It has no access to the vector store; it grades the candidate against the reference answer and key facts. That is why every reference must be verified against the source chunks.
 
-For out-of-scope questions, use the status check in Section 3.3, and a short judge prompt only for naive answers that don't start with `INSUFFICIENT_CONTEXT` (returns `refused: true|false`).
+### 4.3 Validating the judge (to do)
 
-### 4.3 Validating the judge
+1. Sample 30 (question, answer) pairs from the existing runs. Mix question types and systems, and include a few calculation and out-of-scope items.
+2. Two team members score each pair with the rubric, blind to the judge's score, then agree on one human label.
+3. Compute exact agreement on 0/1/2 and quadratic-weighted Cohen's kappa (`sklearn.metrics.cohen_kappa_score(human, judge, weights="quadratic")`), with a bootstrap 95% interval.
+4. Target ≥ 80% exact agreement. Below that, read the disagreements, tighten the rubric wording, re-validate on 10 fresh pairs, and re-judge.
+5. Report the agreement in the evaluation section.
 
-1. Sample 30 (question, answer) pairs from the first completed runs (Stage 1 naive answers plus early agentic answers). Mix question types and include a few out-of-scope refusals.
-2. Two team members score each pair with the same rubric, without seeing the judge's score. Settle disagreements together to produce one human label.
-3. Compare judge vs human: exact agreement on the 0/1/2 score and weighted Cohen's kappa (`sklearn.metrics.cohen_kappa_score(human, judge, weights="quadratic")`). With only 30 pairs, add a bootstrap 95% interval for kappa and report it.
-4. Target ≥ 80% exact agreement. A kappa point estimate of 0.6 on 30 pairs still has a wide interval, so treat the interval as the finding. Below target, read the disagreements, tighten the rubric wording, and re-validate on a fresh 10 pairs.
-5. Report the agreement numbers in the evaluation section. This is a cheap way to show the LLM scores can be trusted.
-
-Do a lighter spot check for faithfulness: read 10 answers with the lowest and highest faithfulness and confirm the scores make sense.
-
-Some reference answers were drafted by an LLM. A person must verify every reference answer and key-facts list against the source documents before the judge runs, especially the 11 records flagged `needs_review`. Otherwise the judge grades against unverified answers.
+Also spot-check faithfulness: read the 5 lowest- and 5 highest-scored answers.
 
 ## 5. Experimental design
 
-Run three stages in order. Each stage carries its winner forward, giving about 10 generation runs in total instead of 30+.
+Run three stages in order, then score. `run_all.py` runs the whole sequence (`--stages 1 2 3 4`, `--skip-api`, `--dry-run`). On the cluster, `IS469_eval.sh` runs Stages 1–2 and `IS469_score.sh` runs scoring. Every step resumes, so after a 2-hour time limit you resubmit the same job.
 
-**Held constant in every stage:** the frozen dataset, chunking (size and overlap), Qwen3-Embedding-0.6B, the ChromaDB index (record the git commit of `chroma_db/`), the answer function and prompt (below), generation temperature 0 with thinking off, a fixed date passed to the agent, and the judge model.
+**Held constant in every stage:** the frozen dataset, chunking, the embedder, the ChromaDB index (recorded per run as the `chroma_db/` commit), the shared answer step, temperature 0 with thinking off, the fixed date 2026-10-28, and the judge.
 
-### Shared settings: one config for all systems
+### Shared settings
 
-All systems read these values from one config file (`src/evaluation/rag_eval/configs/*.yaml`) and log them in every run.
+Every run reads its settings from one YAML in `rag_eval_approach/configs/`. `run.py` stores the config, its hash, the git commit, the corpus snapshot, the local model names and the machine in `<run_id>.meta.json`.
 
 | Setting | Value |
 | --- | --- |
-| Per-query retrieval depth k | 5 for all systems |
-| Reranker candidate pool | 10 for all systems (the existing `CANDIDATES`) |
+| Retrieval depth k | 5 per query, for every system (N2 sets its own k, below) |
+| Candidate pool | 10 (`CANDIDATES`) |
 | RRF constant | 60 |
-| Answer function | One shared function for N1, N2 and A1: the supervisor's `ANSWER_SYSTEM` prompt, temperature 0, `think=False`, each chunk cut to 2,000 characters (`DOC_CHARS`; was 1,200, which hid facts in 8 questions; a longer chunk shows its opening plus the part that best matches the question, `supervisor.excerpt`) |
-| Agent-only limits (part of what "agentic" means here) | `max_steps` 4, `max_queries` 2, `max_chunks` 6, `audit_min_score` 0.5 |
-| Tools | None registered (`tools=None`), so no calculator or web search is used |
-| Local models | Set in `src/config.py` (`INTAKE_MODEL`, `PLANNER_MODEL`, `SUPERVISOR_MODEL`, `AUDITOR_MODEL`, all `qwen3.5:4b`; the same-named environment variables override them). An evaluation YAML with `generator.model: default` follows `SUPERVISOR_MODEL`. Each run's metadata records the models used |
+| Answer step | `ANSWER_SYSTEM`, temperature 0, `think=False`, `num_ctx` 8192, 2,000-character excerpt per chunk. Shared by N1, N2 and A1 (Section 0.4) |
+| Agent limits (part of what "agentic" means here) | `max_steps` 4, `max_queries` 2, `max_chunks` 8, `audit_min_score` 0.5 (`a1_agentic_qwen.yaml`) |
+| Tools | None (`tools=None`): no calculator or web search |
+| Local models | All `qwen3.5:4b` (`src/config.py`). `generator.model: default` follows `SUPERVISOR_MODEL` |
 
 ### Stage 1: Retrieval ablation (RQ1, RQ2)
 
-**Variable:** retriever configuration. **Fixed:** naive pipeline, Qwen 3.5 4B generator.
+**Variable:** the retriever configuration. **Fixed:** the naive pipeline and the Qwen 3.5 4B generator.
 
-| Config | Dense | BM25 | Reranker | Role |
-| --- | --- | --- | --- | --- |
-| R0 | ✓ |  |  | Naive baseline |
-| R1 |  | ✓ |  | Reference point: shows how much exact keyword matching alone gets you |
-| R2 | ✓ | ✓ |  | Effect of hybrid only |
-| R3 | ✓ |  | ✓ | Effect of reranking only |
-| R4 | ✓ | ✓ | ✓ | Full stack (today's `Retriever.search()`) |
+| Config | Mode | Dense | BM25 | Reranker | Built from |
+| --- | --- | --- | --- | --- | --- |
+| R0 | `dense` | ✓ | | | `_vector_ranking` top k (naive baseline) |
+| R1 | `bm25` | | ✓ | | `_bm25_ranking` top k (keyword reference point) |
+| R2 | `hybrid` | ✓ | ✓ | | `_candidates` RRF order, top k |
+| R3 | `dense_rerank` | ✓ | | ✓ | `_vector_ranking` top 10, then `_rerank` |
+| R4 | `hybrid_rerank` | ✓ | ✓ | ✓ | `Retriever.search()` unchanged |
 
-This is the 2×2 design (R0, R2, R3, R4) plus a BM25-only reference. Hybrid fusion: Reciprocal Rank Fusion with constant 60 over the top 10 from each retriever. Reranker: the existing cross-encoder (`bge-reranker-v2-m3`) rescoring the 10 candidates, keep the top 5.
-
-**Implementation note.** `Retriever.search()` currently always runs hybrid plus rerank (the mode flags were removed earlier to keep it simple), so R0–R3 need new code. Put it in an eval-only subclass in `src/evaluation/rag_eval/`, built from the existing stage methods, and leave the production `search()` unchanged:
-
-| Config | Built from |
-| --- | --- |
-| R0 | `_vector_ranking` top 5 |
-| R1 | `_bm25_ranking` top 5 |
-| R2 | `_candidates` order, top 5 (no rerank) |
-| R3 | `_vector_ranking` top 10, then `_rerank`, top 5 (`_candidates` always fuses BM25, so R3 needs its own path) |
-| R4 | `search()` as it is |
-
-Non-reranked configs have no reranker score; use the vector or RRF score in the `score` field, and note it.
+This is a 2×2 design (R0, R2, R3, R4) plus a BM25-only reference. The non-reranked modes have no 0–1 score, so `score` is the cosine, BM25 or RRF score. An agent on such a mode needs `audit_min_score` 0, and `run_all.py` sets that automatically.
 
 **Procedure:**
 
-1. Retrieval only, all 5 configs: compute part recall@5, P@5, F1@5, MRR, Hit@5 and retrieval latency. No LLM calls, so this takes minutes. Extend `evaluate.py`'s `MODES` dict, which was built for this.
-2. Generate answers with R0 and with the config picked by the rule in step 3. Score with the grounding scorer and the correctness rubric.
-3. **Write the selection rule down before running anything.** Suggested: carry R4 (hybrid + rerank) forward unless its part recall@5 is below R0's, or its median retrieval latency is more than 3× R0's with no recall gain; in that case carry the config with the highest part recall@5, breaking ties by MRR.
-4. The selection uses the same questions as the final report, so treat the ablation as descriptive. Don't claim the chosen config is best in general. If R4 wins on retrieval but not on correctness, report that as a finding.
+1. `evaluate_rag.py --mode all` retrieves depth 10 for every answerable question, with no LLM, and scores the top 5. It saves `results/retrieval/<mode>.json`, with a summary for the primary set (`all`, `simple`, `multi`), `computation` and `all_with_computation`.
+2. **Selection rule, written down before any run** (`run_all.select_mode`): carry R4 forward unless its part recall@5 is below R0's, or its median latency is over 3× R0's with no recall gain. Otherwise carry the mode with the highest part recall, ties broken by MRR. Only the primary set decides. The choice goes to `results/selected_mode.json`.
+3. Generate answers with R0 (`s1_naive_r0_dense`) and with the selected mode (`n1_naive`), and score both.
+4. The selection uses the same questions as the final report, so treat the ablation as descriptive. If R4 wins on retrieval but not on correctness, or R3 beats R4, report that.
 
-**Table 1a: retrieval quality** (answerable questions, n = ?)
+**Table 1a: retrieval quality** (`analyze.py` → `table1a_retrieval_ablation`; primary set, plus a calculation row per mode)
 
-| Config | Part recall@5 | P@5 | F1@5 | MRR | Hit@5 (all parts) | Retrieval latency (ms, median) |
+| Config | Part recall@5 | P@5 | F1@5 | MRR | Hit@5 | Retrieval latency (ms, median) |
 | --- | --- | --- | --- | --- | --- | --- |
-| R0 Dense |  |  |  |  |  |  |
-| R1 BM25 |  |  |  |  |  |  |
-| R2 Hybrid |  |  |  |  |  |  |
-| R3 Dense + rerank |  |  |  |  |  |  |
-| R4 Hybrid + rerank |  |  |  |  |  |  |
+| R0 Dense … R4 Hybrid + rerank | | | | | | |
 
-**Table 1b: end-to-end answer quality** (naive pipeline, Qwen 3.5 4B)
+**Table 1b: end-to-end answer quality** (naive pipeline, Qwen 3.5 4B; rows of `runs_summary`)
 
-| Config | Accuracy (%) | Mean correctness (0–2) | Numeric acc. (%) | Faithfulness | Ctx precision |
+| Config | Accuracy (95% CI) | Mean correctness | Numeric acc. | Faithfulness | Ctx precision |
 | --- | --- | --- | --- | --- | --- |
-| R0 |  |  |  |  |  |
-| Best config |  |  |  |  |  |
+| R0 | | | | | |
+| Selected config (N1) | | | | | |
 
 ### Stage 2: Naive vs agentic RAG (RQ3)
 
-**Variable:** system (N1 naive, N2 naive with matched context, A1 agentic). **Fixed:** the Stage 1 retriever used by all three, the shared settings above, and Qwen 3.5 4B.
+**Variable:** the system. **Fixed:** the Stage 1 retriever, the shared settings and Qwen 3.5 4B.
 
-| System | Description | Why it is there |
+| System | Config | Description | Why it is there |
+| --- | --- | --- | --- |
+| N1 Naive | `n1_naive` | One retrieval, top 5, one shared answer call | The fixed-pipeline baseline |
+| N2 Naive, matched context | `n2_naive_matched` | N1 with k = ceil(A1's mean chunks in the answer prompt). `run_all.py` computes it; it came out at 6 (mean 5.26) | Separates "more context" from "agentic behaviour" |
+| A1 Agentic | `a1_agentic_qwen` | The full stack of Section 0.3 | The system under test |
+
+**What N2 does not control.** Beyond seeing more chunks, A1 also:
+
+- drops chunks the auditor rejects;
+- adds the intake's user facts and assumptions to the answer prompt;
+- can stop early, give up or ask.
+
+N2 controls only the number of chunks. State this in the report. If time allows, an **A1 without the auditor** run (the auditor approves everything) measures the auditor's own contribution.
+
+**Running A1:**
+
+- A fresh user per question, a fixed `today`, a temporary `UserStore` and no tools, all handled in `systems.py`.
+- `run_all.py --repeats 1` is the default. The earlier three A1 repeats were identical at temperature 0, so they are not independent samples. If you rerun repeats, report mean ± range.
+- All systems answer every record, out-of-scope ones included.
+
+**Tables** (`analyze.py`):
+
+| Table | Content | How |
 | --- | --- | --- |
-| N1 Naive | One retrieval, top 5 chunks, one generation with the shared answer function | The fixed-pipeline baseline the slides require |
-| N2 Naive, matched context | Same as N1, but k set to A1's mean number of unique chunks seen (rounded up), or an equal context-token budget | Separates "more context" from "agentic behaviour" |
-| A1 Agentic | The supervisor stack from `src/supervisor/`: decomposer (intake and query planning) → supervisor loop (search, decide) → auditor (filters chunks, suggests follow-up queries) → answer | System under test |
+| 2a | Overall per system: accuracy with bootstrap CI, numeric accuracy, false refusals and clarifications, faithfulness, context precision, part recall, chunks seen/used, latency median/p90, tokens | `runs_summary` |
+| 2b | Accuracy by question type, with calculation questions as their own row | `--types n1_naive n2_naive_matched a1_agentic_qwen` |
+| 2c | Paired outcomes A1 vs N2 and A1 vs N1: win/loss table, exact McNemar, paired bootstrap CI of the difference, latency and token ratios. Printed for the primary set, the calculation questions and all answerable questions | `--pair a1_agentic_qwen n2_naive_matched --pair a1_agentic_qwen n1_naive` |
+| 2d | Primary accuracy split by whether N1's retrieval covered every fact (Hit@5). Agentic RAG should help mainly where the first retrieval misses | `--stratify n1_naive` |
+| 2e | Out-of-scope outcomes per run and `oos_group`, with Wilson CIs (Section 2.3) | Always written |
 
-**What A1 is, and what N2 does not control.** A1 is the whole stack, not "retrieval as one tool". Beyond seeing more chunks, it also (a) drops chunks the auditor rejects, (b) adds planner-extracted user facts and assumptions to the answer prompt, and (c) can stop early or give up. N2 controls only the number of chunks. State this in the report. If time allows, add an **A1 without the auditor** run (auditor set to approve everything) to measure the auditor's own contribution.
-
-**Running A1 on evaluation questions** (all through `handle_turn(user_id, messages, today=…)`):
-
-- Use a **fresh `user_id` per question** (or delete the profile afterwards), otherwise profile facts from one question leak into the next.
-- Pass a **fixed `today`** date for every run; otherwise "this year" questions drift with the clock.
-- Point `UserStore(path=…)` at a **temporary directory**. By default it writes into `chroma_db/`, which is tracked by git, so evaluation would dirty the frozen corpus snapshot.
-- Status `clarify`, `refused` or `no_answer` on an answerable question is scored as incorrect (Section 3.3).
-- Register no tools, so web search and the tax calculator are off and both systems answer from the same corpus.
-
-Run all three systems on every question, including out-of-scope ones. Run A1 three times (agent paths vary) and N1 and N2 once. Build N2 after A1's first run, once you know its mean chunks seen. Score all metrics from Section 3. For agentic retrieval metrics, use the union of chunks across calls and report chunks seen. Trajectory metrics (searches per question, queries skipped as near-duplicates, stop reason) go in the separate agent eval. Failed runs count as wrong (Section 3.3).
-
-**Table 2a: overall**
-
-| System | Accuracy (%) | Numeric acc. (%) | Refusal acc. | Faithfulness | Ctx precision | Part recall@5 | Chunks seen (mean) | Latency median / p90 (s) | Tokens per question |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| N1 Naive |  |  |  |  |  |  | 5 |  |  |
-| N2 Naive, matched context |  |  |  |  |  |  |  |  |  |
-| A1 Agentic (mean of 3 runs) |  |  |  |  |  |  |  |  |  |
-
-**Table 2b: accuracy by question type** (shows *where* agentic helps)
-
-| Type (n) | N1 accuracy (%) | N2 accuracy (%) | A1 accuracy (%) | A1 − N2 (pp) |
-| --- | --- | --- | --- | --- |
-| definition (n = ) |  |  |  |  |
-| number (n = ) |  |  |  |  |
-| procedure (n = ) |  |  |  |  |
-| multi-part (n = ) |  |  |  |  |
-| edge-case (n = ) |  |  |  |  |
-
-Add the same breakdown by source (online guide, REIT ETF guide, insurer guide) if space allows.
-
-**Table 2c: paired outcomes** (A1 vs N2, per question, correctness 2 vs < 2; repeat for A1 vs N1)
-
-|  | Agentic correct | Agentic not correct |
-| --- | --- | --- |
-| **Naive correct** |  |  |
-| **Naive not correct** |  |  |
-
-The off-diagonal cells are the questions that matter. They also feed the qualitative analysis.
-
-**Table 2d: stratified by naive retrieval success** (answerable questions). Split the questions by whether N1 covered every part (Hit@5 = 1). Agentic RAG should help mainly when the first retrieval misses, so this split shows whether it does, even with 31 answerable questions.
-
-| Stratum | n | N1 accuracy (%) | N2 accuracy (%) | A1 accuracy (%) |
-| --- | --- | --- | --- | --- |
-| N1 Hit@5 = 1 (retrieval succeeded) |  |  |  |  |
-| N1 Hit@5 = 0 (retrieval missed) |  |  |  |  |
+The off-diagonal cells of 2c are the questions that matter, and they feed the qualitative analysis.
 
 ### Stage 3: Generator LLM comparison (RQ4)
 
-**Variable:** the LLM that writes the answer (naive) or that decides and answers (agentic). **Fixed:** Stage 1 retriever, shared settings, prompts, judge.
+**Variable:** the LLM that writes the answer (naive) or that routes, decides and answers (agentic). **Fixed:** the Stage 1 retriever, the shared settings, the prompts and the judge.
 
-**What a generator swap really changes.** Only the supervisor's `llm` callable can be replaced. The decomposer and the auditor call local Ollama directly (`INTAKE_MODEL` and `AUDITOR_MODEL`), so in an "agentic with Claude or GPT" run the API model makes the decide and answer calls while Qwen 3.5 4B still plans and audits. State this in the report. The supervisor passes an Ollama-style JSON schema to `llm(messages, schema)`, so each API model needs a small adapter (system message passed separately, schema mapped to the provider's structured-output option). If you want a fully API-driven agent, the decomposer and auditor would also need adapters, which is out of scope for this plan.
+**What a swap really changes.** Only the supervisor's `llm` callable is replaced. The intake gate, planner and auditor call local Ollama directly (`INTAKE_MODEL`, `PLANNER_MODEL`, `AUDITOR_MODEL`). So in an "agentic with Claude" run, Qwen 3.5 4B still decides refuse/clarify, writes planned queries and audits. Report it as "supervisor LLM swapped". Every provider sits behind one `llm(messages, schema)` adapter (`llm.py`; Anthropic, OpenAI-compatible including Groq, and Google).
 
-| Run | Generator | System |
-| --- | --- | --- |
-| G1 | Qwen 3.5 4B | Naive (reuse from Stage 2) |
-| G2 | Qwen 3.5 4B | Agentic (reuse from Stage 2) |
-| G3 | Anthropic model (e.g. a Haiku- or Sonnet-tier model) | Naive |
-| G4 | Anthropic model | Agentic (supervisor LLM swapped) |
-| G5 | OpenAI model (similar tier) | Naive |
-| G6 | OpenAI model | Agentic (supervisor LLM swapped) |
+| Run | Generator | System | Config |
+| --- | --- | --- | --- |
+| G1 / G2 | Qwen 3.5 4B | Naive / agentic | Reuse N1 and A1 |
+| G3 / G4 | `claude-sonnet-5-5` (effort medium; no temperature) | Naive / agentic | `g_naive_anthropic`, `g_agentic_anthropic` |
+| G5 / G6 | `openai/gpt-oss-120b` on Groq (temperature 0) | Naive / agentic | See the note below |
 
-The "OpenAI" generator in this project is gpt-oss-120b served by Groq (an open-weight model, not GPT-4 or GPT-5). This needs only 4 new runs, since G1 and G2 are reused. If time is short, run one API model only (G3 and G4) and add the other later. Pick API models of a similar price tier so the comparison is fair, and record exact model IDs. Count tool-call failures as wrong (Section 3.3).
+**Fix before running Stage 3:**
+
+- `run_all.py` runs the `g_*_anthropic` and `g_*_openai` configs. `g_agentic_openai.yaml` (gpt-oss-120b on Groq) and `g_agentic_anthropic.yaml` still have `max_chunks: 6`, while A1 uses 8. So the agentic Stage 3 runs would differ from A1 in more than the model.
+- The newer `g_*_gptoss120b` configs match A1 (`max_chunks` 8), but `run_all.py` does not run them. It also pairs only `g_*_anthropic` and `g_*_openai` in the analysis.
+- **Pick one set** (set `max_chunks: 8` in the anthropic and openai configs, or switch `run_all.py` to the `gptoss120b` names) before the first Stage 3 run.
+- The API runs need internet, so run them on a machine with outbound access, not on a compute node.
 
 **Table 3: generator comparison**
 
-| Generator | System | Accuracy (%) | Numeric acc. (%) | Faithfulness | Latency median (s) | Cost per 100 questions (USD) |
-| --- | --- | --- | --- | --- | --- | --- |
-| Qwen 3.5 4B | Naive |  |  |  |  | local |
-| Qwen 3.5 4B | Agentic |  |  |  |  | local |
-| Anthropic | Naive |  |  |  |  |  |
-| Anthropic | Agentic (supervisor LLM only) |  |  |  |  |  |
-| OpenAI | Naive |  |  |  |  |  |
-| OpenAI | Agentic (supervisor LLM only) |  |  |  |  |  |
+| Generator | System | Accuracy (95% CI) | Numeric acc. | Faithfulness | OOS decline rate | Latency median | Cost per 100 questions |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Qwen 3.5 4B | Naive / agentic | | | | | | local |
+| Claude Sonnet | Naive / agentic (supervisor only) | | | | | | |
+| gpt-oss-120b | Naive / agentic (supervisor only) | | | | | | |
 
-Key reading for RQ4: compare the agentic gain (agentic minus naive accuracy) per model. If the gain is largest for Qwen, agentic RAG compensates for a small model. If it is largest for API models, the small model can't drive the agent well.
+Key reading for RQ4: compare the agentic gain (agentic minus naive accuracy) for each model. If the gain is largest for Qwen, agentic RAG compensates for a small model. If it is largest for the API models, the small model can't drive the agent well. Because the intake and auditor stay on Qwen in every agentic run, a small gain for the API models may come from the shared Qwen components.
 
 ### Run budget
 
-| Stage | Generation runs | Judge calls (a naive run ≈ 127: 41 correctness + 82 grounding + up to 4 refusal checks; an agent run ≈ 87, because only about 70% of answerable questions get an answer) |
+| Stage | Generation runs | Notes |
 | --- | --- | --- |
-| 1 | 2 (R0 + chosen config) | ~250 |
-| 2 | 4 new (N2, A1 × 3); N1 reused from Stage 1 | ~390 |
-| 3 | 4 | ~430 |
-| Total |  | ~1,070 judge calls, each 2,000–3,000 tokens (about 3 million tokens), plus the 30-pair validation |
+| 1 | 2 (R0, N1) | Plus 5 retrieval-only modes, with no LLM |
+| 2 | 2 (A1, N2); N1 reused | A1 is about 3–4× N1's latency per question |
+| 3 | 4 | API calls: 1 per record for the naive runs; for the agentic runs, a route call, 0–3 decide calls and an answer call per record |
+| Scoring | | Per run: up to 80 judge rows (60 correctness + the out-of-scope refusal checks that need the judge), plus 2 grounding calls per answered question. Local judge: time, not money |
 
-Cache every generation (Section 9.3) so you never regenerate just to re-score.
-
-**Compute budget.** An agent run makes several local LLM calls per question (intake, audit, decide, answer) plus one or more reranked searches. **Time 5 questions on the target machine before committing** to 3 repeats × 35 questions. The cluster script (`IS469_testing.sh`) has a 2-hour job limit and uses `--requeue`, so the runner must be resumable and each job must process a slice of the dataset (Section 9.3). Record which machine produced each run.
+Cache every generation. Scoring never regenerates, and a judge change only deletes score files.
 
 ## 6. Qualitative analysis protocol
 
@@ -471,57 +511,43 @@ Read 10 cases in full, classify every failure in the test set with one taxonomy,
 
 ### 6.1 Selecting the 10 cases
 
-Select from Stage 2 and 3 outputs, using the paired table (Table 2c) and the score files:
-
 | Slot | Count | How to find them |
 | --- | --- | --- |
 | Agentic correct, naive wrong | 3 | Off-diagonal cell of Table 2c; prefer different question types |
-| Naive correct, agentic wrong | 2 | Other off-diagonal cell. These show where the agent hurts |
+| Naive correct, agentic wrong | 2 | The other off-diagonal cell; shows where the agent hurts |
 | Both wrong | 2 | Correctness 0 for both; reveals corpus or retrieval limits |
-| Retrieval perfect (R@5 = 1) but answer wrong | 1 | Isolates generation failures from retrieval failures |
-| Out-of-scope | 1 | One correct refusal or one failed refusal |
+| Retrieval perfect (Hit@5 = 1) but answer wrong | 1 | Isolates generation failures |
+| Out-of-scope | 1 | One correct or failed decline, preferably a near-miss |
 | Qwen wrong, API model right (Stage 3) | 1 | Shows what model size buys |
 
-If a slot is empty, say so; that is itself a finding (e.g. "naive never beat agentic").
+If a slot is empty, say so; that is itself a finding. Calculation questions may fill a slot; mark them as such.
 
 ### 6.2 Failure taxonomy
 
-Tag every answer scored below 2 with **one primary code** (the earliest failure in the pipeline). One member tags, a second checks 10.
+Tag every answer scored below 2 with **one primary code**, the earliest failure in the pipeline. One member tags and a second checks 10.
 
 | Code | Failure | How to tell |
 | --- | --- | --- |
 | F1 | Retrieval miss | No gold chunk in the retrieved set |
-| F2 | Ranked too low | Gold chunk retrieved but outside the top 5 passed to the LLM (or below the reranker cutoff) |
-| F3 | Partial context | Some parts covered, but not all (common on multi-part) |
+| F2 | Ranked too low / filtered | Gold chunk retrieved but not in the answer prompt (outside the top k, below the reranker cutoff, or rejected by the auditor; note which) |
+| F3 | Partial context | Some parts covered, but not all |
 | F4 | Unsupported claim | Answer states something not in the context (low faithfulness) |
-| F5 | Wrong number | numeric\_ok = false while the correct number was in the context |
-| F6 | Misread context | Right chunk, wrong conclusion (e.g. missed a condition or exception) |
-| F7 | Incorrect refusal | Declined an answerable question (includes agent status `no_answer`) |
+| F5 | Wrong number | numeric\_ok = false while the correct number was in the context (for calculation questions: an arithmetic error) |
+| F6 | Misread context | Right chunk, wrong conclusion (missed a condition or exception) |
+| F7 | Incorrect refusal | Declined an answerable question (`refused` or `no_answer`) |
 | F8 | Failed refusal | Answered an out-of-scope question |
 | F9 | Incomplete answer | Correct but missing a required part |
-| F10 | Run failure | Tool-call error, step-limit hit, timeout, empty answer, or an agent `clarify` or `refused` status on an answerable question |
+| F10 | Run failure | Error, timeout, empty answer, or `clarify` on an answerable question |
 
-F1–F3 are retrieval failures, F4–F6 and F9 are generation failures, F7–F8 are scope failures, and F10 is a run failure. Report a count table of codes per system. This tells you whether to fix retrieval or generation. For agentic runs, also check whether the **auditor** rejected a chunk that held a needed fact; code it F2 and note "auditor" in the diagnosis.
+- F1–F3 are retrieval failures; F4–F6 and F9 are generation failures; F7–F8 are scope failures; F10 is a run failure.
+- For agentic runs, the per-search log (`search_log`: audited and approved ids) shows whether the auditor rejected a gold chunk.
 
-**Table 4: failure counts**
-
-| Code | Naive (Qwen) | Agentic (Qwen) | Agentic (best API model) |
-| --- | --- | --- | --- |
-| F1 Retrieval miss |  |  |  |
-| F2 Ranked too low |  |  |  |
-| F3 Partial context |  |  |  |
-| F4 Unsupported claim |  |  |  |
-| F5 Wrong number |  |  |  |
-| F6 Misread context |  |  |  |
-| F7 Incorrect refusal |  |  |  |
-| F8 Failed refusal |  |  |  |
-| F9 Incomplete |  |  |  |
-| F10 Run failure |  |  |  |
+**Table 4: failure counts.** Rows F1–F10; columns Naive (Qwen), Agentic (Qwen) and Agentic (best API model).
 
 ### 6.3 Worked-example template
 
 ```markdown
-### Case Q__: <short title, e.g. "Agentic recovers a missed REIT ETF passage">
+### Case <qid>: <short title, e.g. "Agentic recovers a missed REIT ETF passage">
 **Question:** ...
 **Type / source:** multi-part / reit_etf_guide
 **Reference answer (short):** ...
@@ -540,282 +566,207 @@ F1–F3 are retrieval failures, F4–F6 and F9 are generation failures, F7–F8 
 
 ## 7. Statistical caution for a small dataset
 
-With 41 answerable questions, one question moves accuracy by about 2.4 points. Report uncertainty on every headline number and compare systems per question, not just by averages.
+With 50 primary questions, one question moves accuracy by 2 points. Report uncertainty on every headline number, and compare systems per question, not only by averages.
 
-1. **Report n everywhere.** Every table and per-category row shows its question count. Never report a percentage for a category with n < 5 without the raw count ("3/4").
-2. **Bootstrap 95% confidence intervals** for accuracy and mean scores. Resample questions with replacement 1,000 times:
-
-```python
-import numpy as np
-def bootstrap_ci(scores, n_boot=1000, seed=0):
-    rng = np.random.default_rng(seed)
-    scores = np.asarray(scores)
-    means = [rng.choice(scores, len(scores)).mean() for _ in range(n_boot)]
-    return np.percentile(means, [2.5, 97.5])
-```
-
-3. **Paired comparison for A1 vs N2 (and A1 vs N1).** Both systems answer the same questions, so compare per question: count wins, losses and ties (Table 2c). For a significance check on the binary "correct" outcome, use an exact McNemar test on the off-diagonal counts (`statsmodels.stats.contingency_tables.mcnemar(table, exact=True)`). It is optional: with about 45 questions it only reaches p < 0.05 when the off-diagonal cells are very lopsided (roughly 6–0 or 10–2), so the win/loss counts and the paired bootstrap in item 4 matter more.
-4. **Paired bootstrap for the difference.** Resample question indices once per iteration and compute agentic minus naive on the same sample. If the 95% interval for the difference includes 0, write "no clear difference".
-5. **Repeat non-deterministic runs.** Even at temperature 0, local models and API models can vary, and the agent's path can change. Run the agentic system (A1) 3 times and report mean ± range; run N1 and N2 once, since they are close to deterministic at temperature 0. If time only allows 1 run, say so as a limitation. Judge scores at temperature 0 are close to stable; re-run the judge once on 10 answers to confirm.
-6. **Wording rules for the report:**
+1. **Report n everywhere.** For any category with n < 5, give the raw count ("3/4"), not a percentage.
+2. **Bootstrap 95% confidence intervals** for accuracy: resample questions with replacement 1,000 times (`analyze.bootstrap_ci`, seed 0).
+3. **Paired comparison for A1 vs N2 and A1 vs N1.**
+   - Both systems answer the same questions, so count wins, losses and ties (Table 2c).
+   - The exact McNemar test (a binomial test on the discordant pairs) is optional: at n = 50 it reaches p < 0.05 only when the off-diagonal is very lopsided, roughly 6–0 or 10–2.
+4. **Paired bootstrap for the difference.** Resample question indices once per iteration and compute A1 minus naive on the same sample. If the 95% interval includes 0, write "no clear difference".
+5. **Repeats.** At temperature 0 the A1 repeats were identical, so one run is the default. Say so as a limitation. Re-judge about 10 answers once to confirm the judge is stable.
+6. **Wording rules for the report** (`analyze.wording`):
 
 | Observed accuracy gap | How to describe it |
 | --- | --- |
-| ≤ 2 questions (≤ ~6 pp) | "comparable"; no claim of a winner |
-| 3–5 questions, CI includes 0 | "slightly higher, but within noise" |
-| CI excludes 0 and consistent across runs | "higher", with the interval |
+| ≤ 2 questions | "comparable"; no claim of a winner |
+| 3 or more questions, CI includes 0 | "slightly different, but within noise" |
+| 3 or more questions, CI excludes 0 | "higher" or "lower", with the interval |
 
-7. **Don't over-read per-category results.** A category with 6 questions can swing 17 points on one answer. Use per-category tables to describe patterns and pick qualitative cases, not to claim significance.
-
-Paraphrased questions share their answer with an original, so they are not independent observations. When you compute intervals or tests, resample by original question (a cluster bootstrap) so each original and its paraphrases count as one unit.
+7. **Don't over-read per-category results.** A category with 5 questions swings 20 points on one answer. Use the per-category tables to describe patterns and pick cases, not to claim significance. The 10 calculation questions are descriptive for the same reason.
+8. **Out-of-scope rates** are small proportions (n = 20, often near 0% or 100%), so they use Wilson intervals rather than the bootstrap, which collapses to a single point at 20/20.
 
 ## 8. Trade-off discussion framework
 
-Judge each alternative against the baseline on four dimensions, then state whether its quality gain justifies its extra cost. The slides' rule is that agentic RAG has to earn its extra cost and latency.
+Judge each alternative against its baseline on four dimensions, then state whether its quality gain justifies its extra cost.
 
 ### 8.1 Dimensions
 
 | Dimension | Measured by | Direction |
 | --- | --- | --- |
-| Quality | Accuracy, numeric accuracy, faithfulness | Higher is better |
+| Quality | Accuracy, numeric accuracy, faithfulness, out-of-scope decline rate | Higher is better |
 | Latency | Median and p90 seconds per question | Lower is better; p90 matters for a chatbot user |
 | Cost | Tokens per question; USD per 100 questions for API models | Lower is better |
-| Complexity | Extra components, prompt/tool engineering, failure modes added (qualitative) | Lower is better |
+| Complexity | Extra components, prompt engineering, failure modes added (qualitative) | Lower is better |
 
-### 8.2 Summary table for the report
-
-Express every alternative relative to its baseline so trade-offs are visible in one row.
+### 8.2 Summary table for the report (Table 5)
 
 | Alternative vs baseline | Δ accuracy (pp, 95% CI) | Δ faithfulness | Latency ratio (×) | Token ratio (×) | Complexity added | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
-| Hybrid vs dense |  |  |  |  | BM25 index |  |
-| Rerank vs no rerank |  |  |  |  | Cross-encoder model |  |
-| Agentic vs matched-context naive (Qwen) |  |  |  |  | Decomposer, auditor, supervisor loop |  |
-| API model vs Qwen (agentic) |  |  |  |  | API dependency, cost |  |
+| Hybrid vs dense | | | | | BM25 index | |
+| Rerank vs no rerank | | | | | Cross-encoder model | |
+| Agentic vs matched-context naive (Qwen) | | | | | Intake gate, planner, auditor, supervisor loop | |
+| API model vs Qwen (agentic) | | | | | API dependency, cost | |
 
-### 8.3 Decision rule
+### 8.3 Decision rule (agreed before seeing results)
 
-Agree a rule *before* seeing results, so the verdict isn't chosen after the fact. Suggested:
+- **Worth it:** an accuracy gain over the matched-context baseline N2 whose 95% CI excludes 0, with a latency ratio ≤ 3×.
+- **Situational:** the gain is mainly on one question type (e.g. multi-step), or the latency ratio is > 3×. Recommend routing: the cheaper system by default, the costlier one for that type.
+- **Not worth it:** no clear accuracy gain (the CI includes 0), or faithfulness drops.
 
-- **Worth it:** accuracy gain over the matched-context baseline N2 whose 95% CI excludes 0, with latency ratio ≤ 3×.
-- **Situational:** gain mainly on one question type (e.g. multi-part), or latency ratio > 3×. Recommend routing: use the cheaper system by default and the costlier one for that type.
-- **Not worth it:** no clear accuracy gain (CI includes 0), or faithfulness drops.
+Also report **extra correct answers per extra second** = Δ correct answers ÷ Δ total latency over the test set.
 
-Also report a simple efficiency figure: **extra correct answers per extra second** = (Δ correct answers) ÷ (Δ total latency over the test set). It turns quality vs latency into one comparable number.
+## 9. Implementation
 
-For the discussion text, cover per alternative: what improved and on which question types, what it cost, and who should pick it (e.g. "for a tax chatbot where a wrong rate is costly, a 2× slower system with higher numeric accuracy is justified").
+Generation and scoring are separate steps, so a judge fix never forces a regeneration.
 
-## 9. Implementation plan
+### 9.1 Design decisions taken from the codebase check (28 Oct)
 
-Build one small evaluation harness that runs any config on the dataset, caches outputs to JSONL, and scores them separately. Generating and scoring as separate steps means a judge fix never forces a regeneration.
-
-### 9.1 Codebase check: what exists and what to build
-
-The plan was checked against the repo on 28 Oct 2026. The structure fits; these items must be built or decided first.
-
-| # | Finding | Required action |
+| # | Finding | What was done |
 | --- | --- | --- |
-| 1 | **The existing naive generator is not comparable.** `RAGGenerator` in `src/inference/inference.py` uses its own prompt, temperature 0.1, no `think=False` (a Qwen thinking model may think before answering) and passes whole chunks. The supervisor uses `ANSWER_SYSTEM`, temperature 0, `think=False`, and cuts each chunk to 1,200 characters (`DOC_CHARS`). Chunks can reach 512 tokens, so facts late in a chunk are invisible to the agent but not to the naive system | Write **one shared answer function** (supervisor prompt, temperature 0, `think=False`, same truncation) used by N1, N2 and A1. Don't use `RAGGenerator` for results |
-| 2 | **"Agentic" is the whole supervisor stack,** including the decomposer, the auditor filter, planner-added user facts and a user profile store. `handle_turn` can also return `clarify` or `refused` | Describe A1 this way in the report; add the A1-without-auditor run if time allows. Handle statuses, fresh `user_id`, fixed `today` and a temporary `UserStore` path (Section 5, Stage 2) |
-| 3 | **No dense-only, BM25-only or no-rerank modes.** `Retriever.search()` always fuses and reranks | Eval-only subclass built from the stage methods (Section 5, Stage 1). Leave production `search()` unchanged |
-| 4 | **Only the supervisor's `llm` is swappable.** The decomposer and auditor call local Ollama directly | State the Stage 3 limitation; write one adapter per API model (Section 5, Stage 3) |
-| 5 | **Logging is not exposed.** `SupervisorResult` has no chunk ids or token counts; the run state is internal | Wrap `retrieval.run` (record every returned chunk) and the `llm` callable; patch both `ollama.chat` and `ollama.Client.chat` to sum token counts (Section 9.3) |
-| 6 | **Dataset v2 is written but not yet committed or labelled.** `src/evaluation/eval_questions.json` now has all tags, reference answers and key facts, but no `gold_passages` | Commit it, then run `label_gold.py` to add `gold_passages` (Section 2.4) |
-| 7 | **The tracked database is at risk.** `.gitignore` has `# chroma_db/` commented out, so `chroma_db/` is committed, and `UserStore` writes into it | Use a temporary `UserStore` path during evaluation; record the `chroma_db/` commit as the corpus snapshot |
-| 8 | **Dependencies.** The judge and API-generator SDKs (`anthropic`, `openai`, `google-genai`) are now pinned in `requirements.txt`. `ragas` is needed only for the optional cross-check, and `statsmodels` is not pinned. `scikit-learn` and PyYAML are already present | Run the optional RAGAS cross-check in a **separate virtual environment** (it only reads the JSONL outputs). Everything else, including `score_grounding.py`, runs in the main environment |
-| 9 | **Compute.** The cluster script has a 2-hour limit and 1 GPU; a laptop CPU takes about 18 s per reranked search at pool 10 | Time 5 questions first; make `run.py` resumable and slice-able; record the machine in every run config |
-
-What already works and should be reused:
-
-| Reused piece | Where |
-| --- | --- |
-| Retrieval stages, RRF constant 60, reranker | `src/retrieval/retriever.py` |
-| Fact-matching helpers `norm()` and `fact_ranks()`, `MODES` dict, per-question rank printout | `src/retrieval/evaluate.py` |
-| Per-stage timings, injectable `llm`, `handle_turn(today=…)`, the agent builder `build_supervisor(...)` | `src/supervisor/supervisor.py`, `src/supervisor/harness.py` |
-| Fixed Ollama keep-alive pinning (a pattern for wrapping `ollama.chat`) | `pin_ollama_keep_alive()` in `supervisor.py` |
-| Resumable cluster job with `--requeue` | `IS469_testing.sh` |
+| 1 | The old naive generator (`src/inference/inference.py`, `RAGGenerator`) used its own prompt, temperature 0.1 and whole chunks | One shared answer step (`answer.py`) reuses the supervisor's prompt, limits and excerpting. `RAGGenerator` is not used for results |
+| 2 | "Agentic" is the whole supervisor stack, which can clarify or refuse | A1 is described that way (Section 0.3). Statuses are scored (Section 3.3). Fresh user, fixed date and a temporary store per question |
+| 3 | `Retriever.search()` always fuses and reranks | `ModeRetriever` builds R0–R3 from the stage methods. Production `search()` is unchanged |
+| 4 | Only the supervisor's `llm` is swappable | The Stage 3 limitation is stated; one adapter per provider |
+| 5 | `SupervisorResult` exposes no chunk ids or token counts | `systems.py` wraps retrieval, the auditor and the answer prompt; `tracking.py` patches both Ollama chat entry points |
+| 6 | `chroma_db/` is git-tracked, and `UserStore` writes into it by default | Temporary `UserStore` path. Every run records the `chroma_db/` commit and whether it was dirty. `git restore -- chroma_db` after scripts that open the collection |
+| 7 | The cluster has a 2-hour job limit | `run.py` and every scorer resume. `--start/--end` slice the dataset |
 
 ### 9.2 Libraries
 
 | Purpose | Library |
 | --- | --- |
-| Vector store, dense retrieval | `chromadb` (existing) |
-| BM25 | `rank_bm25` (existing) |
-| Reranker | `sentence-transformers` `CrossEncoder` (existing) |
-| Local LLMs | `ollama` (existing) |
-| Config files | `PyYAML` (existing) |
-| Kappa | `scikit-learn` (existing) |
-| Faithfulness / context precision | `score_grounding.py` with the judge SDK (main environment); `ragas` only for the optional cross-check (separate environment, pin the exact version) |
-| Judge / API generators | Provider SDKs (`anthropic`, `openai`, `google-genai`), and the OpenAI-compatible Groq endpoint |
-| Analysis | `pandas`, `numpy`, `statsmodels` (McNemar), `matplotlib` (scoring environment) |
+| Vector store, BM25, reranker, embedder | `chromadb`, `rank_bm25`, `sentence-transformers` |
+| Local LLMs and judge | `ollama` |
+| Config files | `PyYAML` |
+| API generators | `anthropic`, `openai` (also for Groq), `google-genai` (`requirements-api.txt`) |
+| Analysis | `pandas`, `numpy`, `scipy` (binomial test for McNemar) |
+| Optional RAGAS cross-check | `ragas` in a separate environment (`requirements-scoring.txt`) |
 
 ### 9.3 Repo structure and logging
 
 ```text
 src/evaluation/
-  eval_questions.json         # dataset v2: questions, tags, reference answers, key facts, gold_passages
+  eval_questions.json         # the dataset (Section 2)
+  qid_map.json                # old Q-ids -> S/M/A/C/O ids
+  agent_eval/                 # the agentic team's suites (robustness incl. P01-P05, safety, trajectory, task success)
   rag_eval/
-    analyze.py                # merges every score into the report tables: bootstrap CIs, paired tests, by type, strata
+    RAG_EVAL_PLAN.md          # this file
+    run_all.py                # Stages 1-4 in order, with the Stage 1 selection rule; resumable
+    analyze.py                # report tables: bootstrap CIs, paired tests, by type, strata, out-of-scope (no model calls)
     db_check/
-      facts.py                # loads the chunks from ChromaDB; snippet matching shared by the two scripts below
+      facts.py                # loads the chunks; snippet matching (norm, matching_ids)
       check_dataset.py        # validates the dataset against the corpus (writes nothing)
       label_gold.py           # fills gold_passages from the verbatim facts (--write)
+      apply_qid_map.py        # renames old qids in an older results folder
     rag_eval_retrieval/
-      retrieval_modes.py      # ModeRetriever: R0-R4 built from Retriever's stage methods
-      metrics.py              # part recall / precision / F1 / MRR / hit against gold_passages
+      retrieval_modes.py      # ModeRetriever: R0-R4
+      metrics.py              # part recall / precision / F1 / MRR / hit
       evaluate_rag.py         # Stage 1 retrieval-only scores -> results/retrieval/<mode>.json
     rag_eval_approach/
-      answer.py               # the ONE shared answer step (supervisor prompt, temperature 0, think off, truncation)
-      systems.py              # NaiveSystem, AgenticSystem: each .answer(question, qid, today) -> record
-      llm.py                  # make_llm(provider, model): one llm(messages, schema) shape for every model
-      llm_anthropic.py, llm_openai.py, llm_google.py   # API adapters (Stage 3 generators, judge)
-      tracking.py             # token counting across every Ollama / API call
-      run.py                  # generate: config + dataset -> results/outputs/<run_id>.jsonl (resumable)
+      answer.py               # the ONE shared answer step
+      systems.py              # NaiveSystem, AgenticSystem: .answer(question, qid, today) -> record
+      llm.py, llm_anthropic.py, llm_openai.py, llm_google.py   # one llm(messages, schema) shape per provider
+      tracking.py             # token counts over every Ollama / API call
+      run.py                  # config + dataset -> results/outputs/<run_id>.jsonl (+ .meta.json); resumable
+      results_io.py           # paths, loaders, analysis groups (is_core, SECONDARY_QTYPES), oos_outcome
       score_retrieval.py      # retrieval metrics on what each run retrieved (no LLM)
-      score_judge.py          # correctness rubric and refusal checks -> results/scores/<run_id>_judge.jsonl
-      score_grounding.py      # faithfulness + context precision, 2 judge calls per answer -> results/scores/<run_id>_grounding.jsonl
-      score_ragas.py          # optional RAGAS cross-check -> results/scores/<run_id>_ragas.csv (separate environment)
-      check_judge.py          # connects to the judge and grades five canned cases before any real scoring
+      score_judge.py          # correctness + refusal checks -> results/scores/<run_id>_judge.jsonl (cached)
+      score_grounding.py      # faithfulness + context precision -> <run_id>_grounding.jsonl (cached)
+      score_ragas.py          # optional RAGAS cross-check (separate environment)
+      check_judge.py          # grades five canned cases before any real scoring
       env.py                  # loads API keys from .env (never committed)
-      results_io.py           # result paths and loaders
-      configs/                # one YAML per run (s1_naive_r0_dense, n1_naive_r4, n2_naive_matched, a1_agentic_qwen,
-                              #   g_naive_* / g_agentic_* for Stage 3) + judge.yaml
-      prompts/                # judge_correctness_v1.txt, judge_refusal_v1.txt, grounding_faithfulness_v1.txt,
-                              #   grounding_context_precision_v1.txt
-      requirements-api.txt, requirements-scoring.txt
-    results/                  # retrieval/, outputs/ (never edited by hand), scores/, report_assets/
+      configs/                # s1_naive_r0_dense, n1_naive, n2_naive_matched, a1_agentic_qwen, g_*, judge.yaml
+      prompts/                # judge_correctness_v1, judge_refusal_v1, grounding_faithfulness_v1, grounding_context_precision_v1
+    results/                  # retrieval/, outputs/ (never edited by hand), scores/, report_assets/, selected_mode.json
+IS469_eval.sh                 # cluster job: Stages 1-2 (run_all.py --stages 1 2 --skip-api by default)
+IS469_score.sh                # cluster job: scoring with the local Ollama judge
 ```
 
-Each line in `outputs/<run_id>.jsonl` holds one question's full record:
+**Each line of `outputs/<run_id>.jsonl`** holds one question's record:
 
-```json
-{"run_id": "s2_agentic_qwen_r1", "qid": "S04", "config_hash": "a1b2c3", "git_commit": "9f8e7d",
- "timestamp": "2026-11-03T14:02:11", "machine": "cluster-gpu", "generator": "qwen3.5:4b", "system": "agentic",
- "status": "answered",
- "retrieved_seen": [{"id": "web:ab12cd34ef:3", "headings": "...", "text": "...", "score": 0.83, "rank": 1}],
- "context_used": [{"id": "web:ab12cd34ef:3", "text": "<as shown in the prompt, truncated>"}],
- "answer": "...", "stop_reason": "auditor_sufficient",
- "latency_s": {"intake": 2.1, "retrieval": 3.4, "audit": 5.2, "decide": 1.0, "answer": 4.0, "total": 15.7},
- "tokens": {"input": 2410, "output": 180}, "error": null}
-```
+- `run_id`, `qid`, `config_hash`, `git_commit`, `timestamp`, `generator`, `system` and `status`;
+- `answer` (the agent's draft, without the Assumptions/Sources footer);
+- `retrieved_seen` (every chunk returned, in order of first appearance) and `context_used` (the chunks in the answer prompt, as excerpted);
+- `searches`, `latency_s` per stage and `tokens`, plus `error` and `wall_s`;
+- agent records also have `stop_reason`, `queries`, `search_log` and `trace`.
 
-- `run_id` = config name + repeat number. Never overwrite an existing output file; a re-run gets a new ID.
-- Save the config YAML and its hash with every run. Store prompt versions as files, not inline strings. Record the corpus snapshot (git commit of `chroma_db/`, scrape date) and the agent limits (`max_steps`, `max_queries`, `max_chunks`, `audit_min_score`).
-- **Two chunk lists per record.** `retrieved_seen` is every chunk any search returned (used for retrieval metrics and chunks seen). `context_used` is the text actually placed in the answer prompt (used for faithfulness and context precision). For naive systems both are the same top-k.
-- **Capturing what `SupervisorResult` does not expose:** wrap `RetrievalAgent.run` to append each returned chunk to `retrieved_seen`; wrap the supervisor's `llm` callable to record token counts; and patch **both** `ollama.chat` and `ollama.Client.chat` (the auditor and the existing naive generator call the client method) to add `prompt_eval_count` and `eval_count` to a per-question counter.
-- `run.py` skips questions already in the output file and accepts `--start/--end` (or a slice list), so a crash or a 2-hour cluster job limit resumes instead of restarting.
-- Log errors per question and keep going. Report error counts.
-- Set seeds where possible and record hardware for local Qwen runs.
+**Rules:**
 
-Minimal run loop:
+- A run id belongs to one configuration. `run.py` refuses to continue if the config hash changed; give the changed config a new run id.
+- The hash does **not** cover question text or code. When a question is reworded, delete its rows from `results/outputs/*.jsonl` and `results/scores/*.jsonl`, so `run.py` answers it again. When a reference answer changes, delete only its `_judge` and `_grounding` rows.
 
-```python
-import json, os, time, hashlib, yaml
-from datetime import date
+  ```bash
+  python -c "
+  import glob, json
+  for f in glob.glob('src/evaluation/rag_eval/results/outputs/*.jsonl') + glob.glob('src/evaluation/rag_eval/results/scores/*.jsonl'):
+      drop = {'S10'} | ({'M02', 'M12'} if f.endswith(('_judge.jsonl', '_grounding.jsonl')) else set())
+      L = open(f, encoding='utf-8').read().splitlines(True)
+      K = [l for l in L if not l.strip() or json.loads(l).get('qid') not in drop]
+      if len(K) != len(L): open(f, 'w', encoding='utf-8').write(''.join(K)); print(f, len(L) - len(K))
+  "
+  ```
 
-def run(config_path, dataset_path, out_path, start=0, end=None):
-    cfg = yaml.safe_load(open(config_path))
-    cfg_hash = hashlib.md5(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:6]
-    done = {json.loads(l)["qid"] for l in open(out_path)} if os.path.exists(out_path) else set()
-    system = build_system(cfg)    # NaiveSystem | MatchedNaiveSystem | AgenticSystem, with retriever mode, k, pool, generator
-    today = date.fromisoformat(cfg["today"])        # fixed for every run
-    with open(out_path, "a") as f:
-        for q in json.load(open(dataset_path))[start:end]:
-            if q["qid"] in done:
-                continue
-            t0 = time.perf_counter()
-            try:
-                # agentic: fresh user_id per question, temp UserStore, handle_turn(user_id, msgs, today=today)
-                res = system.answer(q["question"], qid=q["qid"], today=today)
-                err = None
-            except Exception as e:
-                res, err = {}, repr(e)
-            rec = {"run_id": cfg["run_id"], "qid": q["qid"], "config_hash": cfg_hash,
-                   "total_s": time.perf_counter() - t0, "error": err, **res}
-            f.write(json.dumps(rec) + "\n")
-```
+  Running this is the pending step before the next Stage 1–2 run.
+- Errors are logged per question with status `error`, and the run carries on. Report error counts.
 
 ### 9.4 Team roles
 
 | Member | Owns | Also does |
 | --- | --- | --- |
-| A | Dataset: flagged questions, paraphrases, gold labelling and audit; commit `eval_dataset_v2.json` | Second-checks failure codes |
-| B | Harness: `run.py`, `answer.py`, `systems.py`, `retrieval_modes.py`, logging wrappers; Stage 1 retrieval ablation | Retrieval metrics script |
-| C | Judge and grounding scorer: scoring scripts, judge validation, API adapters | Stage 3 API model runs |
-| D | Stage 2 runs (agent wrapper: fresh user, fixed date, temp store), analysis script, statistics, qualitative analysis lead | Assembles report tables and figures |
+| A | Dataset: `needs_review` checks, gold labelling and audit | Second-checks failure codes |
+| B | Harness: `run.py`, `answer.py`, `systems.py`, `retrieval_modes.py`, logging; Stage 1 | Retrieval metrics |
+| C | Judge and grounding scorer, judge validation, API adapters | Stage 3 runs |
+| D | Stage 2 runs, `analyze.py`, statistics, qualitative analysis lead | Report tables and figures |
 
-Everyone completes about 4 of the flagged questions, audits about 4 gold labels, and scores about 15 judge-validation pairs (two scorers per pair).
+Everyone reviews about 4 flagged questions and scores about 15 judge-validation pairs (two scorers per pair).
 
-### 9.5 Timeline (working back from 10 Nov)
+### 9.5 Remaining timeline (suggested, to 10 Nov)
 
-Assumes the earlier G1 deadline. G2 (13 Nov) gains 3 days of buffer.
+| Dates | Milestone | Done when |
+| --- | --- | --- |
+| 5–6 Nov | Drop the stale rows (9.3); cluster: Stage 1 rerun, Stage 2 resume (S10, C01–C10); Stage 4 scoring; check the `needs_review` records | Table 1a/1b/2a–2e filled on 80 records |
+| 6–7 Nov | Judge validation on 30 pairs; fix the Stage 3 configs and run them | Agreement reported; Table 3 filled |
+| 7–8 Nov | Failure coding (F1–F10), 10 qualitative cases, trade-off table | Tables 4 and 5, 3 worked examples |
+| 8–9 Nov | Write the evaluation section; final checks | Draft reviewed by 2 members |
+| 10 Nov | Submit (G2 on 13 Nov gives 3 days of buffer) | |
 
-| Dates | Milestone | Owner | Done when |
-| --- | --- | --- | --- |
-| 27–29 Oct | Write the shared answer function; verify the `needs_review` reference answers (dataset v2.1 is written: 45 scored + 5 paraphrases; the 10 added questions still need review); run `label_gold.py` and hand-check about 15 questions' labels; harness runs N1 and A1 end to end on 5 questions; time those 5 questions on the cluster | A, B, D | `eval_dataset_v2.json` committed and frozen; gold audit passed |
-| 30 Oct – 1 Nov | Retrieval modes R0–R3; Stage 1 retrieval metrics for R0–R4; judge prompt written; Stage 1 generation (R0 + chosen config) | B; C | Table 1a filled; selection rule applied |
-| 2–3 Nov | Judge validated on 30 pairs; Stage 2 runs: N1, A1 (3 repeats), then N2 matched to A1's mean chunks seen | C; D | Judge agreement ≥ 80%; Tables 1b, 2a–2d filled |
-| 4–5 Nov | Stage 3 API model runs and scoring | C | Table 3 filled |
-| 6–7 Nov | Failure coding (F1–F10), 10 qualitative cases, bootstrap CIs, trade-off table | D, A | Tables 4 and 5, 3 worked examples |
-| 8–9 Nov | Write the evaluation section; final checks | All | Draft reviewed by 2 members |
-| 10 Nov | Submit | All |  |
-
-Set a hard cut-off: no new configs after 5 Nov. Anything later goes into the report as a limitation.
+No new configs after 7 Nov. Anything later goes into the report as a limitation.
 
 ## 10. Deliverables and evaluation section outline
-
-The report's RAG evaluation needs 6 tables, 3 figures and 3 worked examples.
 
 ### 10.1 Tables and figures
 
 | ID | Content | From |
 | --- | --- | --- |
-| Table 0 | Dataset summary: counts by type, source, difficulty; judge–human agreement | Sections 2, 4.3 |
-| Table 1a / 1b | Retrieval ablation: retrieval metrics (R0–R4), end-to-end quality (R0 vs best) | Stage 1 |
-| Table 2a / 2b / 2c / 2d | N1 vs N2 vs A1: overall, by question type, paired outcomes, stratified by naive retrieval success | Stage 2 |
+| Table 0 | Dataset summary: groups, types, sources, difficulty; judge–human agreement | Sections 2, 4.3 |
+| Table 1a / 1b | Retrieval ablation (R0–R4); end-to-end quality (R0 vs selected) | Stage 1 |
+| Table 2a–2e | N1 vs N2 vs A1: overall, by type, paired, stratified, out-of-scope | Stage 2 |
 | Table 3 | Generator comparison | Stage 3 |
 | Table 4 | Failure code counts per system | Section 6.2 |
-| Table 5 | Trade-off summary with verdicts (Section 8.2) | Section 8 |
-| Figure 1 | Part recall@5 and MRR per retriever config, bar chart with bootstrap CIs | Table 1a |
-| Figure 2 | Accuracy by question type, N1 vs N2 vs A1, grouped bars | Table 2b |
-| Figure 3 | Quality vs latency scatter: one point per system × generator, accuracy on y, median latency on x | Tables 2a, 3 |
-
-Figure 3 shows the whole trade-off at a glance: points up and to the left are better.
+| Table 5 | Trade-off summary with verdicts | Section 8 |
+| Figure 1 | Part recall@5 and MRR per retriever config | Table 1a |
+| Figure 2 | Accuracy by question type, N1 vs N2 vs A1 | Table 2b |
+| Figure 3 | Quality vs latency: one point per system × generator | Tables 2a, 3 |
 
 ### 10.2 Evaluation section outline
 
-1. **Evaluation setup** (½ page): dataset and tags (Table 0), how gold passages were labelled, the shared settings table, what "agentic" means in this repo, the judge model and its validated agreement.
-2. **Metrics** (½ page): one line per metric with why it fits a tax chatbot; why BLEU/ROUGE were not used.
-3. **Stage 1: retrieval ablation** (½–1 page): Tables 1a and 1b, Figure 1. Which component helped retrieval, and whether it carried through to answers.
-4. **Stage 2: naive vs agentic RAG** (1 page): Tables 2a–2d, Figure 2. Lead with the paired result and its CI.
-5. **Stage 3: generator comparison** (½–1 page): Table 3. The agentic gain per model, and the supervisor-LLM-only caveat.
-6. **Qualitative analysis** (1 page): Table 4 and 3 worked examples, chosen to explain the biggest quantitative findings.
-7. **Trade-offs** (½ page): Table 5 and Figure 3, applying the decision rule from Section 8.3.
+1. **Setup** (½ page): the system (Section 0, condensed), dataset and groups (Table 0), gold labelling, shared settings, the intake-safe wording note, the judge and its validated agreement.
+2. **Metrics** (½ page): one line per metric and why it fits a tax chatbot; why BLEU/ROUGE were not used.
+3. **Stage 1** (½–1 page): Tables 1a and 1b, Figure 1. Which component helped retrieval, and whether it carried through to answers.
+4. **Stage 2** (1 page): Tables 2a–2e, Figure 2. Lead with the paired result and its CI; then the calculation and out-of-scope groups.
+5. **Stage 3** (½–1 page): Table 3, the agentic gain per model, and the supervisor-only caveat.
+6. **Qualitative analysis** (1 page): Table 4 and 3 worked examples.
+7. **Trade-offs** (½ page): Table 5 and Figure 3, applying the rule in Section 8.3.
 
-Open each subsection with its finding and number (e.g. "Agentic RAG answered 6 more questions correctly than naive RAG (+13 pp, 95% CI ...), mostly on multi-part questions"), then the table.
+Open each subsection with its finding and number (e.g. "Agentic RAG answered 5 more primary questions correctly than matched-context naive RAG (+10 pp, 95% CI …)"), then the table.
 
-## Assumptions to confirm
+## Limitations and scope
 
-These choices were assumed; change them if they don't match your setup.
-
-- Dataset v2.1 (45 scored questions + 5 paraphrases) is written at `src/evaluation/eval_questions.json` and will be committed to the repo. The original 11 flagged records have been reviewed; the 10 added questions (S17–S21 and M16–M20) are flagged `needs_review` and must be verified before the judge runs.
-- Gold passages are auto-labelled with `label_gold.py` and audited by hand. The corpus is not re-ingested, so chunk ids stay valid.
-- Final k = 5 for every system; reranker candidate pool 10 (the existing `CANDIDATES`); RRF constant 60.
-- All systems share one answer function (supervisor prompt, temperature 0, thinking off, 1,200-character truncation).
-- The agent runs with its default limits (`max_steps` 4, `max_queries` 2, `max_chunks` 6, `audit_min_score` 0.5), no tools, a fixed `today`, a fresh user per question and a temporary profile store.
-- Agent statuses `clarify`, `refused` and `no_answer` on answerable questions count as incorrect.
-- Qwen 3.5 4B runs through Ollama (laptop or the cluster GPU), so its cost is reported as tokens and latency, not USD. Record the machine per run.
-- In Stage 3 only the supervisor's LLM is swapped; the decomposer and auditor stay on Qwen 3.5 4B.
-- RAGAS is used only for the optional cross-check. Its class names follow recent releases (0.2+); check them against the version you install, in the separate environment.
-- The deadline is 10 Nov (G1). With 13 Nov (G2), add the 3 days as buffer before writing.
-- You have API access to a judge model outside the compared generators. If not, see Section 4.1.
-
-### Not covered by this plan
-
-Reflection, future work and risks/guardrails are deferred, but the course rubric still requires them. Beyond that, this plan does not cover:
-
-- **Citation accuracy:** whether the answer cites the right source. For a tax chatbot this is worth adding if time allows.
-- **Multi-turn conversations:** every question is single-turn. The agent supports clarification turns and user profiles; test a few separately if the chatbot will be used that way.
-- **Time-sensitive answers:** results depend on the corpus snapshot (e.g. the 30 Nov 2026 deadline, the YA 2026 rebate), so record the scrape date.
-- **Latency across local and API models:** not directly comparable, so compare naive vs agentic within each generator.
-- **A fully API-driven agent:** the decomposer and auditor stay on local Qwen (Section 5, Stage 3).
+- **Single-turn only.** The agent supports clarification turns and user profiles. The questions are worded so that the intake gate never clarifies (Section 2.3), so clarification quality is not measured here; it belongs to the agentic team's suites.
+- **No tools.** The calculator is off, so the calculation questions measure the answer LLM's own arithmetic.
+- **Supervisor-only swap in Stage 3.** The intake, planner and auditor stay on Qwen 3.5 4B.
+- **Time-sensitive answers.** Results depend on the corpus snapshot (scraped 14 Oct 2026; e.g. the YA 2026 rebate) and on the fixed date 2026-10-28.
+- **Same questions for selection and reporting.** Stage 1's selection and the final numbers use one test set, so the ablation is descriptive.
+- **Judge.** A 12B local judge with validation pending (Section 4.3).
+- **Not covered:** citation accuracy (whether `[Doc n]` points at the right chunk), multi-turn conversations, and a fully API-driven agent.

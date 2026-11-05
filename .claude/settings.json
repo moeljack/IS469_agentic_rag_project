@@ -10,7 +10,8 @@
       "Bash(cat)",
       "Bash(python /tmp/an.py)",
       "Bash(python -)",
-      "Bash(python src/../run_all.py --help)"
+      "Bash(python src/../run_all.py --help)",
+      "Bash(PYTHONIOENCODING=utf-8 PYTHONUNBUFFERED=1 projenv/Scripts/python.exe \"C:/Users/joelm/AppData/Local/Temp/claude/c96b30b95fa6af5f/7039bb9e-b714-4662-a4ef-46071cba944c/scratchpad/review/intake_probe.py\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\joelm\\IS469_agentic_rag_project\\results\\outputs"

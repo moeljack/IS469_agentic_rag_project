@@ -1,0 +1,20 @@
+You are checking whether a chatbot's answer is supported by the documents it was given.
+
+DOCUMENTS (the only information the chatbot saw):
+{context}
+
+ANSWER:
+{response}
+
+Step 1. List every factual claim the answer makes about tax rules, rates, amounts, dates, conditions or procedures.
+Ignore citation markers such as [Doc 1], greetings, and statements that the documents do not cover something.
+Split a sentence with two facts into two claims.
+
+Step 2. For each claim, decide whether it is supported: true only if the documents state it or it follows directly from
+what they state. A claim that is true in general but not stated in the documents is NOT supported. Quote the supporting
+sentence in "evidence" (or leave it empty if there is none).
+
+If the answer makes no factual claims, return an empty list.
+
+Return ONLY this JSON:
+{"claims": [{"claim": "<one claim>", "evidence": "<short quote or empty>", "supported": true|false}]}

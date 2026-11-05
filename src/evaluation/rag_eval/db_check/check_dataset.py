@@ -3,8 +3,8 @@
 Run:  python src/evaluation/rag_eval/db_check/check_dataset.py [--data src/evaluation/eval_questions.json]
 
 Checks: valid JSON with every required field; unique qids; single-fact questions have one fact and multi-part ones at
-least two; out-of-scope questions have none; every fact is found verbatim in at least one chunk (and not in a suspiciously
-large number); no multi-part question has all its facts in one chunk; paraphrase_of points at a real question.
+least two; out-of-scope questions have none and an oos_group; every fact is found verbatim in at least one chunk (and not
+in a suspiciously large number); no multi-part question has all its facts in one chunk.
 Prints the counts by type, question type, source and difficulty. Exit code 1 if there are errors.
 """
 import argparse
@@ -20,6 +20,7 @@ from facts import DATASET, load_chunks, matching_ids
 REQUIRED = {"qid", "type", "tier", "qtype", "source", "difficulty", "numeric", "answerable", "question",
             "reference_answer", "key_facts", "facts", "needs_review"}
 MAX_MATCHES = 5   # a fact matching more chunks than this is probably too generic to be a reliable label
+OOS_GROUPS = ("off-topic", "near-miss", "not-in-corpus")   # reported separately by analyze.py (Table 2e)
 
 parser = argparse.ArgumentParser(description="Check the evaluation dataset against the corpus")
 parser.add_argument("--data", default=str(DATASET))
@@ -46,8 +47,8 @@ for r in data:
         errors.append(f"{qid}: single-fact question should have exactly 1 fact")
     if r["answerable"] and r["type"] == "multi" and len(r["facts"]) < 2:
         errors.append(f"{qid}: multi-part question needs at least 2 facts")
-    if "paraphrase_of" in r and r["paraphrase_of"] not in ids:
-        errors.append(f"{qid}: paraphrase_of {r['paraphrase_of']} not found")
+    if not r["answerable"] and r.get("oos_group") not in OOS_GROUPS:
+        errors.append(f"{qid}: out-of-scope needs oos_group, one of {OOS_GROUPS}")
 
     matches = []
     for number, alternatives in enumerate(r["facts"], 1):
@@ -65,10 +66,9 @@ for r in data:
                 if matches[i] == matches[j] and len(matches[i]) == 1:
                     errors.append(f"{qid}: facts {i + 1} and {j + 1} live in the same single chunk {sorted(matches[i])}")
 
-scored = [r for r in data if "paraphrase_of" not in r]
-answerable = [r for r in scored if r.get("answerable")]
-print(f"records {len(data)} | scored {len(scored)} | answerable {len(answerable)} | "
-      f"out-of-scope {len(scored) - len(answerable)} | paraphrases {len(data) - len(scored)}")
+answerable = [r for r in data if r.get("answerable")]
+print(f"records {len(data)} | answerable {len(answerable)} | out-of-scope {len(data) - len(answerable)} "
+      f"{dict(Counter(r.get('oos_group') for r in data if not r.get('answerable')))}")
 for key in ("type", "qtype", "source", "difficulty"):
     print(f"{key:<10}:", dict(Counter(r.get(key) for r in answerable)))
 print(f"numeric   : {sum(bool(r.get('numeric')) for r in answerable)} | needs_review: {sum(bool(r.get('needs_review')) for r in data)}")

@@ -1,0 +1,22 @@
+# Stage 3: A1 with gpt-oss-120b as the supervisor LLM (Groq, OpenAI-compatible; pip install openai; GROQ_API_KEY).
+# Only the supervisor's route, decide and answer calls use this model; the intake gate, planner and auditor stay on
+# Qwen 3.5 4B via Ollama (INTAKE_MODEL / PLANNER_MODEL / AUDITOR_MODEL), so report it as "supervisor LLM swapped".
+# The agent limits match a1_agentic_qwen.yaml, so the only change is the supervisor model.
+# Groq is reached over the internet: run on a machine that has it (not a compute node without outbound access).
+run_id: g_agentic_gptoss120b
+system: agentic
+retriever:
+  mode: hybrid_rerank
+  k: 5
+  candidates: 10
+agent:
+  max_steps: 4
+  max_queries: 2
+  max_chunks: 8
+  audit_min_score: 0.5
+generator:
+  provider: groq
+  model: openai/gpt-oss-120b
+  options:
+    temperature: 0         # set to null if the model rejects temperature
+today: "2026-10-28"

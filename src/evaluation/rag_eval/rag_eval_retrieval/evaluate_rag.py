@@ -10,11 +10,13 @@ scores the top `--k` of them (plan Section 3.1):
     MRR             1 / rank of the first gold chunk, over the full depth
     hit@k           every fact covered (strict; multi-part questions are the hardest to pass)
 
-Out-of-scope questions are skipped (they have no facts), and the casual-wording paraphrases are scored on their own
-with --paraphrases. Results per mode are saved to results/retrieval/<mode>.json for analyze.py.
+Out-of-scope questions are skipped (they have no facts). The summary's `all` (and its simple / multi split) is the
+primary set of lookup questions; the calculation questions are summarised on their own (`computation`) and only joined
+in `all_with_computation`, so they never shift the R0-R4 ranking. Results per mode are saved to
+results/retrieval/<mode>.json for analyze.py.
 
 Run:  python src/evaluation/rag_eval/rag_eval_retrieval/evaluate_rag.py --mode all
-      python src/evaluation/rag_eval/rag_eval_retrieval/evaluate_rag.py --mode dense --paraphrases
+      python src/evaluation/rag_eval/rag_eval_retrieval/evaluate_rag.py --mode dense
 """
 import argparse
 import json
@@ -26,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))   # repo root, so `src` is importable
 
 from src.config import CANDIDATES, RERANK_MODEL, RERANK_QUANTIZE
+from src.evaluation.rag_eval.rag_eval_approach.results_io import SECONDARY_QTYPES
 from src.evaluation.rag_eval.rag_eval_retrieval.metrics import mean, part_ranks, retrieval_metrics
 from src.evaluation.rag_eval.rag_eval_retrieval.retrieval_modes import MODES, RERANKED, ModeRetriever
 
@@ -38,14 +41,11 @@ parser.add_argument("--mode", default="hybrid_rerank", choices=[*MODES, "all"], 
 parser.add_argument("--k", type=int, default=5, help="cutoff for recall, precision, F1 and hit (chunks given to the generator)")
 parser.add_argument("--depth", type=int, default=10, help="how many chunks to retrieve (MRR and the rank table look this deep)")
 parser.add_argument("--candidates", type=int, default=CANDIDATES, help="candidate pool for the fused and reranked modes")
-parser.add_argument("--paraphrases", action="store_true",
-                    help="score only the casual-wording paraphrases (reported separately from the main questions)")
 parser.add_argument("--limit", type=int, help="score only the first N questions (smoke test)")
 args = parser.parse_args()
 
 questions = json.loads(QUESTIONS.read_text(encoding="utf-8"))
-# out-of-scope questions have no facts to find, and paraphrases are scored on their own (--paraphrases)
-questions = [q for q in questions if q.get("answerable", True) and ("paraphrase_of" in q) == args.paraphrases]
+questions = [q for q in questions if q.get("answerable", True)]   # out-of-scope questions have no facts to find
 questions = questions[:args.limit] if args.limit else questions
 missing = [q["qid"] for q in questions if "gold_passages" not in q]
 if missing:
@@ -70,7 +70,6 @@ def line(name, s):
     return f"{name:<22}{s['n']:>4}{cells}{s['ms_median']:>10.0f}"
 
 
-suffix = "_paraphrases" if args.paraphrases else ""
 header = f"{'mode':<22}{'n':>4}" + "".join(f"{label + '@' + str(args.k) if key != 'rr' else label:>10}"
                                           for key, label in METRICS) + f"{'ms (med)':>10}"
 summaries = {}
@@ -91,18 +90,21 @@ for mode in modes:
                      "retrieved": [{"rank": i, "id": h["id"], "score": h["score"]} for i, h in enumerate(hits, 1)],
                      "part_ranks": part_ranks(ids, q["gold_passages"]),
                      "metrics": retrieval_metrics(ids, q["gold_passages"], k=args.k), "seconds": seconds})
-    summary = {"all": summarise(rows), **{t: summarise([r for r in rows if r["type"] == t]) for t in ("simple", "multi")}}
+    core = [r for r in rows if r["qtype"] not in SECONDARY_QTYPES]
+    summary = {"all": summarise(core), **{t: summarise([r for r in core if r["type"] == t]) for t in ("simple", "multi")},
+               "computation": summarise([r for r in rows if r["qtype"] in SECONDARY_QTYPES]),
+               "all_with_computation": summarise(rows)}
     summaries[mode] = summary
     RESULTS.mkdir(parents=True, exist_ok=True)
-    (RESULTS / f"{mode}{suffix}.json").write_text(json.dumps({
+    (RESULTS / f"{mode}.json").write_text(json.dumps({
         "mode": mode, "label": MODES[mode], "k": args.k, "depth": args.depth, "candidates": args.candidates,
         "reranker": RERANK_MODEL if mode in RERANKED else None, "int8": RERANK_QUANTIZE,
-        "paraphrases": args.paraphrases, "summary": summary, "questions": rows}, indent=1), encoding="utf-8")
+        "summary": summary, "questions": rows}, indent=1), encoding="utf-8")
 
     print(f"\n{MODES[mode]} ({mode}) | k {args.k} | depth {args.depth} | pool {args.candidates} | "
-          f"saved to {RESULTS / f'{mode}{suffix}.json'}")
+          f"saved to {RESULTS / f'{mode}.json'}")
     print(header)
-    for part in ("all", "simple", "multi"):
+    for part in ("all", "simple", "multi", "computation", "all_with_computation"):
         if summary[part]["n"]:
             print(line(f"  {part}", summary[part]))
     print(f"\nRank of the first gold chunk for each fact ('-' = not in the top {args.depth})")
@@ -111,7 +113,7 @@ for mode in modes:
         print(f"{i:<4}{q['qid']:<5}{q['type'][:5]:<7}{(q.get('source') or '')[:7]:<8}{ranks:>8}   {q['question'][:60]}")
 
 if len(modes) > 1:
-    print(f"\nAll modes ({len(questions)} questions{', paraphrases' if args.paraphrases else ''})")
+    print(f"\nAll modes ({summaries[modes[0]]['all']['n']} primary questions; calculation questions not included)")
     print(header)
     for mode in modes:
         print(line(MODES[mode], summaries[mode]["all"]))

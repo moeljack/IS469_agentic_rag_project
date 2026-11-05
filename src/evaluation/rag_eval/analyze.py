@@ -1,12 +1,19 @@
 """Turn the scores into the report's tables (plan Sections 7, 8 and 10). Reads only results/; calls no model.
 
-    Table 1a     retrieval ablation R0-R4 (from rag_eval_retrieval/evaluate_rag.py)
-    Runs         one row per run and per repeated config: accuracy with a bootstrap 95% CI, mean correctness, numeric
-                 accuracy, refusals, non-answers, RAGAS means, retrieval, chunks seen/used, latency, tokens (Tables 1b, 2a, 3)
-    --pair A B   paired comparison on the same questions (Table 2c): win/loss table, exact McNemar test, paired
-                 bootstrap CI of the accuracy difference, latency and token ratios, and the plan's wording rule
-    --types      accuracy by question type for the given runs (Table 2b)
-    --stratify   accuracy split by whether that naive run's retrieval covered every fact (Table 2d)
+The headline is the primary set (results_io.is_core: answerable lookup questions). The calculation questions
+(qtype computation) are a secondary analysis, and all answerable questions together are a robustness check only.
+
+    Table 1a     retrieval ablation R0-R4 on the primary set, plus a calculation row per mode (evaluate_rag.py)
+    Runs         one row per run and per repeated config: primary accuracy with a bootstrap 95% CI, mean correctness,
+                 numeric accuracy, refusals, non-answers, RAGAS means, retrieval, chunks seen/used, latency, tokens
+                 (Tables 1b, 2a, 3), then the calculation accuracy and the all-answerable accuracy as separate columns
+    Table 2e     out-of-scope behaviour per run and oos_group: declined / clarified / answered, the decline rate with a
+                 Wilson 95% CI, and answerable questions wrongly declined or clarified (always written)
+    --pair A B   paired comparison on the same questions (Table 2c), for the primary set, the calculation questions and
+                 all answerable questions: win/loss table, exact McNemar test, paired bootstrap CI of the accuracy
+                 difference, latency and token ratios, and the plan's wording rule
+    --types      accuracy by question type for the given runs, calculation questions as their own row (Table 2b)
+    --stratify   primary-set accuracy split by whether that naive run's retrieval covered every fact (Table 2d)
 
 A name is a run id (n1_naive) or a repeated config without its _repN suffix (a1_agentic_qwen = its repeats together:
 per question, the share of repeats that were correct; the win/loss table uses the majority).
@@ -30,11 +37,22 @@ import pandas as pd
 from scipy.stats import binomtest
 
 from src.evaluation.rag_eval.rag_eval_approach.results_io import (
-    NON_ANSWERS, OUTPUTS, RESULTS, SCORES, load_dataset, read_jsonl)
+    DECLINED, NON_ANSWERS, OUTPUTS, RESULTS, SCORES, is_core, load_dataset, oos_outcome, read_jsonl)
 
 ASSETS = RESULTS / "report_assets"
 RETRIEVAL = RESULTS / "retrieval"
 RAGAS_TEXT = ["user_input", "retrieved_contexts", "response", "reference", "judge"]
+GROUPS = {"primary": "primary questions", "computation": "calculation questions",
+          "all": "all answerable questions (robustness check)"}
+
+
+def in_group(frame, group):
+    """Rows of one analysis group: primary (headline), computation (secondary) or all answerable."""
+    if group == "primary":
+        return frame[frame["core"]]
+    if group == "computation":
+        return frame[frame["answerable"] & ~frame["core"]]
+    return frame[frame["answerable"]]
 
 
 def bootstrap_ci(values, n_boot=1000, seed=0):
@@ -44,6 +62,15 @@ def bootstrap_ci(values, n_boot=1000, seed=0):
     rng = np.random.default_rng(seed)
     means = [rng.choice(values, len(values)).mean() for _ in range(n_boot)]
     return tuple(np.percentile(means, [2.5, 97.5]))
+
+
+def wilson_ci(successes, n, z=1.96):
+    """95% interval for a proportion; unlike the bootstrap it stays sensible at 0/n or n/n on small samples."""
+    if n == 0:
+        return float("nan"), float("nan")
+    p = successes / n
+    centre, half = (p + z * z / (2 * n)) / (1 + z * z / n), z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return centre - half, centre + half
 
 
 def base_name(run_id):
@@ -58,6 +85,7 @@ def load_run(run_id, dataset):
         latency, tokens = rec.get("latency_s") or {}, rec.get("tokens") or {}
         rows.append({"run_id": run_id, "qid": rec["qid"], "answerable": bool(q.get("answerable")), "type": q["type"],
                      "qtype": q.get("qtype"), "source": q.get("source"), "numeric": bool(q.get("numeric")),
+                     "oos_group": q.get("oos_group"), "core": is_core(q),
                      "status": "error" if rec.get("error") else rec.get("status"),
                      "latency": latency.get("total", rec.get("wall_s")),
                      "tokens": (tokens.get("input") or 0) + (tokens.get("output") or 0)})
@@ -80,13 +108,20 @@ def load_run(run_id, dataset):
         frame = frame.merge(ragas.add_prefix("ragas_").rename(columns={"ragas_qid": "qid"}), on="qid", how="left")
     if "score" in frame:
         frame["correct"] = (frame["score"] == 2).astype(float).where(frame["answerable"])
+    refused = frame["refused"] if "refused" in frame else pd.Series(None, index=frame.index)
+    frame["outcome"] = [None if a else oos_outcome(s, r) for a, s, r in zip(frame["answerable"], frame["status"], refused)]
     return frame
 
 
 def summarise(name, frame):
-    ans, oos = frame[frame["answerable"]], frame[~frame["answerable"]]
-    row = {"name": name, "runs": frame["run_id"].nunique(), "answerable": ans["qid"].nunique(),
-           "non_answers": int(ans["status"].isin(NON_ANSWERS).sum())}
+    """One row of runs_summary. Every answer-quality, retrieval and cost column is over the primary set; the
+    calculation questions and all answerable questions get their own accuracy columns."""
+    ans, comp, oos = in_group(frame, "primary"), in_group(frame, "computation"), frame[~frame["answerable"]]
+    row = {"name": name, "runs": frame["run_id"].nunique(), "primary": ans["qid"].nunique(),
+           "computation": comp["qid"].nunique(),
+           "non_answers": int(ans["status"].isin(NON_ANSWERS).sum()),
+           "declined_answerable": int(ans["status"].isin(DECLINED).sum()),     # false refusals
+           "clarified_answerable": int((ans["status"] == "clarify").sum())}
     if "correct" in frame:
         per_q = ans.groupby("qid")["correct"].mean()
         lo, hi = bootstrap_ci(per_q.values)
@@ -96,8 +131,14 @@ def summarise(name, frame):
                    mean_correctness=ans["score"].mean(),
                    numeric_accuracy=ans.loc[ans["numeric"], "numeric_ok"].astype(float).mean(),
                    unscored=int(ans["score"].isna().sum()))   # not judged yet, or judge output unparseable (counted wrong)
+        # secondary analysis and robustness check, never the headline
+        row.update(accuracy_computation=comp.groupby("qid")["correct"].mean().mean(),
+                   clarified_computation=int((comp["status"] == "clarify").sum()),
+                   accuracy_all_answerable=in_group(frame, "all").groupby("qid")["correct"].mean().mean())
     if "refused" in frame and len(oos):
         row["refusals"] = f"{int((oos['refused'] == True).sum())}/{len(oos)}"   # unparseable (None) counts as not refused
+    if len(oos):
+        row.update({f"oos_{k}": int((oos["outcome"] == k).sum()) for k in ("declined", "clarified", "answered")})
     for col in [c for c in frame if c.startswith("ragas_") or c in ("faithfulness", "ctx_precision", "ctx_ap")]:
         row[col] = pd.to_numeric(ans[col], errors="coerce").mean()   # ragas_* only if the optional cross-check was run
     for col in ("r", "hit", "n_seen", "n_used"):
@@ -105,20 +146,46 @@ def summarise(name, frame):
             row[{"r": "part_recall", "hit": "hit_all_parts", "n_seen": "chunks_seen", "n_used": "chunks_used"}[col]] = ans[col].mean()
     if "n_seen" in frame:
         row["chunks_seen_p90"] = ans["n_seen"].quantile(0.9)
-    row.update(latency_median=frame["latency"].median(), latency_p90=frame["latency"].quantile(0.9),
-               tokens_mean=frame["tokens"].mean())
+    row.update(latency_median=ans["latency"].median(), latency_p90=ans["latency"].quantile(0.9),
+               tokens_mean=ans["tokens"].mean())
     return row
 
 
-def correctness(frames, name):
-    """Per-question share of correct answers for a run id or a repeated config (answerable questions only)."""
+def out_of_scope(frames):
+    """Table 2e: per run and per oos_group, what the system did with the out-of-scope questions, next to how often it
+    declined or clarified answerable ones (a system that declines everything would otherwise look perfect)."""
+    rows = []
+    for run_id, frame in frames.items():
+        oos, ans = frame[~frame["answerable"]], frame[frame["answerable"]]
+        if oos.empty:
+            continue
+        groups = [("all", oos)] + [(g, oos[oos["oos_group"] == g]) for g in sorted(oos["oos_group"].dropna().unique())]
+        for group, part in groups:
+            counts = part["outcome"].value_counts()
+            declined = int(counts.get("declined", 0))
+            lo, hi = wilson_ci(declined, len(part))
+            row = {"run_id": run_id, "oos_group": group, "n": len(part), "declined": declined,
+                   "clarified": int(counts.get("clarified", 0)), "answered": int(counts.get("answered", 0)),
+                   "other": int(counts.get("error", 0) + counts.get("unscored", 0)),
+                   "decline_rate": declined / len(part), "ci_low": lo, "ci_high": hi}
+            if group == "all":
+                row.update(answerable_declined=f"{int(ans['status'].isin(DECLINED).sum())}/{len(ans)}",
+                           answerable_clarified=f"{int((ans['status'] == 'clarify').sum())}/{len(ans)}")
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def correctness(frames, name, group="primary"):
+    """Per-question share of correct answers for a run id or a repeated config, over one analysis group (GROUPS),
+    and that group's rows."""
     runs = [r for r in frames if r == name or base_name(r) == name]
     if not runs:
         raise SystemExit(f"no run called {name!r}; runs: {sorted(frames)}")
     frame = pd.concat([frames[r] for r in runs])
     if "correct" not in frame:
         raise SystemExit(f"{name}: no judge scores yet (run score_judge.py)")
-    return frame[frame["answerable"]].groupby("qid")["correct"].mean(), frame
+    rows = in_group(frame, group)
+    return rows.groupby("qid")["correct"].mean(), rows
 
 
 def wording(diff_questions, ci):
@@ -129,10 +196,12 @@ def wording(diff_questions, ci):
     return "higher" if diff_questions > 0 else "lower"
 
 
-def pair(frames, a, b, seed=0):
-    ca, fa = correctness(frames, a)
-    cb, fb = correctness(frames, b)
+def pair(frames, a, b, group="primary", seed=0):
+    ca, fa = correctness(frames, a, group)
+    cb, fb = correctness(frames, b, group)
     qids = sorted(set(ca.index) & set(cb.index))
+    if not qids:
+        return f"### {a} vs {b}: {GROUPS[group]}\n\nNo question in this group was answered by both runs yet."
     va, vb = ca[qids].values, cb[qids].values
     ma, mb = va > 0.5, vb > 0.5   # majority vote over repeats
     both, a_only, b_only, neither = int((ma & mb).sum()), int((ma & ~mb).sum()), int((~ma & mb).sum()), int((~ma & ~mb).sum())
@@ -144,7 +213,7 @@ def pair(frames, a, b, seed=0):
     diff = va.mean() - vb.mean()
     lat = fa["latency"].median() / fb["latency"].median() if fb["latency"].median() else float("nan")
     tok = fa["tokens"].mean() / fb["tokens"].mean() if fb["tokens"].mean() else float("nan")
-    lines = [f"### {a} vs {b} ({len(qids)} answerable questions)", "",
+    lines = [f"### {a} vs {b}: {GROUPS[group]} ({len(qids)})", "",
              f"| | {b} correct | {b} not correct |", "|---|---|---|",
              f"| **{a} correct** | {both} | {a_only} |", f"| **{a} not correct** | {b_only} | {neither} |", "",
              f"- Accuracy: {va.mean():.0%} vs {vb.mean():.0%}; difference {diff:+.0%} "
@@ -175,11 +244,15 @@ def main():
     ablation = []
     for path in sorted(RETRIEVAL.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
-        s = data["summary"]["all"]
-        ablation.append({"config": data["label"] + (" (paraphrases)" if data.get("paraphrases") else ""),
-                         "n": s["n"], f"part_recall@{data['k']}": s["r"], f"precision@{data['k']}": s["p"],
-                         f"F1@{data['k']}": s["f1"], "MRR": s["rr"], f"hit@{data['k']}": s["hit"],
-                         "latency_ms_median": s["ms_median"]})
+        # "all" is the primary set; the calculation questions get their own row (older files have no such key)
+        parts = [("", data["summary"]["all"])]
+        if data["summary"].get("computation", {}).get("n"):
+            parts.append((" (calculation questions)", data["summary"]["computation"]))
+        for suffix, s in parts:
+            ablation.append({"config": data["label"] + suffix,
+                             "n": s["n"], f"part_recall@{data['k']}": s["r"], f"precision@{data['k']}": s["p"],
+                             f"F1@{data['k']}": s["f1"], "MRR": s["rr"], f"hit@{data['k']}": s["hit"],
+                             "latency_ms_median": s["ms_median"]})
     if ablation:
         frame = pd.DataFrame(ablation)
         save("table1a_retrieval_ablation", frame)
@@ -196,14 +269,17 @@ def main():
     rows += [summarise(f"{name} (mean of {len(ids)})", pd.concat([frames[i] for i in ids]))
              for name, ids in groups.items() if len(ids) > 1]
     save("runs_summary", pd.DataFrame(rows))
+    oos_table = out_of_scope(frames)
+    if not oos_table.empty:
+        save("table2e_out_of_scope", oos_table)
 
     if args.pair:
-        save("paired_comparisons", text="\n\n".join(pair(frames, a, b) for a, b in args.pair))
+        save("paired_comparisons", text="\n\n".join(pair(frames, a, b, g) for a, b in args.pair for g in GROUPS))
 
     if args.types:
         cells = {}
         for name in args.types:
-            per_q, _ = correctness(frames, name)
+            per_q, _ = correctness(frames, name, "all")   # every type, the calculation questions as their own row
             for qtype, group in pd.DataFrame({"correct": per_q}).join(
                     pd.Series({k: v.get("qtype") for k, v in dataset.items()}, name="qtype")).groupby("qtype"):
                 cells.setdefault(qtype, {"type": qtype, "n": len(group)})[name] = (
@@ -215,6 +291,7 @@ def main():
         if hits.empty:
             raise SystemExit(f"no retrieval scores for {args.stratify} (run score_retrieval.py)")
         hit = hits.set_index("qid")["hit"]
+        hit = hit[[qid in dataset and is_core(dataset[qid]) for qid in hit.index]]   # primary set only
         out = []
         for label, value in (("retrieval succeeded (hit = 1)", 1), ("retrieval missed (hit = 0)", 0)):
             qids = hit[hit == value].index

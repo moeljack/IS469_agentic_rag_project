@@ -1,0 +1,8 @@
+# What score_task_success.py needs. With the local Ollama judge these are already in the project's .venv (the agent
+# uses all of them), so nothing extra has to be installed: no RAGAS, no LangChain.
+ollama
+numpy
+pandas
+pyyaml
+# Only for an API judge (provider anthropic / openai / google in configs/judge.yaml), install the one you use:
+#   langchain-anthropic   langchain-openai   langchain-google-genai

@@ -6,7 +6,9 @@ stay in the denominator: a run error, an empty answer, or the status clarify / r
 
 Out-of-scope questions get a refusal check instead: refused true is correct. A no_answer or refused status, or a naive
 answer starting with INSUFFICIENT_CONTEXT, counts as refused without the judge; clarify and run errors count as not
-refused; any other answer goes to the judge with the short refusal prompt.
+refused; any other answer goes to the judge with the short refusal prompt. `outcome` says what the system did:
+declined | clarified | answered (a hallucination risk) | error | unscored, so a clarifying question is reported on its
+own instead of being lumped in with answers.
 
 Run:  python src/evaluation/rag_eval/rag_eval_approach/score_judge.py a1_agentic_qwen_rep1 n1_naive
       python src/evaluation/rag_eval/rag_eval_approach/score_judge.py --all --judge configs/judge.yaml
@@ -28,7 +30,7 @@ import yaml
 from src.evaluation.rag_eval.rag_eval_approach.answer import INSUFFICIENT
 from src.evaluation.rag_eval.rag_eval_approach.llm import make_llm
 from src.evaluation.rag_eval.rag_eval_approach.results_io import (
-    NON_ANSWERS, OUTPUTS, SCORES, load_dataset, load_meta, read_jsonl, run_ids)
+    DECLINED, NON_ANSWERS, OUTPUTS, SCORES, load_dataset, load_meta, oos_outcome, read_jsonl, run_ids)
 
 HERE = Path(__file__).resolve().parent
 PROMPTS = {"correctness": HERE / "prompts" / "judge_correctness_v1.txt", "refusal": HERE / "prompts" / "judge_refusal_v1.txt"}
@@ -106,15 +108,15 @@ def score(rec, q, judge, judge_name, templates):
 
     row.update(kind="refusal", refused=False)
     if error:
-        return {**row, "reason": "run error"}
-    if status in ("no_answer", "refused") or answer.startswith(INSUFFICIENT):
-        return {**row, "refused": True, "reason": f"declined (status {status})"}
+        return {**row, "reason": "run error", "outcome": "error"}
+    if status in DECLINED or answer.startswith(INSUFFICIENT):
+        return {**row, "refused": True, "reason": f"declined (status {status})", "outcome": "declined"}
     if status == "clarify":
-        return {**row, "reason": "asked a clarifying question instead of declining"}
+        return {**row, "reason": "asked a clarifying question instead of declining", "outcome": "clarified"}
     parsed, raw = ask(judge, "refusal", fill(templates["refusal"], question=q["question"], response=answer))
-    if parsed is None:
-        return {**row, "judged": True, "raw": raw, "reason": "judge output unparseable", "refused": None}
-    return {**row, "judged": True, "raw": raw, "reason": parsed["reasoning"], "refused": bool(parsed["refused"])}
+    refused = None if parsed is None else bool(parsed["refused"])
+    return {**row, "judged": True, "raw": raw, "refused": refused, "outcome": oos_outcome(status, refused),
+            "reason": "judge output unparseable" if parsed is None else parsed["reasoning"]}
 
 
 def main():
