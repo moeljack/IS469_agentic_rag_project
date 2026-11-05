@@ -272,7 +272,7 @@
   "difficulty": "easy",
   "numeric": true,
   "answerable": true,
-  "question": "How much CIT rebate will my company get for YA 2026?",
+  "question": "What CIT Rebate will companies get for YA 2026?",
   "reference_answer": "For YA 2026 the enhanced CIT Rebate is 50% of the corporate tax payable, together with an enhanced CIT Rebate Cash Grant of $2,000. The total maximum benefit is $40,000.",
   "key_facts": [
    "50%",
@@ -1723,7 +1723,7 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "Our company made a trade loss of $150,000 this year. Last year we had taxable income of $200,000. How much of the loss can we carry back to set off against last year's income?",
+  "question": "Our company made a trade loss of $150,000 this year. Last year our chargeable income was $200,000. How much of the loss can we carry back to set off against last year's chargeable income?",
   "reference_answer": "Current year unutilised trade losses can be carried back to set off the income of the immediately preceding YA, subject to a cap of $100,000. So at most $100,000 of the $150,000 loss can be carried back (subject to the qualifying conditions).",
   "key_facts": [
    "$100,000"
@@ -1749,10 +1749,11 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "Our company donated $10,000 to an approved Institution of a Public Character. How much tax deduction can we claim for it?",
-  "reference_answer": "Qualifying donations to IPCs get a 250% tax deduction, so a $10,000 donation gives a deduction of $25,000.",
+  "question": "Our company's chargeable income before donations is $300,000, and we donated $10,000 to an approved Institution of a Public Character. How much tax deduction can we claim for the donation, and what is our chargeable income after it?",
+  "reference_answer": "Qualifying donations to IPCs get a 250% tax deduction, so the $10,000 donation gives a deduction of $25,000, and chargeable income falls from $300,000 to $275,000.",
   "key_facts": [
-   "$25,000"
+   "$25,000",
+   "$275,000"
   ],
   "facts": [
    [
@@ -1802,7 +1803,7 @@
   "difficulty": "hard",
   "numeric": true,
   "answerable": true,
-  "question": "Our REIT ETF is paying a distribution of $500,000 in 2026 to a qualifying non-resident non-individual unit holder. How much tax must be withheld, and is that the final tax?",
+  "question": "Our REIT ETF has chargeable income of $500,000 this year and is distributing all of it in 2026 to a qualifying non-resident non-individual unit holder. How much tax must be withheld from that distribution, and is it a final tax?",
   "reference_answer": "From 1 July 2018 to 31 December 2030 the withholding tax rate on distributions to qualifying non-resident non-individual unit holders is 10%, and it is a final tax. So $50,000 must be withheld from the $500,000 distribution.",
   "key_facts": [
    "10%",
