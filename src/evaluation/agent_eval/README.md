@@ -14,6 +14,7 @@ The agent-specific dimensions of the Eval Plan. The RAG metrics (retrieval, corr
 | `IS469_task_success.sh` | Slurm job: starts Ollama, pulls the judge, runs `score_task_success.py` (or `SCORER=score_consistency.py`) on the GPU node | - |
 | `score_tool_calls.py` | Tool-call accuracy: schema validity, right tool (route), right arguments (tool-step accuracy), error recovery | No |
 | `tool_trace.py` | Records every tool call the agent makes (used by `run_suite.py`), and injects a failed first search for `--fault` | - |
+| `score_cost_latency.py` | Cost and latency (RQ4): tokens and wall-clock seconds per question, agentic vs naive, with paired ratios | No |
 | `score_trajectory.py` | Step efficiency: wandering/looping rate, step count, budget hits | No |
 | `run_suite.py` | Runs the agent (or naive RAG) on the robustness, safety or tool-call suite | Yes (Ollama, retriever) |
 | `injection.py` | Plants a malicious chunk in retrieval results (used by `run_suite.py --suite safety`) | - |
@@ -113,6 +114,29 @@ Judge scores are cached in `results/task_success/<run_id>_judge.csv` per answer,
 rerun only judges new answers (and answers the judge failed on, up to `--attempts` times), and changing the judge or
 a prompt judges everything again rather than mixing scores.
 
+## Cost and latency (RQ4)
+
+`score_cost_latency.py` answers *what does each agentic RAG answer cost compared with naive RAG?* from the run files
+rag_eval's `run.py` already wrote (`rag_eval/results/outputs/`), so nothing has to be rerun. No price is applied:
+
+- **RQ4a, tokens per question:** input + output tokens summed over every LLM call for the question (agent: intake,
+  route, decide, planner, auditor, answer; naive: the answer call), with LLM calls per question.
+- **RQ4b, wall-clock time per question:** the run's own timer from question to answer (`latency_s.total`).
+
+It reports, per run and pooled over repeats: mean tokens (input, output, total, with a bootstrap 95% CI), median and
+p90; mean latency (with a 95% CI), median, p90 and max. For agentic vs naive on the same questions: the token ratio
+and latency ratio (agentic mean / naive mean) and the extra tokens and seconds per question, each with a paired
+bootstrap 95% CI. It also shows where the agent's time goes (mean seconds per stage), and with `--by-type`, tokens and
+time per question type and per status.
+
+```
+python3 src/evaluation/agent_eval/score_cost_latency.py --all --by-type
+python3 src/evaluation/agent_eval/score_cost_latency.py --all --pair a1_agentic_qwen n1_naive --pair a1_agentic_qwen n2_naive_matched
+```
+
+Without `--pair`, every agentic config is compared with every naive one. Questions whose run crashed are left out and
+counted. Compare latency only between runs made on the same hardware.
+
 ## Answer consistency
 
 The Robustness Score asks whether the agent still answers when a question is rephrased. Consistency asks whether it
@@ -186,6 +210,7 @@ Robustness and safety runs made after this change also record tool calls: score 
 - `agent_eval/results/task_success/`: `<run_id>_judge.csv` (judge scores), `<run_id>_judge_details.jsonl` (claims and
   question parts per answer), `<run_id>_task_success.jsonl` (one row per question: status, scores, success, reason),
   `task_success_<suite>.{md,csv}` (summary)
+- `agent_eval/results/cost_latency/`: `cost_latency.{md,csv}` (tables), `<config>_cost_latency.jsonl` (per question)
 - `agent_eval/results/consistency/`: `<run_id>_consistency.jsonl` (judge verdicts per pair), `consistency.{md,csv}`
 - `agent_eval/results/tool_calls/`: `<run_id>_tool_calls.jsonl` (per question), `tool_calls_<suite>.{md,csv}`
 - `agent_eval/results/robustness/`, `.../safety/` and `.../toolcalls/`: `<run_id>.jsonl` (one record per case, from
