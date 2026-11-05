@@ -42,7 +42,9 @@ class FaultyRetriever:
     def __init__(self, inner, mode):
         if mode not in self.MODES:
             raise ValueError(f"fault mode must be one of {self.MODES}, not {mode!r}")
-        self._inner, self.mode, self.active, self.triggered = inner, mode, False, 0
+        # fault_mode, not `mode`: `mode` must keep passing through to the real retriever (its retrieval mode, which
+        # systems.py and the supervisor's RetrievalAgent read to know whether there is a reranker)
+        self._inner, self.fault_mode, self.active, self.triggered = inner, mode, False, 0
 
     def __getattr__(self, name):      # mode, collection, _rerank, warm-up helpers... all from the real retriever
         return getattr(self._inner, name)
@@ -50,7 +52,7 @@ class FaultyRetriever:
     def search(self, query, k=5, **kwargs):
         if self.active:
             self.triggered += 1
-            if self.mode == "empty":
+            if self.fault_mode == "empty":
                 return []
             raise RuntimeError("injected retrieval failure (agent_eval tool-call fault test)")
         return self._inner.search(query, k=k, **kwargs)
@@ -186,7 +188,7 @@ class ToolCallRecorder:
             self._searches += 1
             fault = None
             if self.faulty is not None and self._searches == 1:
-                self.faulty.active, fault = True, self.faulty.mode
+                self.faulty.active, fault = True, self.faulty.fault_mode
             event = {"type": "search", "step": self._step, "queries": [q.text for q in queries], "new_chunks": 0,
                      "approved": 0, "audited": False, "auditor_unavailable": False, "fault": fault, "error": None}
             self.events.append(event)
