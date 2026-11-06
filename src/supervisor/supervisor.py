@@ -38,7 +38,13 @@ Guard rails in code (a 4B model is not trusted with the loop itself):
   * invalid actions (unknown tool, repeated queries, empty ask_user) are logged and cost a step
   * unparseable model output falls back to: answer if anything is vetted, else give_up
   * follow-up queries that repeat or nearly repeat a searched one (keyword overlap >= QUERY_SIMILARITY) are
-    dropped before retrieval; when none are left, the loop stops and answers from what is vetted
+    dropped before retrieval; when none are left, the model is told which were dropped and decides once more
+    (MAX_ERROR_RETRIES), and only then does the loop stop and answer from what is vetted. Queries whose search
+    returned no results at all are only blocked when repeated exactly: a rewording may still find something
+  * a search that raises (retriever down, injected fault) does not end the question: the failure is shown to the
+    model, which may retry or search differently; a second failure stops the loop ("tool_error")
+  * a follow-up search that returns zero new chunks gets one more decide call before the loop stops
+  * give_up always ends with status "no_answer", even when some chunks were vetted
   * chunks the reranker scores below `audit_min_score` are rejected without an auditor call, except the best
     `audit_keep_top` of each search
   * when the auditor reports the approved chunks are sufficient, the loop answers without another decide call
@@ -101,6 +107,8 @@ AUDIT_CHARS = 2000                  # per-chunk text shown to the auditor (the s
                                     # meant to confirm; 8 x 2000 chars plus the prompt still fits 8k)
 MAX_DOCS = 8                        # vetted chunks put in the answer prompt (8 x DOC_CHARS, about 5k tokens, fits 8k)
 MAX_DRY_ROUNDS = 2                  # stop after this many searches in a row that approve nothing new (and nothing is vetted)
+MAX_ERROR_RETRIES = 1               # per error kind (tool error, all queries repeated, zero new chunks): how many times the
+                                    # model is shown the error and asked to decide again before the harness stops the loop
 
 NO_CONTEXT = "The IRAS sources I have don't cover this. Please check iras.gov.sg or rephrase your question."
 
@@ -145,6 +153,9 @@ Actions:
 - answer: you have enough related documents (or tool output) to answer the question.
 - give_up: the documents cannot answer this and further searching will not help.
 Rules: search again only when the covered topics miss part of the question; use the auditor's suggestions when given.
+If ACTIONS SO FAR says a search FAILED, returned no results, or was skipped because its queries repeat earlier ones,
+respond to that: retry a failed search, or search again with different official IRAS terms. Choose give_up only when
+no other query could help.
 Never invent rates, caps or numbers. Reply with JSON: {"action": ..., "queries": [...], "tool": "", "question": "", "reason": "..."}"""
 
 ANSWER_SYSTEM = """You are a Singapore corporate income tax assistant. Answer the QUESTION using ONLY the DOCUMENTS.
@@ -214,11 +225,13 @@ class RetrievalAgent:
         """question: when given, every merged chunk is re-scored by the reranker against it, so the batch cap and the
         supervisor's reranker cutoff judge relevance to the question rather than to the keyword query that found it."""
         self.last_notes = []
+        self.last_hits = 0                                  # chunks the retriever returned, before any de-duplication
         chosen = queries if queries is not None else plan.queries
         seen, found = set(exclude), {}
         for q in chosen:
             extra = {} if self.candidates is None else {"candidates": self.candidates}
             hits = self.retriever.search(q.text, k=self.k, min_score=self.min_score, **extra)
+            self.last_hits += len(hits)
             new = 0
             for h in hits:
                 if h["id"] in seen:
@@ -348,7 +361,7 @@ class SupervisorResult:
     plan: Optional[Decompose] = None
     draft: str = ""                     # raw answer from the model
     audits: list[RetrievalAudit] = field(default_factory=list)   # one per search action
-    stop_reason: str = ""               # agent_answered | auditor_sufficient | suggestions_repeat | agent_gave_up | max_steps | no_new_queries | ...
+    stop_reason: str = ""               # agent_answered | auditor_sufficient | suggestions_repeat | agent_gave_up | max_steps | no_new_queries | tool_error | ...
     route: str = ""                     # step 1: "planned" (intake wrote the queries) | "search" | "decompose"
     sources: list[str] = field(default_factory=list)
     profile_changes: list[tuple] = field(default_factory=list)
@@ -396,6 +409,10 @@ class _Run:
     last_new_chunks_count: Optional[int] = None         # chunks the latest search returned for the first time
     route: str = ""                                     # how step 1 searched (see SupervisorResult.route)
     question: str = ""                                  # what every retrieved chunk is scored against (the question as written)
+    no_hit: list = field(default_factory=list)          # queries whose search returned no results at all (exact repeats blocked)
+    retries: dict = field(default_factory=dict)         # error kind -> times the model was asked to respond to it
+    force_decide: bool = False                          # the model must see the last error: skip the no-decide shortcuts
+    last_skipped: list = field(default_factory=list)    # queries the repeat guard dropped on the latest step
 
 
 # ---------------------------------------------------------------- Ollama runtime: keep the models loaded
@@ -570,12 +587,18 @@ class Supervisor:
         if ask:
             self.store.save_pending(user_id, plan.entities)
             return out("clarify", ask)
+        if stop == "agent_gave_up":
+            # the model decided the documents cannot answer this: respect it, even if some chunks were vetted
+            if run.vetted or run.tool_out:
+                trace.append(f"give_up: not answering from the {len(run.vetted)} vetted chunk(s)")
+            return out("no_answer", NO_CONTEXT)
         if not run.vetted and not run.tool_out:
             return out("no_answer", NO_CONTEXT)
 
         # --- the supervisor writes the final answer
         docs = self._documents(run)
-        partial = stop in ("max_steps", "no_new_queries") or bool(run.audits and not run.audits[-1].all_relevant)
+        partial = (stop in ("max_steps", "no_new_queries", "tool_error")
+                   or bool(run.audits and not run.audits[-1].all_relevant))
         try:
             draft = _timed(run.timings, "answer", self.llm,
                            self._answer_messages(question, plan, docs, assumptions, partial)).strip()
@@ -605,8 +628,10 @@ class Supervisor:
                 # The last search's audit approved something but the auditor's only ideas for what is missing are
                 # queries already searched (or near-repeats): another search would bring back the same chunks, so
                 # answer now instead of paying for a decide call whose search would be skipped anyway.
-                repeats = _repeated_suggestions(run, available)
-                gap = _uncovered_fact(run)
+                # After an error the model must see it, so these shortcuts that skip the decide call are off.
+                repeats = [] if run.force_decide else _repeated_suggestions(run, available)
+                gap = "" if run.force_decide else _uncovered_fact(run)
+                run.force_decide = False
                 if repeats and gap:
                     # the auditor says a fact is still missing but only suggests queries already searched: search the
                     # missing fact itself, once, instead of answering with part of the question uncovered
@@ -627,22 +652,48 @@ class Supervisor:
                 # 1. Prepare queries first
                 queries = self._next_queries(step, action, d, plan, question, run, trace)
                 if queries is None:
+                    if self._retry(run, "no_new_queries"):
+                        # tell the model what was dropped and let it respond once before the harness stops
+                        dropped = f" ({run.last_skipped})" if run.last_skipped else ""
+                        run.log.append(f"search skipped: every query proposed{dropped} repeats one already searched. "
+                                       "Use different official IRAS terms, or answer / give_up.")
+                        trace.append("  guard: no new queries left to search; letting the model decide once more.")
+                        run.force_decide = True
+                        continue
                     run.log.append("search skipped: no new queries")
                     trace.append("  guard: no new queries left to search; stopping search loop.")
                     return "no_new_queries", None          # supervise() answers if anything is vetted
                 approved_before = len(run.vetted)
 
-                # 2. Execute search ONCE
-                audit = self._search(plan, audit_q, queries, run, trace)
+                # 2. Execute search ONCE. A search that raises is an observation for the model, not a crash: its
+                # queries are not marked as tried (_search adds them only after retrieval succeeds), so it may retry.
+                try:
+                    audit = self._search(plan, audit_q, queries, run, trace)
+                except Exception as e:
+                    used, why = [q.text for q in queries], f"{type(e).__name__}: {e}"[:200]
+                    run.suggestions = []
+                    if self._retry(run, "tool_error"):
+                        run.log.append(f"search {used}: FAILED, the search tool raised an error ({why}); nothing "
+                                       "was retrieved. Retry the search, or try different queries.")
+                        trace.append(f"  search failed ({why}); letting the model decide what to do.")
+                        run.force_decide = True
+                        continue
+                    run.log.append(f"search {used}: FAILED again ({why})")
+                    trace.append(f"  search failed again ({why}); stopping search loop.")
+                    return "tool_error", None              # supervise() answers if anything is vetted
 
                 # 3. Early termination on zero-delta
                 # Only trigger on step > 1 (step 1 is the initial cold search)
                 # eliminates redundant multi-hop loops. speeding up time for retrieval
                 if step > 1 and run.last_new_chunks_count == 0:
-                    trace.append("  guard: zero new chunks retrieved; stopping search loop.")
-                    if run.vetted or run.tool_out:
-                        return "agent_answered", None
-                    return "agent_gave_up", None
+                    if self._retry(run, "zero_new"):
+                        trace.append("  guard: zero new chunks retrieved; letting the model decide once more.")
+                        run.force_decide = True
+                    else:
+                        trace.append("  guard: zero new chunks retrieved; stopping search loop.")
+                        if run.vetted or run.tool_out:
+                            return "agent_answered", None
+                        return "agent_gave_up", None
 
                 # 4. The auditor says the approved chunks answer every part of the question: answer now instead of
                 # paying for another decide call (unless a calculator still has to run for a computation).
@@ -690,12 +741,13 @@ class Supervisor:
         flt = base.filter if base else SearchFilter(domain=plan.domain.value, year=plan.tax_year)
         make = type(base) if base else PlannedQuery  # build with the plan's own classes
         skipped: list[str] = []
+        run.last_skipped = skipped                   # the loop shows the model these when nothing is left
 
         if action == "decompose":
             # Step 1: break the whole question down. Later: plan only for what the last audit says is missing.
             missing = run.audits[-1].missing if step > 1 and run.audits else None
-            drafted = _timed(run.timings, "plan", self._plan, plan, question, missing, run.tried, trace)
-            texts = _new_queries(drafted, run.tried, skipped)
+            drafted = _timed(run.timings, "plan", self._plan, plan, question, missing, run.tried + run.no_hit, trace)
+            texts = _drop_exact(_new_queries(drafted, run.tried, skipped), run.no_hit, skipped)
             if skipped:
                 trace.append(f"  guard: skipped near-duplicate planned queries {skipped}")
             if texts:
@@ -709,7 +761,7 @@ class Supervisor:
                 return queries
             trace.append("  planner gave no new queries; falling back to "
                          + ("the question as written" if step == 1 else "the model's and auditor's queries"))
-            skipped = []
+            skipped.clear()
 
         if step == 1:
             # capping queries limits total database round-trips
@@ -720,12 +772,23 @@ class Supervisor:
 
         # Repeats and near-repeats of searched queries retrieve the same chunks, so they are dropped
         # before any retrieval runs. If none of the model's queries are new, the auditor's get a chance.
-        texts = (_new_queries(d.get("queries") or [], run.tried, skipped)
-                 or _new_queries(run.suggestions, run.tried, skipped))
+        # A query whose search returned no results at all is only blocked when repeated exactly: its rewordings were
+        # never searched, so the near-duplicate rule (which assumes they bring back the same chunks) does not apply.
+        texts = (_drop_exact(_new_queries(d.get("queries") or [], run.tried, skipped), run.no_hit, skipped)
+                 or _drop_exact(_new_queries(run.suggestions, run.tried, skipped), run.no_hit, skipped))
         if skipped:
             trace.append(f"  guard: skipped near-duplicate queries {skipped}")
         queries = [make(text=q, filter=flt) for q in texts[: self.max_queries]]
         return queries or None
+
+    @staticmethod
+    def _retry(run: _Run, kind: str) -> bool:
+        """True (and counts it) if the model may still be shown an error of this kind and decide again."""
+        n = run.retries.get(kind, 0)
+        if n >= MAX_ERROR_RETRIES:
+            return False
+        run.retries[kind] = n + 1
+        return True
 
     def _route(self, plan: Decompose, question: str, trace: list[str]) -> dict:
         """Step 1 when the intake wrote no sub-queries: search the question as written, or decompose it first.
@@ -764,10 +827,20 @@ class Supervisor:
 
         trace += [f"  {n}" for n in getattr(self.retrieval, "last_notes", [])]
         used = [q.text for q in queries]
-        run.tried += used
+        hits = getattr(self.retrieval, "last_hits", None)
+        if hits == 0:
+            # nothing came back at all (not even chunks seen before): record the queries so exact repeats are
+            # blocked, but keep them out of `tried`, whose near-duplicate rule would block every rewording too
+            run.no_hit += used
+        else:
+            run.tried += used
         batch = [c for c in batch if c.id not in run.judged]
         if not batch:
-            run.log.append(f"search {used}: no new chunks")
+            if hits == 0:
+                run.log.append(f"search {used}: returned NO results at all. Search again with different queries "
+                               "(other official IRAS terms).")
+            else:
+                run.log.append(f"search {used}: no new chunks (only chunks already judged)")
             run.suggestions = []
             return None
 
@@ -956,6 +1029,20 @@ def _new_queries(wanted: list, tried: list, skipped: Optional[list] = None) -> l
         seen.append(q)
         out.append(q)
     return out[:3]
+
+
+def _drop_exact(texts: list[str], banned: list, skipped: Optional[list] = None) -> list[str]:
+    """`texts` minus exact (case- and space-insensitive) repeats of `banned`; dropped ones go to `skipped`."""
+    norm = lambda s: re.sub(r"\s+", " ", str(s)).strip().lower()   # noqa: E731
+    gone = {norm(b) for b in banned}
+    out = []
+    for t in texts:
+        if norm(t) in gone:
+            if skipped is not None and t not in skipped:
+                skipped.append(t)
+        else:
+            out.append(t)
+    return out
 
 
 def _repeated_suggestions(run: _Run, available: list[str]) -> list[str]:
