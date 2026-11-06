@@ -230,16 +230,18 @@ class RetrievalAgent:
         seen, found = set(exclude), {}
         for q in chosen:
             extra = {} if self.candidates is None else {"candidates": self.candidates}
-            hits = self.retriever.search(q.text, k=self.k, min_score=self.min_score, **extra)
+            hits = self.retriever.search(expand(q.text), k=self.k, min_score=self.min_score, **extra)
             self.last_hits += len(hits)
             new = 0
             for h in hits:
                 if h["id"] in seen:
                     if h["id"] in found and (h.get("score") or 0.0) > (found[h["id"]].get("score") or 0.0):
-                        found[h["id"]] = h                      # found by two queries: keep the better score
+                        # found[h["id"]] = h                      # found by two queries: keep the better score
+                        found[h["id"]] = {**h, "query": q.text}
                     continue
                 seen.add(h["id"])
-                found[h["id"]] = h
+                # found[h["id"]] = h
+                found[h["id"]] = {**h, "query": q.text}
                 new += 1
             self.last_notes.append(f"retrieved {len(hits)} chunk(s), {new} new, for {q.text!r}")
         rerank = getattr(self.retriever, "_rerank", None)
@@ -247,9 +249,21 @@ class RetrievalAgent:
         if question and found and rerank and reranked:
             # the better of its score for the question and for the query that found it: against a two-part question
             # the chunk answering one part scores low, but it scored well for the query written for that part
-            scores = rerank(question, list(found))
+            scores = rerank(expand(question), list(found))
             found = {i: {**h, "score": round(max(scores[i], h.get("score") or 0.0), 4)} for i, h in found.items()}
-        ranked = sorted(found.values(), key=lambda h: h.get("score") or 0.0, reverse=True)[: self.max_chunks]
+        ranked = sorted(found.values(), key=lambda h: h.get("score") or 0.0, reverse=True)
+        # each query's best chunk goes first: ranked against the whole question, one part of a multi-part question
+        # can fill the batch and push out the other part's chunks; the first audit_keep_top also skip the cutoff
+        firsts, seen_q = [], set()
+        for h in ranked:
+            if h.get("query") not in seen_q:
+                seen_q.add(h.get("query"))
+                firsts.append(h)
+        first_ids = {h["id"] for h in firsts}
+        ranked = (firsts + [h for h in ranked if h["id"] not in first_ids])[: self.max_chunks]
+        if len(found) > self.max_chunks:
+            self.last_notes.append(f"batch cap: {len(found) - self.max_chunks} chunk(s) beyond max_chunks "
+                                   f"{self.max_chunks} not audited")
         return [Chunk(id=h["id"], content=h["text"],
                       metadata={"source": h.get("source", ""), "headings": h.get("headings", ""),
                                 "pages": h.get("pages", ""), "source_type": h.get("source_type", ""),
@@ -698,7 +712,14 @@ class Supervisor:
                 # 4. The auditor says the approved chunks answer every part of the question: answer now instead of
                 # paying for another decide call (unless a calculator still has to run for a computation).
                 pending_tools = [t for t in available if t not in run.tool_out]
-                if audit is not None and audit.sufficient is True and run.vetted and not pending_tools:
+                # ...but only if some approved chunk cleared the reranker cutoff: "sufficient" on chunks that all
+                # scored below it (kept only by audit_keep_top) usually means the right chunks were never found
+                confident = any(_score(c) is None or _score(c) >= self.audit_min_score for c in run.vetted.values())
+                if audit is not None and audit.sufficient is True and run.vetted and not pending_tools \
+                        and not confident:
+                    trace.append("  guard: auditor reports sufficient, but every approved chunk scored below the "
+                                 f"reranker cutoff {self.audit_min_score:.2f}; asking the model instead.")
+                if audit is not None and audit.sufficient is True and run.vetted and not pending_tools and confident:
                     trace.append("  guard: auditor reports the approved chunks are sufficient; answering.")
                     return "auditor_sufficient", None
 
@@ -953,6 +974,17 @@ _STOPWORDS = {"a", "an", "the", "of", "for", "and", "or", "to", "in", "on", "is"
 _SYNONYMS = {"requirement": "condition", "criteria": "condition", "criterion": "condition",
              "eligibility": "condition", "eligible": "condition", "qualifying": "condition", "qualify": "condition",
              "rule": "condition"}
+
+# abbreviations users type that the retriever and reranker don't match to the full IRAS terms
+ABBREV = {"NOA": "Notice of Assessment", "ECI": "Estimated Chargeable Income", "FYE": "financial year end",
+          "CIT": "corporate income tax", "WHT": "withholding tax", "IPC": "Institution of a Public Character",
+          "IBNR": "incurred but not reported", "NWP": "net written premium", "COR": "Certificate of Residence"}
+_ABBR = re.compile(r"(?<!\()\b(" + "|".join(ABBREV) + r")\b(?!\))", re.I)
+
+
+def expand(text: str) -> str:
+    """'when do we get our NOA?' -> 'when do we get our Notice of Assessment (NOA)?'"""
+    return _ABBR.sub(lambda m: f"{ABBREV[m.group(1).upper()]} ({m.group(1)})", text or "")
 
 
 def _query_terms(q: str) -> set[str]:
