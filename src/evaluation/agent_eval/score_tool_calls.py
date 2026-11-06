@@ -42,6 +42,7 @@ Error Recovery Rate = recovered / errors (reported separately for injected and n
 Run (anywhere, reads files only):
     python src/evaluation/agent_eval/score_tool_calls.py --all
     python src/evaluation/agent_eval/score_tool_calls.py a1_agentic_qwen_toolcalls a1_agentic_qwen_toolcalls_empty
+    python src/evaluation/agent_eval/score_tool_calls.py --all --suite main           (full runs in results/output)
     python src/evaluation/agent_eval/score_tool_calls.py --all --suite robustness     (runs recorded after this change)
 Writes agent_eval/results/tool_calls/<run_id>_tool_calls.jsonl and tool_calls_<suite>.{md,csv}.
 """
@@ -49,15 +50,16 @@ import argparse
 import json
 import math
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-EVAL = HERE.parent
-DATASET = EVAL / "eval_questions.json"
-SUITES = HERE / "results"                                   # run_suite.py writes agent_eval/results/<suite>/
-OLD_SUITES = EVAL / "rag_eval" / "results" / "agent_eval"   # where suite outputs went before; still read
-OUT = HERE / "results" / "tool_calls"
+sys.path.insert(0, str(HERE.parents[2]))
+
+from src.evaluation.agent_eval.paths import DATASET, OUTPUT, RESULTS  # noqa: E402
+SUITES = RESULTS                                            # run_suite.py writes agent_eval/results/<suite>/
+OUT = RESULTS / "tool_calls"
 NOT_RUNS = ("_scores", "_judge", "_judge_details", "_trajectory", "_ragas", "_task_success", "_tool_calls")
 MULTI = {"multi-part", "multi-step"}
 TOOL_ACTIONS = {"search", "decompose"}
@@ -77,13 +79,9 @@ def base_name(run_id):
 
 
 def find_runs(suite, names=(), every=False):
-    """{run_id: records} from agent_eval/results/<suite>/ and the old rag_eval/results/agent_eval/<suite>/ (a run in
-    both is read from the new folder)."""
-    folder = SUITES / suite
-    by_stem = {}
-    for d in (OLD_SUITES / suite, folder):                  # new folder last, so it wins
-        by_stem.update({p.stem: p for p in d.glob("*.jsonl") if not p.stem.endswith(NOT_RUNS)})
-    files = [by_stem[s] for s in sorted(by_stem)]
+    """{run_id: records} from agent_eval/results/<suite>/ (suite main: agent_eval/results/output/)."""
+    folder = OUTPUT if suite == "main" else SUITES / suite
+    files = sorted(p for p in folder.glob("*.jsonl") if not p.stem.endswith(NOT_RUNS))
     if not every:
         files = [p for p in files if p.stem in names or base_name(p.stem) in names]
         found = {p.stem for p in files} | {base_name(p.stem) for p in files}
@@ -306,7 +304,8 @@ def main():
     parser = argparse.ArgumentParser(description="Tool-call accuracy of the agent (no LLM)")
     parser.add_argument("runs", nargs="*", help="run ids (a name without _repN takes all its repeats)")
     parser.add_argument("--all", action="store_true", help="every run with recorded tool calls in the suite folder")
-    parser.add_argument("--suite", default="toolcalls", choices=["toolcalls", "robustness", "safety"])
+    parser.add_argument("--suite", default="toolcalls", choices=["toolcalls", "main", "robustness", "safety"],
+                        help="toolcalls (default), main (full runs in results/output), robustness or safety")
     parser.add_argument("--data", default=str(DATASET), help="question set (default: src/evaluation/eval_questions.json)")
     args = parser.parse_args()
     if not args.runs and not args.all:

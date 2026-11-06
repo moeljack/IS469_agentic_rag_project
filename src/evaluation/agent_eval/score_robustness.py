@@ -2,7 +2,7 @@
 differently, and does it give the same answer? No model is called.
 
 Each rephrased question (robustness suite, run_suite.py) is compared with its original question, answered in a normal
-run (rag_eval/results/outputs, e.g. the A1 repeats). The right behaviour depends on the original:
+run (agent_eval/results/output, e.g. the A1 repeats). The right behaviour depends on the original:
     answerable      the agent should answer: `completed` = status "answered" (a refusal, a clarification question,
                     no_answer or an error counts as not completed)
     out-of-scope    the agent should decline: `declined` = status refused, no_answer or clarify (an answer is a failure)
@@ -24,7 +24,7 @@ Against an original answered in several repeats, each value is the mean over tho
 Errors (a case that raised) are not robustness failures but crashes: they are counted separately and the scorer warns.
 Fix the cause and rerun those cases before reporting (move the suite's .jsonl aside, then rerun run_suite.py).
 
-Summary (rag_eval/results/report_assets/agent_robustness.{md,csv}): for the whole run, per round of cases (round 1 =
+Summary (agent_eval/results/robustness/agent_robustness.{md,csv}): for the whole run, per round of cases (round 1 =
 rewrites of questions the agent answers; round 2 = harder rewrites of multi-part, previously refused and out-of-scope
 questions) and per rewrite kind:
     completion_original / completion_variant / completion_delta   the Robustness Score is completion_variant
@@ -47,8 +47,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from src.evaluation.agent_eval.common import (  # noqa: E402
-    SUITE_OUT, baseline_records, key_fact_hit, mean, norm, part_recall, save_table, suite_runs)
-from src.evaluation.rag_eval.rag_eval_approach.results_io import load_dataset  # noqa: E402
+    SUITE_OUT, baseline_records, key_fact_hit, load_dataset, mean, norm, part_recall, save_table, suite_runs)
 
 DECLINED = {"refused", "no_answer", "clarify"}
 CITATION = re.compile(r"\[doc \d+\]")
@@ -161,7 +160,7 @@ def main():
     parser.add_argument("runs", nargs="*", help="robustness run ids (a name without _repN takes all repeats)")
     parser.add_argument("--all", action="store_true", help="every run in agent_eval/results/robustness")
     parser.add_argument("--baseline", required=True,
-                        help="run in rag_eval/results/outputs that answered the original questions, e.g. a1_agentic_qwen")
+                        help="run in agent_eval/results/output that answered the original questions, e.g. a1_agentic_qwen")
     parser.add_argument("--differing", type=float, default=0.5,
                         help="list answerable pairs whose number_agreement is below this (default 0.5)")
     args = parser.parse_args()
@@ -169,7 +168,8 @@ def main():
     dataset = load_dataset()
     base = baseline_records(args.baseline)
     if not base:
-        raise SystemExit(f"no outputs called {args.baseline!r} in rag_eval/results/outputs")
+        raise SystemExit(f"no outputs called {args.baseline!r} in agent_eval/results/output "
+                         "(run run_suite.py --suite main, or copy the runs there)")
     runs = suite_runs("robustness", args.runs, args.all)
     original = {qid: averaged([outcome(r, dataset[qid]) for r in recs]) for qid, recs in base.items() if qid in dataset}
 
@@ -231,7 +231,7 @@ def main():
     for key in sorted(k for k in pooled if k.startswith("kind: ")):
         table.append(summarise(f"  {key}", pooled[key]))
     print()
-    save_table("agent_robustness", table,
+    save_table("agent_robustness", table, folder="robustness",
                extra=f"Originals from `{args.baseline}` (mean over its repeats). Answerable pairs: completion = "
                      "answered. Out-of-scope pairs: decline = refused/no_answer/clarify. key_fact_hit checks numeric "
                      "key facts only, without a judge. Consistency (pairs where both versions were answered): "

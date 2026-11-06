@@ -1,9 +1,10 @@
 """Step efficiency of the agent (Eval Plan: "Step Efficiency"): did it reach its answer without wandering or looping?
 
 A characteristic failure of agentic RAG is searching again and again without making progress. This scorer turns each
-agent run's trajectory into per-question statistics and a run summary. No LLM is called.
+agent run's trajectory into per-question statistics and a run summary. No LLM is called. It reads the full runs in
+agent_eval/results/output/ (run_suite.py --suite main).
 
-Per question (results/scores/<run_id>_trajectory.jsonl):
+Per question (agent_eval/results/trajectory/<run_id>_trajectory.jsonl):
     steps               actions the supervisor loop took (search, decompose, answer, give_up, ...), 0 if the intake gate
                         refused or clarified before the loop started
     searches            searches actually executed (a search step whose queries were all dropped as near-duplicates is
@@ -18,14 +19,15 @@ Per question (results/scores/<run_id>_trajectory.jsonl):
                         search retrieved a gold chunk for a fact not yet covered, an objective alternative to the
                         auditor's verdict
 
-Run summary (results/report_assets/agent_step_efficiency.{md,csv}), over questions that reached the loop:
+Run summary (agent_eval/results/trajectory/agent_step_efficiency.{md,csv}), over questions that reached the loop:
     wasted_search_rate  wasted searches / executed searches         <- the plan's Wandering/Looping Rate
     wasted_followup_rate  wasted follow-up searches / follow-up searches
     steps mean / p90, searches mean, one-shot share (answered after exactly one search), budget-hit rate,
     redundant-query rate, blocked queries, stop-reason counts, LLM calls per question
 
 Run:  python src/evaluation/agent_eval/score_trajectory.py a1_agentic_qwen_rep1 a1_agentic_qwen_rep2
-      python src/evaluation/agent_eval/score_trajectory.py --all          (every agentic run in results/outputs)
+      python src/evaluation/agent_eval/score_trajectory.py a1_agentic_qwen      (all its repeats)
+      python src/evaluation/agent_eval/score_trajectory.py --all                (every agentic run in results/output)
 """
 import argparse
 import ast
@@ -38,10 +40,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-from src.evaluation.rag_eval.rag_eval_approach.results_io import (  # noqa: E402
-    OUTPUTS, RESULTS, SCORES, load_dataset, read_jsonl, run_ids)
-
-ASSETS = RESULTS / "report_assets"
+from src.evaluation.agent_eval.paths import OUTPUT, base_name, load_dataset, read_jsonl, results_dir  # noqa: E402
 
 # Trace line formats written by src/supervisor/supervisor.py
 STEP = re.compile(r"^step (\d+): (\w+)")
@@ -49,6 +48,8 @@ RETRIEVED = re.compile(r"^\s+retrieved (\d+) chunk\(s\), (\d+) new, for (.+)$")
 VERDICT = re.compile(r"^\s+(approved|REJECTED|skipped) ")
 BLOCKED = re.compile(r"guard: skipped near-duplicate (?:planned )?queries (\[.*\])\s*$")
 AUTO_ANSWER = "skipping the decide call"          # step N: answer chosen by a guard, not by a decide call
+NOT_RUNS = ("_scores", "_judge", "_judge_details", "_trajectory", "_ragas", "_task_success", "_tool_calls",
+            "_consistency", "_cost_latency")
 
 
 # ---------------------------------------------------------------- parsing
@@ -178,6 +179,7 @@ def summarise(name, rows):
     out = {
         "name": name,
         "questions": len(rows),
+        "crashed": sum(1 for r in rows if r["status"] == "error"),
         "stopped_at_intake": len(rows) - len(loop),
         "reached_loop": len(loop),
         "steps_mean": _mean([r["steps"] for r in loop]),
@@ -204,10 +206,6 @@ def summarise(name, rows):
     return out
 
 
-def base_name(run_id):
-    return re.sub(r"_rep\d+$", "", run_id)
-
-
 def markdown(table):
     cols = list(dict.fromkeys(k for row in table for k in row))
     def cell(col, v):
@@ -223,23 +221,39 @@ def markdown(table):
     return "\n".join(lines)
 
 
+def run_ids(names=(), every=False):
+    """Run ids in agent_eval/results/output: the ones named (a name without _repN takes all its repeats) or all."""
+    stems = sorted(p.stem for p in OUTPUT.glob("*.jsonl") if not p.stem.endswith(NOT_RUNS))
+    if every:
+        return stems
+    picked = [s for s in stems if s in names or base_name(s) in names]
+    found = set(picked) | {base_name(s) for s in picked}
+    missing = [n for n in names if n not in found]
+    if missing:
+        raise SystemExit(f"no outputs for {missing} in {OUTPUT} (run run_suite.py --suite main, or copy the runs there)")
+    return picked
+
+
 def is_agentic(run_id):
-    recs = read_jsonl(OUTPUTS / f"{run_id}.jsonl")
+    recs = read_jsonl(OUTPUT / f"{run_id}.jsonl")
     return bool(recs) and any(r.get("system") == "agentic" for r in recs)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Step efficiency of agentic runs (no LLM)")
     parser.add_argument("runs", nargs="*")
-    parser.add_argument("--all", action="store_true", help="every agentic run in results/outputs")
+    parser.add_argument("--all", action="store_true", help="every agentic run in agent_eval/results/output")
     parser.add_argument("--loopers", type=int, default=2,
                         help="list questions with at least this many wasted follow-up searches (default 2)")
     args = parser.parse_args()
+    if not args.runs and not args.all:
+        parser.error("name runs to score, or use --all")
 
     dataset = load_dataset()
-    SCORES.mkdir(parents=True, exist_ok=True)
-    ids = [r for r in run_ids(args.runs, args.all) if is_agentic(r)]
-    skipped = sorted(set(run_ids(args.runs, args.all)) - set(ids))
+    out_dir = results_dir("trajectory")
+    every = run_ids(args.runs, args.all)
+    ids = [r for r in every if is_agentic(r)]
+    skipped = sorted(set(every) - set(ids))
     if skipped:
         print(f"skipping non-agentic runs (one search per question by design): {skipped}")
     if not ids:
@@ -247,12 +261,15 @@ def main():
 
     per_run, table = {}, []
     for run_id in ids:
-        rows = [score_record(rec, dataset[rec["qid"]]) for rec in read_jsonl(OUTPUTS / f"{run_id}.jsonl")
-                if rec["qid"] in dataset]
+        rows = [score_record(rec, dataset[rec["qid"]]) for rec in read_jsonl(OUTPUT / f"{run_id}.jsonl")
+                if rec.get("qid") in dataset]
         per_run[run_id] = rows
-        (SCORES / f"{run_id}_trajectory.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows),
-                                                           encoding="utf-8")
+        (out_dir / f"{run_id}_trajectory.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows),
+                                                            encoding="utf-8")
         table.append(summarise(run_id, rows))
+        crashed = sum(1 for r in rows if r["status"] == "error")
+        if crashed:
+            print(f"WARNING {run_id}: {crashed} question(s) crashed; their trajectories stop at the crash")
     groups = {}
     for run_id in ids:
         groups.setdefault(base_name(run_id), []).append(run_id)
@@ -260,15 +277,14 @@ def main():
         if len(members) > 1:
             table.append(summarise(f"{name} (pooled {len(members)})", [r for m in members for r in per_run[m]]))
 
-    ASSETS.mkdir(parents=True, exist_ok=True)
     text = markdown(table)
-    (ASSETS / "agent_step_efficiency.md").write_text(text + "\n", encoding="utf-8")
+    (out_dir / "agent_step_efficiency.md").write_text(text + "\n", encoding="utf-8")
     cols = list(dict.fromkeys(k for row in table for k in row))
     csv = [",".join(cols)] + [",".join(json.dumps(row.get(c, "")) if isinstance(row.get(c), str) else
                                        ("" if row.get(c) is None else str(row.get(c))) for c in cols) for row in table]
-    (ASSETS / "agent_step_efficiency.csv").write_text("\n".join(csv) + "\n", encoding="utf-8")
+    (out_dir / "agent_step_efficiency.csv").write_text("\n".join(csv) + "\n", encoding="utf-8")
     print(text)
-    print(f"\n  -> {ASSETS / 'agent_step_efficiency.md'}")
+    print(f"\n  -> {out_dir / 'agent_step_efficiency.md'}")
 
     loopers = [(run_id, r) for run_id, rows in per_run.items() for r in rows
                if r["wasted_followups"] >= args.loopers or r["budget_hit"]]

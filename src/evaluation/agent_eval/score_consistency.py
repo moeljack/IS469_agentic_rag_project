@@ -3,7 +3,7 @@ is asked in different words? The LLM judge compares the two answers in full.
 
 score_robustness.py checks whether the agent still answers a rephrased question and, without a judge, whether the two
 answers state the same numbers. This script shows the judge both answers, the one to the original question (from a
-normal run, --baseline) and the one to the rephrased question (robustness suite, run_suite.py), and asks where they
+normal run in agent_eval/results/output, --baseline) and the one to the rephrased question (robustness suite, run_suite.py), and asks where they
 differ (prompts/consistency_v1.txt; one call per pair, JSON constrained by a schema like the task-success judge):
 
     differences    each point where the answers differ: what A says, what B says, and whether they contradict each
@@ -41,11 +41,11 @@ ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT))
 
 from src.evaluation.agent_eval.judge import DEFAULT_JUDGE, json_judge, judge_name, load_judge, read_judge  # noqa: E402
+from src.evaluation.agent_eval.paths import DATASET, OUTPUT, RESULTS  # noqa: E402
 
-DATASET = EVAL / "eval_questions.json"
-BASELINES = EVAL / "rag_eval" / "results" / "outputs"
-SUITE_DIRS = [EVAL / "rag_eval" / "results" / "agent_eval" / "robustness", HERE / "results" / "robustness"]  # new last
-OUT = HERE / "results" / "consistency"
+BASELINES = OUTPUT                                  # agent_eval/results/output/: the original questions' runs
+SUITE_DIRS = [RESULTS / "robustness"]               # agent_eval/results/robustness/: the rephrased questions' runs
+OUT = RESULTS / "consistency"
 PROMPT = HERE / "prompts" / "consistency_v1.txt"
 METHOD = "consistency-v1"
 NOT_RUNS = ("_scores", "_judge", "_judge_details", "_trajectory", "_ragas", "_task_success", "_tool_calls",

@@ -1,6 +1,6 @@
 """Cost and latency per question (Eval Plan: "Cost and Latency"; RQ4: what does each agentic RAG answer cost compared
-with naive RAG?). No model is called: everything comes from the run files rag_eval's run.py writes
-(rag_eval/results/outputs/<run_id>.jsonl), so no rerun is needed.
+with naive RAG?). No model is called: everything comes from the full runs in agent_eval/results/output/<run_id>.jsonl
+(run_suite.py --suite main, for the agentic and the naive configs).
 
     RQ4a  token cost per question   `tokens` = input + output tokens summed over every LLM call for the question.
                                     For the agent that is the intake, route, decide, planner, auditor and answer
@@ -34,14 +34,16 @@ import argparse
 import json
 import math
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-EVAL = HERE.parent
-DATASET = EVAL / "eval_questions.json"
-OUTPUTS = EVAL / "rag_eval" / "results" / "outputs"
-OUT = HERE / "results" / "cost_latency"
+sys.path.insert(0, str(HERE.parents[2]))
+
+from src.evaluation.agent_eval.paths import DATASET, OUTPUT as OUTPUTS, RESULTS  # noqa: E402
+
+OUT = RESULTS / "cost_latency"
 NOT_RUNS = ("_scores", "_judge", "_judge_details", "_trajectory", "_ragas", "_task_success", "_tool_calls",
             "_grounding", "_retrieval", "_consistency")
 
@@ -234,12 +236,12 @@ def save(name, sections, note=""):
 def main():
     parser = argparse.ArgumentParser(description="Tokens and wall-clock time per question, agentic vs naive (no LLM)")
     parser.add_argument("runs", nargs="*", help="run ids or configs (a name without _repN takes all its repeats)")
-    parser.add_argument("--all", action="store_true", help="every run in rag_eval/results/outputs")
+    parser.add_argument("--all", action="store_true", help="every run in agent_eval/results/output")
     parser.add_argument("--pair", nargs=2, action="append", default=[], metavar=("AGENTIC", "NAIVE"),
                         help="compare two configs on the same questions (default: every agentic config vs every naive one)")
     parser.add_argument("--by-type", action="store_true", help="add tables per question type and per status")
     parser.add_argument("--data", default=str(DATASET), help="question set, for --by-type (default: eval_questions.json)")
-    parser.add_argument("--outputs", default=str(OUTPUTS), help="folder with the run files (default: rag_eval/results/outputs)")
+    parser.add_argument("--outputs", default=str(OUTPUTS), help="folder with the run files (default: agent_eval/results/output)")
     args = parser.parse_args()
     if not args.runs and not args.all:
         parser.error("name runs to score, or use --all")

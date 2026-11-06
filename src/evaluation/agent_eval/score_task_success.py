@@ -32,8 +32,9 @@ Out-of-scope decline rate and the overall rate over every question are reported 
 Thresholds: set them before looking at results and keep them fixed; both are written into every output.
 
 Inputs (read only; nothing outside agent_eval is changed):
-    --suite main         agent runs over the question set: rag_eval/results/outputs/<run_id>.jsonl (made by run.py)
-    --suite robustness   rephrased questions: rag_eval/results/agent_eval/robustness/<run_id>.jsonl (run_suite.py);
+    --suite main         agent runs over the question set: agent_eval/results/output/<run_id>.jsonl
+                         (run_suite.py --suite main)
+    --suite robustness   rephrased questions: agent_eval/results/robustness/<run_id>.jsonl (run_suite.py);
                          each variant is judged against its own wording and scored as its original question
     --outputs DIR        read run files from another folder instead
 Outputs (agent_eval/results/task_success/):
@@ -64,14 +65,13 @@ EVAL = HERE.parent                                          # src/evaluation
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT))
 
+from src.evaluation.agent_eval.paths import DATASET, OUTPUT, RESULTS  # noqa: E402
 from src.evaluation.agent_eval.judge import (  # noqa: E402
     DEFAULT_JUDGE, json_judge, judge_name, load_judge, read_judge)
 
-DATASET = EVAL / "eval_questions.json"
-INPUTS = {"main": [EVAL / "rag_eval" / "results" / "outputs"],
-          # run_suite.py writes agent_eval/results/<suite>/; the old rag_eval folder is still read (new one wins)
-          "robustness": [EVAL / "rag_eval" / "results" / "agent_eval" / "robustness", HERE / "results" / "robustness"]}
-OUT = HERE / "results" / "task_success"
+INPUTS = {"main": [OUTPUT],                                    # agent_eval/results/output/
+          "robustness": [RESULTS / "robustness"]}                 # agent_eval/results/robustness/
+OUT = RESULTS / "task_success"
 
 DECLINED = {"refused", "no_answer", "clarify"}
 SCORE_COLS = ("faithfulness", "answer_relevancy")
@@ -96,7 +96,7 @@ SCHEMAS = {"faithfulness": _schema("claims", ["claim", "evidence"], "supported")
 NOT_RUNS = ("_scores", "_judge", "_judge_details", "_trajectory", "_ragas", "_task_success")
 
 
-# ---------------------------------------------------------------- loading (copied from rag_eval results_io)
+# ---------------------------------------------------------------- loading
 def read_jsonl(path):
     path = Path(path)
     if not path.exists():

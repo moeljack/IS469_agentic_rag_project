@@ -1,5 +1,8 @@
-"""Run a system on the agent-eval test suites (Eval Plan: "Robustness and Safety", "Tool-Call Accuracy") and save one
-record per case.
+"""Run a system on the agent-eval question sets and save one record per case.
+
+    main         the evaluation questions as they are (eval_questions.json, without the paraphrases): the full runs
+                 the other scorers read (task success, step efficiency, cost and latency, and every --baseline).
+                 Saved as agent_eval/results/output/<run_id>[_repN].jsonl, e.g. a1_agentic_qwen_rep1, n1_naive.
 
     robustness   data/robustness_cases.json: every rephrased question (P01-P05, the paraphrases that used to live in
                  the dataset, plus colloquial, typo and verbose rewrites of questions the agent answers).
@@ -10,6 +13,8 @@ record per case.
                  returns nothing or raises, to measure error recovery. Score with score_tool_calls.py.
 
 Run (on the machine with Ollama and the retriever, like run.py):
+    python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite main --repeat 1
+    python src/evaluation/agent_eval/run_suite.py n1_naive.yaml --suite main
     python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite robustness --repeat 1
     python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite safety --repeat 1
     python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite toolcalls --repeat 1
@@ -18,13 +23,14 @@ Run (on the machine with Ollama and the retriever, like run.py):
 
 The config is any run.py config (a path, or a file name in rag_eval_approach/configs/); the system is built exactly
 as run.py builds it, only the retriever is wrapped for the safety suite (injection) or a fault run. Output:
-    agent_eval/results/<suite>/<run_id>_<suite>[_<fault>][_repN].jsonl   (+ .meta.json)
-Resumable (cases already in the file are skipped) and never mixes configurations, like run.py. A run started before
-outputs moved here (rag_eval/results/agent_eval/<suite>/) is copied across and continued. A case that raises
+    main          agent_eval/results/output/<run_id>[_repN].jsonl                        (+ .meta.json)
+    other suites  agent_eval/results/<suite>/<run_id>_<suite>[_<fault>][_repN].jsonl    (+ .meta.json)
+Resumable (cases already in the file are skipped) and never mixes configurations, like run.py. A case that raises
 is saved with status "error". For the agent, the record also holds what the user store saved during the case
 (`profile_facts`, `profile_history`), so the safety scorer can check whether an injection wrote to memory, and every
 tool call the agent made (`tool_calls`, from tool_trace.py), in every suite.
-Score with score_robustness.py, score_safety.py and score_tool_calls.py (no model needed).
+Nothing is read from or written to rag_eval's result folders; rag_eval supplies only the code that builds the systems
+(systems.py) and the configs.
 """
 import argparse
 import datetime as dt
@@ -40,36 +46,18 @@ sys.path.insert(0, str(ROOT))
 
 import yaml  # noqa: E402
 
-from src.evaluation.rag_eval.rag_eval_approach.results_io import DATASET, RESULTS  # noqa: E402
+from src.evaluation.agent_eval.paths import CONFIGS, DATASET, OUTPUT, RESULTS  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-CONFIGS = ROOT / "src" / "evaluation" / "rag_eval" / "rag_eval_approach" / "configs"
 CASE_FILES = {"robustness": HERE / "data" / "robustness_cases.json", "safety": HERE / "data" / "injection_cases.json",
-              "toolcalls": None}               # toolcalls: the dataset's own questions, no case file
-SUITE_OUT = HERE / "results"                   # src/evaluation/agent_eval/results/<suite>/, wherever the job starts
-OLD_SUITE_OUT = RESULTS / "agent_eval"         # where suite outputs went before (rag_eval/results/agent_eval/<suite>/)
-
-
-def adopt_old_run(suite, run_id, out_path, meta_path):
-    """A run started in the old folder continues in the new one: when the new folder has no output for this run id
-    but the old one does, copy its .jsonl and .meta.json across (the originals stay), so finished cases are kept and
-    not run again."""
-    if out_path.exists() or meta_path.exists():
-        return
-    old_dir = OLD_SUITE_OUT / suite
-    old_out, old_meta = old_dir / out_path.name, old_dir / meta_path.name
-    if old_out.exists() or old_meta.exists():
-        import shutil
-        for src, dst in ((old_out, out_path), (old_meta, meta_path)):
-            if src.exists():
-                shutil.copy2(src, dst)
-        print(f"{run_id}: continuing the run found in {old_dir} (copied to {out_path.parent})")
+              "toolcalls": None, "main": None}   # toolcalls, main: the dataset's own questions, no case file
+SUITE_OUT = RESULTS                            # agent_eval/results/<suite>/ (main: agent_eval/results/output/)
 
 
 def load_cases(suite, dataset_path=DATASET, case_file=None):
     """[{case_id, question, ...}] for the suite. Robustness cases get variant_of (the original qid) and kind."""
     dataset = {q["qid"]: q for q in json.loads(Path(dataset_path).read_text(encoding="utf-8"))}
-    if suite == "toolcalls":                    # every scored question, unchanged (run.py's selection)
+    if suite in ("toolcalls", "main"):          # every scored question, unchanged (run.py's selection)
         return [{"case_id": q["qid"], "qid": q["qid"], "question": q["question"]}
                 for q in dataset.values() if "paraphrase_of" not in q]
     cases = json.loads(Path(case_file or CASE_FILES[suite]).read_text(encoding="utf-8"))
@@ -139,17 +127,17 @@ def main():
     from src.evaluation.rag_eval.rag_eval_approach.llm import resolve_model
     cfg["generator"]["model"] = resolve_model(cfg["generator"]["provider"], cfg["generator"]["model"])
     config_hash = hashlib.md5(json.dumps(cfg, sort_keys=True).encode("utf-8")).hexdigest()[:8]
-    run_id = (f"{cfg['run_id']}_{args.suite}" + (f"_{args.fault}" if args.fault else "")
+    suffix = "" if args.suite == "main" else f"_{args.suite}"          # main runs keep run.py's names
+    run_id = (f"{cfg['run_id']}{suffix}" + (f"_{args.fault}" if args.fault else "")
               + (f"_rep{args.repeat}" if args.repeat else ""))
     today = dt.date.fromisoformat(str(cfg["today"]))
 
     cases = load_cases(args.suite, case_file=args.cases)
     if args.only:
         cases = [c for c in cases if c["case_id"] in set(args.only)]
-    out_dir = SUITE_OUT / args.suite
+    out_dir = OUTPUT if args.suite == "main" else SUITE_OUT / args.suite
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path, meta_path = out_dir / f"{run_id}.jsonl", out_dir / f"{run_id}.meta.json"
-    adopt_old_run(args.suite, run_id, out_path, meta_path)
     if meta_path.exists():
         previous = json.loads(meta_path.read_text(encoding="utf-8"))["config_hash"]
         if previous != config_hash:
