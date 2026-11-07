@@ -48,6 +48,13 @@ export PYTHONUNBUFFERED=1
 source "$PROJECT_DIR/.venv/bin/activate"
 cd "$PROJECT_DIR"
 
+# Fail in a second, before Ollama starts, if the web app's package is missing from .venv.
+if ! python3 -c "import flask" 2>/dev/null; then
+    echo "ERROR: Flask is not installed in $PROJECT_DIR/.venv. On the login node run:"
+    echo "    source $PROJECT_DIR/.venv/bin/activate && pip install flask"
+    exit 1
+fi
+
 echo "Job $SLURM_JOB_ID on $(hostname) | git $(git rev-parse --short HEAD 2>/dev/null)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo "WARNING: no GPU visible"
 
@@ -108,9 +115,10 @@ app.app.run(host=os.environ['APP_HOST'], port=int(os.environ['APP_PORT']), debug
 APP_PID=$!
 
 END_TIME=$(squeue -h -j "$SLURM_JOB_ID" -o %e 2>/dev/null)
+[ -z "$END_TIME" ] && END_TIME="the job time limit"
 CONNECT_FILE="$PROJECT_DIR/app_connect.${SLURM_JOB_ID}.txt"
 cat > "$CONNECT_FILE" <<EOF
-IS469 chatbot, job $SLURM_JOB_ID on $(hostname) ($NODE_IP), valid until ${END_TIME:-the job's time limit}.
+IS469 chatbot, job $SLURM_JOB_ID on $(hostname) ($NODE_IP), valid until $END_TIME.
 
 1. On your laptop (SMU network or VPN), in a terminal / PowerShell window, run and keep it open:
 
@@ -131,12 +139,25 @@ cat "$CONNECT_FILE"
 echo "================================================================"
 
 # Report when the app is actually answering (models warm), so you know when to open the browser.
-if timeout 900 bash -c "until curl -s http://$APP_HOST:$APP_PORT/status | grep -q '\"ready\": *true'; do
-        kill -0 $APP_PID 2>/dev/null || exit 1; sleep 5; done"; then
-    echo ">>> App is ready at http://127.0.0.1:${APP_PORT} (through the tunnel)."
-else
-    echo "WARNING: app not ready after 15 minutes or it exited; check the log above."
-fi
+# init_app() catches its own errors and the server still starts, so a failed start-up shows up in /status, not as a crash.
+for _ in $(seq 1 180); do                                   # up to 15 minutes
+    if ! kill -0 "$APP_PID" 2>/dev/null; then
+        echo "ERROR: the app process exited during start-up; see the Python error above."
+        break
+    fi
+    STATUS_JSON=$(curl -s "http://$APP_HOST:$APP_PORT/status")
+    if echo "$STATUS_JSON" | grep -q '"ready": *true'; then
+        echo ">>> App is ready at http://127.0.0.1:${APP_PORT} (through the tunnel)."
+        break
+    elif echo "$STATUS_JSON" | grep -q 'Failed to initialize'; then
+        echo "ERROR: app start-up failed: $STATUS_JSON"
+        kill "$APP_PID" 2>/dev/null
+        break
+    fi
+    sleep 5
+done
 
 wait "$APP_PID"
-echo "App exited (status $?)."
+APP_STATUS=$?
+echo "App exited (status $APP_STATUS)."
+exit "$APP_STATUS"      # so a crashed app shows as FAILED in Slurm, not COMPLETED
