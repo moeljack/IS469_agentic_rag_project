@@ -79,6 +79,54 @@ Notes:
 - One failing PDF does not stop the run; failures are listed at the end.
 - `models/`, `chroma_db/` and the virtual environment are git-ignored.
 
+## Web chatbot
+
+`app.py` is a Flask front end (`templates/index.html`) for the supervisor: pick or add a user, chat, and see the saved
+profile and the agent trace for each answer.
+
+**Locally:** run `python app.py` (with Ollama running) and open `http://localhost:8080`. The page shows the start-up
+progress; the first answer is available once the models and reranker are loaded.
+
+### On the GPU cluster (`IS469_app.sh`)
+
+The app runs as a Slurm job on a compute node, and you reach it from your laptop through an SSH tunnel via the login
+node, the same way the cluster's Jupyter notebooks work. You need to be on the SMU network or VPN.
+
+1. From the project directory on the cluster, submit the job:
+   ```bash
+   sbatch IS469_app.sh
+   ```
+2. Once it is running (`squeue -u $USER` shows `R`), print this job's connection details:
+   ```bash
+   cat app_connect.<jobid>.txt
+   ```
+3. On your laptop, in a terminal or PowerShell window, run the `ssh` command from that file and leave the window open
+   (after the password prompt it prints nothing, which is normal). It looks like:
+   ```powershell
+   ssh -N -L <port>:<node-ip>:<port> <your-id>@origami.smu.edu.sg
+   ```
+4. Open `http://127.0.0.1:<port>` in your browser. The job log (`<user>.<jobid>.out`) prints `>>> App is ready` once
+   the models are warm, which can take a minute or two.
+
+Stop the app with `scancel <jobid>`.
+
+What the script does: starts Ollama, pulls the models set in `src/config.py`, then starts the app on this node's
+cluster IP with a per-job port (30000-39999, the next free one if taken), so jobs don't clash with each other or with
+Ollama. It runs `app.py` as is; nothing in `app.py` needs changing.
+
+Good to know:
+- **The URL works only while the job runs** (`--time`, 2 hours by default; the student QOS allows up to 1 day).
+- **The job holds its GPU, CPUs and memory the whole time, even when nobody is chatting**, and counts toward your job
+  limit like any other job. Your eval jobs may queue (`PD`) while it runs, so cancel it when you are done.
+- **There is no login.** Anyone on the cluster network who finds the node and port can open the app and pick any
+  user id, so don't enter real company data.
+- If your laptop's port is busy, change only the first number in the `ssh` command (e.g. `-L 18080:<node-ip>:<port>`)
+  and open `http://127.0.0.1:18080`.
+- If the tunnel connects but the page doesn't load, the node's IP may have been picked from the wrong network
+  interface (`hostname -I` in the script); check the address in `app_connect.<jobid>.txt`.
+- Paths: edit `PROJECT_DIR` / `SCRATCH_DIR` at the top of the script (or export them), as in the other job scripts.
+  `LOGIN_HOST` defaults to `origami.smu.edu.sg`.
+
 ## Troubleshooting
 
 - `WinError 1314` (symlink privilege) from Hugging Face: turn on Windows Developer Mode
