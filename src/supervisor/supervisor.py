@@ -164,7 +164,11 @@ ANSWER_SYSTEM = """You are a Singapore corporate income tax assistant. Answer th
 - Never state a rate, cap, threshold, date or amount that is not in the documents or tool output.
 - If COVERAGE NOTE is present, say plainly which part of the question the documents do not cover.
 - If the documents do not contain the answer, reply exactly: INSUFFICIENT_CONTEXT: The provided documents do not contain this information.
-Be concise and direct."""
+Be concise and direct.
+- If the QUESTION asks several things, answer each one under its own number, in order. If no document covers a part, say so for that part.
+- Before giving a rate, amount or deadline, say which scheme or rule applies to the user's facts and why. When the documents describe similar rules (e.g. start-up vs partial tax exemption, voluntary disclosure vs incorrect-return penalties, general vs captive insurers), use only the one whose conditions match the user.
+- Use the rules for the year under USER FACTS. A filing deadline falls in the Year of Assessment, the year after the financial year end.
+"""
 
 
 # ---------------------------------------------------------------- data shared by the adapters and the loop
@@ -329,7 +333,8 @@ def agent_judge(agent=None, model: str = AUDITOR_MODEL) -> Callable:
                          if not (p.covered_by in approved or (p.covered_by == 0 and has_earlier))]
             if uncovered:
                 sufficient = False
-                missing = missing or text(uncovered[0].part)
+                # missing = missing or text(uncovered[0].part)
+                missing = "; ".join(text(p.part) for p in uncovered)
         return {"chunks": rows, "suggested_queries": suggested, "sufficient": sufficient, "missing": missing}
 
     return judge

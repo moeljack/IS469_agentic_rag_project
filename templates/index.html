@@ -162,18 +162,6 @@
     .md th, .md td { border: 1px solid #334155; padding: 6px 10px; text-align: left; }
     .md th { background: #0f172a; }
     .md hr { border: none; border-top: 1px solid #334155; margin: 1em 0; }
-    .cite {
-      display: inline-block;
-      padding: 0 6px;
-      margin: 0 1px;
-      border-radius: 4px;
-      background: #334155;
-      color: #cbd5e1;
-      font-size: 0.75em;
-      font-weight: 600;
-      vertical-align: 0.1em;
-      white-space: nowrap;
-    }
 
     /* --- Agent trace: collapsed by default --- */
     .trace {
@@ -388,13 +376,18 @@
       });
     }
 
+    // The supervisor cites retrieved chunks as [Doc 3] or [Doc 1, Doc 6]. Users can't open those chunks (the
+    // Sources list has the real links), so the markers are hidden here. The answer itself keeps them, so the
+    // terminal harness and the evals still see the citations.
+    const DOC_CITATION_RE = /[ \t]*\[\s*Doc\s*\d+(?:\s*[,;]\s*(?:Doc\s*)?\d+)*\s*\]/gi;
+    function stripDocCitations(text) {
+      return String(text).replace(DOC_CITATION_RE, "");
+    }
+
     // Returns sanitized HTML for a reply, or null when the Markdown libraries didn't load
     function renderMarkdown(text) {
       if (!MARKDOWN_OK) return null;
-      const html = DOMPurify.sanitize(marked.parse(String(text)));
-      // Show citations like [Doc 4] or [Doc 1, Doc 6] as small chips
-      return html.replace(/\[(Doc\s*\d+(?:\s*,\s*Doc\s*\d+)*)\]/g,
-        (_, refs) => refs.split(/\s*,\s*/).map(r => `<span class="cite">${r}</span>`).join(""));
+      return DOMPurify.sanitize(marked.parse(stripDocCitations(text)));
     }
 
     // One-line label for the collapsed trace, e.g. "Agent trace · answered · 43.2s"
@@ -537,7 +530,7 @@
         body.innerHTML = html;
       } else {
         body.className = "plain";
-        body.textContent = content;
+        body.textContent = (role === "bot" && !plain) ? stripDocCitations(content) : content;
       }
       bubble.appendChild(body);
 
