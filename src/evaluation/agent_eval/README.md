@@ -1,7 +1,9 @@
 # Agent evaluation
 
 The agent-specific dimensions of the Eval Plan. The RAG metrics (retrieval, correctness, grounding) live in
-`../rag_eval/`; these scripts read the same outputs or run the same systems.
+`../rag_eval/`. Agent eval keeps its own runs and results: everything it reads and writes is under
+`agent_eval/results/` (see `paths.py`). From rag_eval it uses only code (`systems.py` builds the agent and naive RAG)
+and the run configs in `rag_eval/rag_eval_approach/configs/`, so both evaluations test the same systems.
 
 | File | Eval Plan dimension | Needs a model? |
 |---|---|---|
@@ -16,19 +18,30 @@ The agent-specific dimensions of the Eval Plan. The RAG metrics (retrieval, corr
 | `tool_trace.py` | Records every tool call the agent makes (used by `run_suite.py`), and injects a failed first search for `--fault` | - |
 | `score_cost_latency.py` | Cost and latency (RQ4): tokens and wall-clock seconds per question, agentic vs naive, with paired ratios | No |
 | `score_trajectory.py` | Step efficiency: wandering/looping rate, step count, budget hits | No |
-| `run_suite.py` | Runs the agent (or naive RAG) on the robustness, safety or tool-call suite | Yes (Ollama, retriever) |
+| `run_suite.py` | Runs the agent (or naive RAG) on the question set (`--suite main`) or the robustness, safety or tool-call suite | Yes (Ollama, retriever) |
 | `injection.py` | Plants a malicious chunk in retrieval results (used by `run_suite.py --suite safety`) | - |
 | `score_robustness.py` | Robustness: completion on rephrased questions vs the originals, and judge-free answer consistency (same numbers, same source chunks) | No |
 | `score_consistency.py` | Answer consistency: the judge compares each rephrased question's answer with the original's (same answer? contradictions?) | Yes (judge) |
 | `prompts/consistency_v1.txt` | The consistency judge prompt | - |
 | `score_safety.py` | Safety / injection resilience: attack success, blocking layer, leaks, hijacked searches, memory writes | No |
+| `paths.py` | Where agent eval reads and writes (`results/output`, `results/<name>`) | - |
 | `common.py` | Shared helpers for the scorers | - |
-| `data/robustness_cases.json` | 45 rewrites: round 1 (R01-R20) rewrites questions the agent answers; round 2 (R21-R45) is harder: multi-part, previously refused or clarified, and out-of-scope questions (O01-O04, where the right behaviour is to decline). The dataset's P01-P05 are added automatically | - |
+| `data/robustness_cases.json` | 66 rewrites of 48 questions in `eval_questions.json` (see *Robustness cases* below). Round 1 (P01-P05, R01-R20): paraphrases and rewrites of questions the agent answers. Round 2 (R21-R45): harder rewrites of multi-part questions and of the out-of-scope O01-O04. Round 3 (R46-R61): rewrites of multi-step (A), computation (C) and out-of-scope O05-O20 questions | - |
 | `data/injection_cases.json` | 11 chunk injections and 5 user-message injections, each with its success check | - |
 
 ## Running
 
-On the GPU machine (same configs as `rag_eval/rag_eval_approach/run.py`):
+On the GPU machine (the configs are rag_eval's, in `rag_eval/rag_eval_approach/configs/`). First the full runs over the
+question set, which the scorers' `--baseline` and the task-success, step-efficiency and cost scorers read:
+
+```
+python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite main --repeat 1     # also --repeat 2, 3
+python src/evaluation/agent_eval/run_suite.py n1_naive.yaml --suite main
+python src/evaluation/agent_eval/run_suite.py n2_naive_matched.yaml --suite main
+```
+
+They are saved as `results/output/<run_id>[_repN].jsonl` (`a1_agentic_qwen_rep1`, `n1_naive`, ...), with the same
+fields as rag_eval's `run.py` records plus the agent's recorded tool calls. Then the suites:
 
 ```
 python src/evaluation/agent_eval/run_suite.py a1_agentic_qwen.yaml --suite robustness --repeat 1
@@ -40,17 +53,46 @@ Anywhere afterwards (reads files only):
 
 ```
 python src/evaluation/agent_eval/score_trajectory.py --all
+python src/evaluation/agent_eval/score_cost_latency.py --all --by-type
 python src/evaluation/agent_eval/score_robustness.py --all --baseline a1_agentic_qwen
 python src/evaluation/agent_eval/score_safety.py --all --baseline a1_agentic_qwen
 ```
 
-`--baseline` is the normal run (in `rag_eval/results/outputs`) whose answers to the original questions the suites are
-compared against.
+`--baseline` is the full run (in `results/output`) whose answers to the original questions the suites are compared
+against.
+
+Runs made earlier with rag_eval's `run.py` can be used by copying them in once (see *Moving existing runs* below).
+
+## Robustness cases
+
+`data/robustness_cases.json` holds every rephrased question, one record per case: `case_id`, `variant_of` (the qid of
+the original in `eval_questions.json`), `kind` (the rewrite style) and `round`. `run_suite.py --suite robustness` reads
+only this file; it checks that every `variant_of` exists in the question set and stops if one does not. The question
+set itself holds no paraphrases.
+
+| Round | Cases | Originals | What it tests |
+|---|---|---|---|
+| 1 | P01-P05, R01-R20 (25) | S01-S07, S09, S11, S12, M02, M03, M08, M10, M13 | Casual, typo and verbose rewrites of questions the agent answers |
+| 2 | R21-R45 (25) | M01, M04, M06, M07, M09, S08, S10, S12-S16, M14, M15, O01-O04 | Harder rewrites: multi-part questions, and out-of-scope questions the agent should still decline |
+| 3 | R46-R61 (16) | A02-A04, A07, A09, C01, C02, C04, C07, C09, O06, O08, O13, O15, O17, O19 | Multi-step and computation questions, and the off-topic, near-miss and not-in-corpus out-of-scope groups |
+
+Rewrite kinds: `paraphrase`, `colloquial`, `typos`, `verbose`, `terse`, `scenario`. Computation rewrites keep every
+figure of the original, so the original's reference answer stays correct.
+
+Not covered by any rewrite: S17-S19, S21, M05, M11, M12, M16-M20, A01, A05, A06, A08, A10, C03, C05, C06, C08, C10,
+O05, O07, O09-O12, O14, O16, O18, O20.
+
+- The baseline must have answered the originals: run the `--suite main` runs on the same `eval_questions.json` as the
+  robustness run. Pairs whose original is missing from the baseline are left out, and `score_robustness.py` lists them.
+- Add new cases with new ids (R62 onwards) and leave existing ones unchanged, so runs made before and after the change
+  still line up case by case. The scorers report each round separately, so earlier results stay comparable on rounds 1
+  and 2.
+- The scorers read `eval_questions.json` when they run, not when the agent ran. After the gold passages change, re-score
+  older runs before comparing them with new ones.
 
 ## Task success
 
-Scores the agent's runs over the question set (made by `rag_eval/rag_eval_approach/run.py`, read from
-`rag_eval/results/outputs`) with an LLM judge (LLM-as-a-judge, not BLEU/ROUGE), as the Eval Plan asks. Two judge calls
+Scores the agent's runs over the question set (`results/output`, from `run_suite.py --suite main`) with an LLM judge (LLM-as-a-judge, not BLEU/ROUGE), as the Eval Plan asks. Two judge calls
 per answer; each returns JSON whose schema is sent to Ollama, which constrains the reply, so the local judge's output
 always parses.
 
@@ -116,8 +158,8 @@ a prompt judges everything again rather than mixing scores.
 
 ## Cost and latency (RQ4)
 
-`score_cost_latency.py` answers *what does each agentic RAG answer cost compared with naive RAG?* from the run files
-rag_eval's `run.py` already wrote (`rag_eval/results/outputs/`), so nothing has to be rerun. No price is applied:
+`score_cost_latency.py` answers *what does each agentic RAG answer cost compared with naive RAG?* from the full runs
+in `results/output/` (agentic and naive configs, `run_suite.py --suite main`). No price is applied:
 
 - **RQ4a, tokens per question:** input + output tokens summed over every LLM call for the question (agent: intake,
   route, decide, planner, auditor, answer; naive: the answer call), with LLM calls per question.
@@ -202,31 +244,46 @@ python3 src/evaluation/agent_eval/score_tool_calls.py --all
 
 It prints the invalid calls and the errors the agent did not recover from, and writes
 `results/tool_calls/<run_id>_tool_calls.jsonl` (per question) and `results/tool_calls/tool_calls_toolcalls.{md,csv}`.
-Robustness and safety runs made after this change also record tool calls: score them with `--suite robustness` or
-`--suite safety`.
+Full runs (`--suite main`), robustness and safety runs also record tool calls: score them with `--suite main`,
+`--suite robustness` or `--suite safety`.
 
 ## Outputs
 
-- `agent_eval/results/task_success/`: `<run_id>_judge.csv` (judge scores), `<run_id>_judge_details.jsonl` (claims and
-  question parts per answer), `<run_id>_task_success.jsonl` (one row per question: status, scores, success, reason),
-  `task_success_<suite>.{md,csv}` (summary)
-- `agent_eval/results/cost_latency/`: `cost_latency.{md,csv}` (tables), `<config>_cost_latency.jsonl` (per question)
-- `agent_eval/results/consistency/`: `<run_id>_consistency.jsonl` (judge verdicts per pair), `consistency.{md,csv}`
-- `agent_eval/results/tool_calls/`: `<run_id>_tool_calls.jsonl` (per question), `tool_calls_<suite>.{md,csv}`
-- `agent_eval/results/robustness/`, `.../safety/` and `.../toolcalls/`: `<run_id>.jsonl` (one record per case, from
-  `run_suite.py`), `.meta.json`, `<run_id>_scores.jsonl`. Runs made before this move are in
-  `rag_eval/results/agent_eval/<suite>/`: the scorers still read them, and `run_suite.py` copies one across when it
-  continues it.
-- `rag_eval/results/scores/<run_id>_trajectory.jsonl`
-- `rag_eval/results/report_assets/agent_step_efficiency.*`, `agent_robustness.*`, `agent_safety.*`
+Everything is under `src/evaluation/agent_eval/results/`:
 
-Suite outputs are kept out of `rag_eval/results/outputs` on purpose: their case ids are not dataset question ids, so the RAG
-scorers' `--all` would fail on them.
+| Folder | Contents |
+|---|---|
+| `output/` | Full runs over the question set: `<run_id>[_repN].jsonl` (one record per question) and `.meta.json` (from `run_suite.py --suite main`) |
+| `robustness/` | Suite runs `<run_id>_robustness[_repN].jsonl`, `<run_id>_scores.jsonl`, `agent_robustness.{md,csv}` |
+| `safety/` | Suite runs `<run_id>_safety[_repN].jsonl`, `<run_id>_scores.jsonl`, `agent_safety.{md,csv}` |
+| `toolcalls/` | Suite runs `<run_id>_toolcalls[_<fault>][_repN].jsonl` |
+| `trajectory/` | `<run_id>_trajectory.jsonl` (per question), `agent_step_efficiency.{md,csv}` |
+| `task_success/` | `<run_id>_judge.csv` (judge scores), `<run_id>_judge_details.jsonl` (claims and question parts), `<run_id>_task_success.jsonl`, `task_success_<suite>.{md,csv}` |
+| `tool_calls/` | `<run_id>_tool_calls.jsonl` (per question), `tool_calls_<suite>.{md,csv}` |
+| `consistency/` | `<run_id>_consistency.jsonl` (judge verdicts per pair), `consistency.{md,csv}` |
+| `cost_latency/` | `cost_latency.{md,csv}` (tables), `<config>_cost_latency.jsonl` (per question) |
+
+### Moving existing runs
+
+Agent eval no longer reads rag_eval's result folders. To use runs made before this change, copy them in once, from the
+project directory:
+
+```
+mkdir -p src/evaluation/agent_eval/results/output
+cp src/evaluation/rag_eval/results/outputs/{a1_agentic_qwen,n1_naive,n2_naive_matched}*.{jsonl,meta.json} src/evaluation/agent_eval/results/output/
+for s in robustness safety toolcalls; do
+  [ -d src/evaluation/rag_eval/results/agent_eval/$s ] && mkdir -p src/evaluation/agent_eval/results/$s && \
+    cp -n src/evaluation/rag_eval/results/agent_eval/$s/* src/evaluation/agent_eval/results/$s/
+done
+```
+
+Leave out any run that crashed (for example on a GPU PyTorch does not support); rerun it with `run_suite.py` instead.
 
 ## Notes
 
-- Task success imports nothing from `rag_eval`: the code it needs (loading `.env`, the judge model, reading JSONL) is
-  copied into `judge.py` and `score_task_success.py`. It only reads the run files rag_eval's `run.py` writes.
+- The scorers import nothing from `rag_eval`. `run_suite.py` imports rag_eval's `systems.py` (and the retrieval and
+  model adapters it uses) to build the system under test, and reads the run configs from
+  `rag_eval/rag_eval_approach/configs/`; `judge.py` holds copies of the rag_eval helpers it needs.
 - An answer the judge could not score shows up as `judge_failed` (counted as a failed task) and is retried on the
   next run, up to `--attempts` times. If there are many, use a stronger judge rather than dropping them.
 - Safety checks are deterministic string and state tests. Read the answers of the cases marked as succeeded before

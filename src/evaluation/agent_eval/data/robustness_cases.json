@@ -48,5 +48,21 @@
  {"case_id": "R42", "variant_of": "O02", "kind": "terse", "round": 2, "question": "pillar two top-up tax in sg if group revenue > EUR750m?"},
  {"case_id": "R43", "variant_of": "O03", "kind": "colloquial", "round": 2, "question": "im a sole prop - what tax rate do i pay on my profits and what personal reliefs can i claim?"},
  {"case_id": "R44", "variant_of": "O04", "kind": "colloquial", "round": 2, "question": "how much CIT rebate will we get for YA2027?"},
- {"case_id": "R45", "variant_of": "O04", "kind": "typos", "round": 2, "question": "wat is the cit rebat for ya 2027 for my compnay"}
+ {"case_id": "R45", "variant_of": "O04", "kind": "typos", "round": 2, "question": "wat is the cit rebat for ya 2027 for my compnay"},
+ {"case_id": "R46", "variant_of": "A02", "kind": "colloquial", "round": 3, "question": "missed the form c-s deadline and iras sent us an estimated NOA that's way too high. do we still have to pay it if we disagree? how do we get it revised, and what happens if we pay late?"},
+ {"case_id": "R47", "variant_of": "A03", "kind": "typos", "round": 3, "question": "we under-declared some incme in last yr's form c-s and iras hasnt contacted us. if we tell them ourselfs will we get penalised, what makes the disclosure count, and how many yrs back can iras raise an aditional assessment?"},
+ {"case_id": "R48", "variant_of": "A04", "kind": "terse", "round": 3, "question": "Dec FYE, want to pay this year's CIT in monthly instalments. ECI deadline for max instalments? how many? what to set up first?"},
+ {"case_id": "R49", "variant_of": "A07", "kind": "colloquial", "round": 3, "question": "we set up our company last year, first accounts closed 31 Dec 2025, revenue about $150k, just the 3 founders as shareholders. which form do we file, when's it due this year, and how much is exempt for a new start-up?"},
+ {"case_id": "R50", "variant_of": "A09", "kind": "typos", "round": 3, "question": "changing our year end from decmber to march. who do we need to notfy, and what does it mean for our tax computaions and ECI filings for the changeover?"},
+ {"case_id": "R51", "variant_of": "C01", "kind": "colloquial", "round": 3, "question": "chargeable income is $150,000 this year and we're not a start-up. how much is exempt under the partial exemption and how much tax do we pay at 17%?"},
+ {"case_id": "R52", "variant_of": "C02", "kind": "typos", "round": 3, "question": "new start-up in our first YA, we qualify for the start-up exemption, chargable income $180,000. how much is exmpt and whats the tax at 17%?"},
+ {"case_id": "R53", "variant_of": "C04", "kind": "terse", "round": 3, "question": "chargeable income $300,000 before donations, donated $10,000 to an IPC. deduction for the donation? chargeable income after?"},
+ {"case_id": "R54", "variant_of": "C07", "kind": "colloquial", "round": 3, "question": "we didnt pay our $20,000 corporate tax on time. whats the late payment penalty, and if it's still unpaid 3 more full months after the 60 days, how much extra penalty do we owe?"},
+ {"case_id": "R55", "variant_of": "C09", "kind": "typos", "round": 3, "question": "YA 2026 chargable income $150,000, not a start-up, hired one local employe in 2025. after the partial exemption and the CIT rebate how much tax do we pay, and do we get a cash grant?"},
+ {"case_id": "R56", "variant_of": "O06", "kind": "colloquial", "round": 3, "question": "how much CPF do i pay as the employer for a 35 yo staff on $5k a month?"},
+ {"case_id": "R57", "variant_of": "O08", "kind": "typos", "round": 3, "question": "how to aply for an employment pass for a foriegn manager we're hiring"},
+ {"case_id": "R58", "variant_of": "O13", "kind": "colloquial", "round": 3, "question": "we bought a company car - can we claim back the GST we paid on it?"},
+ {"case_id": "R59", "variant_of": "O15", "kind": "terse", "round": 3, "question": "GST-registered. quarterly GST return due dates?"},
+ {"case_id": "R60", "variant_of": "O17", "kind": "colloquial", "round": 3, "question": "checking an old assessment - what was the corporate tax rate back in YA 2008?"},
+ {"case_id": "R61", "variant_of": "O19", "kind": "typos", "round": 3, "question": "will the corprate tax rate chnage in budget 2027?"}
 ]
