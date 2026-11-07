@@ -26,7 +26,7 @@ and the run configs in `rag_eval/rag_eval_approach/configs/`, so both evaluation
 | `score_safety.py` | Safety / injection resilience: attack success, blocking layer, leaks, hijacked searches, memory writes | No |
 | `paths.py` | Where agent eval reads and writes (`results/output`, `results/<name>`) | - |
 | `common.py` | Shared helpers for the scorers | - |
-| `data/robustness_cases.json` | 66 rewrites of 48 questions in `eval_questions.json` (see *Robustness cases* below). Round 1 (P01-P05, R01-R20): paraphrases and rewrites of questions the agent answers. Round 2 (R21-R45): harder rewrites of multi-part questions and of the out-of-scope O01-O04. Round 3 (R46-R61): rewrites of multi-step (A), computation (C) and out-of-scope O05-O20 questions | - |
+| `data/robustness_cases.json` | 98 rewrites covering all 80 questions in `eval_questions.json` (see *Robustness cases* below). Round 1 (P01-P05, R01-R20): paraphrases and rewrites of questions the agent answers. Round 2 (R21-R45): harder rewrites of multi-part questions and of the out-of-scope O01-O04. Round 3 (R46-R61): rewrites of multi-step (A), computation (C) and out-of-scope O05-O20 questions. Round 4 (R62-R93): one rewrite of each question the earlier rounds left out, mostly scenario, paraphrase and terse | - |
 | `data/injection_cases.json` | 11 chunk injections and 5 user-message injections, each with its success check | - |
 
 ## Running
@@ -75,16 +75,30 @@ set itself holds no paraphrases.
 | 1 | P01-P05, R01-R20 (25) | S01-S07, S09, S11, S12, M02, M03, M08, M10, M13 | Casual, typo and verbose rewrites of questions the agent answers |
 | 2 | R21-R45 (25) | M01, M04, M06, M07, M09, S08, S10, S12-S16, M14, M15, O01-O04 | Harder rewrites: multi-part questions, and out-of-scope questions the agent should still decline |
 | 3 | R46-R61 (16) | A02-A04, A07, A09, C01, C02, C04, C07, C09, O06, O08, O13, O15, O17, O19 | Multi-step and computation questions, and the off-topic, near-miss and not-in-corpus out-of-scope groups |
+| 4 | R62-R93 (32) | S17-S19, S21, M05, M11, M12, M16-M20, A01, A05, A06, A08, A10, C03, C05, C06, C08, C10, O05, O07, O09-O12, O14, O16, O18, O20 | Full coverage: one rewrite of every question rounds 1-3 left out (9 scenario, 8 paraphrase, 7 terse, 5 verbose, 3 typos; scenario, paraphrase, terse and verbose each spread over at least four of the S, M, A, C and O types) |
 
-Rewrite kinds: `paraphrase`, `colloquial`, `typos`, `verbose`, `terse`, `scenario`. Computation rewrites keep every
-figure of the original, so the original's reference answer stays correct.
+Rewrite kinds (98 cases in all):
 
-Not covered by any rewrite: S17-S19, S21, M05, M11, M12, M16-M20, A01, A05, A06, A08, A10, C03, C05, C06, C08, C10,
-O05, O07, O09-O12, O14, O16, O18, O20.
+| Kind | Cases | What it changes |
+|---|---|---|
+| `paraphrase` | 13 | Same meaning in different words, sharing few keywords with the original (P01-P05 are casual paraphrases) |
+| `scenario` | 13 | The question wrapped in the user's situation, with details that do not change the answer |
+| `terse` | 13 | Keywords and fragments only |
+| `verbose` | 9 | The same question with more words and context |
+| `colloquial` | 31 | Informal wording, abbreviations, lower case |
+| `typos` | 19 | Misspellings of the original's words (figures are never misspelled) |
+
+Computation rewrites keep every figure of the original, so the original's reference answer stays correct.
+Out-of-scope rewrites stay out of scope.
+
+Every question has at least one rewrite. Rounds 1 and 2 were written for questions the agent already answered, so on
+their own they give an optimistic robustness score; rounds 3 and 4 complete the set, and the "all" row covers every
+question. The kinds are not spread evenly over the questions (colloquial is the most common), so compare kinds within
+a question type, not across the whole set.
 
 - The baseline must have answered the originals: run the `--suite main` runs on the same `eval_questions.json` as the
   robustness run. Pairs whose original is missing from the baseline are left out, and `score_robustness.py` lists them.
-- Add new cases with new ids (R62 onwards) and leave existing ones unchanged, so runs made before and after the change
+- Add new cases with new ids (R94 onwards) and leave existing ones unchanged, so runs made before and after the change
   still line up case by case. The scorers report each round separately, so earlier results stay comparable on rounds 1
   and 2.
 - The scorers read `eval_questions.json` when they run, not when the agent ran. After the gold passages change, re-score
