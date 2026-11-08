@@ -10,4 +10,4 @@ generator:
   model: claude-sonnet-5-5
   options:
     effort: medium         # Claude has no temperature; effort is the depth control (optional)
-today: "2026-11-03"
+today: "2026-10-28"

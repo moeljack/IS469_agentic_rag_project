@@ -10,11 +10,11 @@ retriever:
 agent:
   max_steps: 4
   max_queries: 2
-  max_chunks: 6
+  max_chunks: 8
   audit_min_score: 0.5
 generator:
   provider: groq       # or groq (OpenAI-compatible endpoint, key GROQ_API_KEY) with model: openai/gpt-oss-120b
-  model: openai/gpt-oss-120b
+  model: openai/gpt-oss-20b
   options:
     temperature: 0         # set to null if the model rejects temperature
-today: "2026-11-03"
+today: "2026-10-28"
