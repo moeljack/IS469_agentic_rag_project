@@ -293,6 +293,8 @@ def main():
                     g = groups[key]
                     sink.append({"config": config, label: key, "questions": len(g),
                                  "tokens_mean": _mean([r["total"] for r in g]),
+                                 "tokens_in_mean": _mean([r["input"] for r in g]),
+                                 "tokens_out_mean": _mean([r["output"] for r in g]),
                                  "llm_calls_mean": _mean([r["calls"] for r in g]),
                                  "latency_mean_s": _mean([r["latency"] for r in g])})
 
