@@ -1,216 +1,138 @@
-# IS469_agentic_rag_project
+# IS469 Agentic RAG: Singapore Tax Assistant
 
-## Setup (Windows)
+An agentic RAG assistant that answers Singapore IRAS tax questions, mostly corporate income tax, from scraped IRAS
+web pages and e-Tax Guide PDFs. Every model runs locally through Ollama (`qwen3.5:4b` by default, set in
+`src/config.py`), and every answer cites its sources.
 
-Requires **Python 3.12** (3.11 also works). PyTorch does not publish wheels for very new Python versions.
+## Agentic flow
 
-```powershell
-py -3.12 -m venv projenv
-.\projenv\Scripts\Activate.ps1
-python --version                     # should say 3.12.x
-pip install -r requirements.txt
+```mermaid
+flowchart TB
+
+  
+
+subgraph OFF["Offline ingestion"]
+
+direction LR
+
+SRC["IRAS web pages + e-Tax Guide PDFs"] --> CHUNK["Clean + chunk"]
+
+CHUNK --> IDX[("ChromaDB (Qwen3 embeddings)<br/>+ BM25 index")]
+
+end
+
+  
+
+OFF .->|"Retrieval tool reads the index"| ON
+
+subgraph ON["Online"]
+
+direction LR
+
+Q(["User question<br/>+ saved profile"]) --> GATE{"Intake gate"}
+
+GATE -->|"refuse / clarify"| OUT(["Reply to user"])
+
+GATE -->|"continue"| SUP{"Supervisor<br/>(max 4 steps)"}
+
+SUP -->|"search / decompose (tool)"| RET["Retrieval tool<br/>(Hybrid retrieval + Rerank)"]
+
+RET --> AUD["Auditor (LM Tool)<br/>approves chunks, checks sufficiency"]
+
+AUD --> SUP
+
+SUP -->|"answer"| ANS(["Cited answer [Doc n]<br/>+ assumptions"])
+
+end
 ```
 
-Models needed
-```
-ollama pull qwen3.5:4b
-ollama pull phi3.5:3.8b
-```
+One turn, in short: the intake gate stops requests that should never reach retrieval. The supervisor then searches,
+has the auditor check every retrieved chunk, and loops (search, decompose, tool, ask, answer, give up) within a step
+budget (4 by default) until the approved chunks cover the question. The answer model sees only approved chunks.
 
-## Ingest documents
+## Chunking
 
-1. Put PDFs in `data/manual/`.
-2. Run:
-   ```powershell
-   python src/ingest/ingest.py
-   ```
+Both sources go into one ChromaDB collection (`manuals`) with the same metadata keys (`source`, `source_type`,
+`headings`, `pages`), so they are searched and ranked together. Chunks are capped at **512 tokens**, counted with the
+embedder's own tokenizer. The text that gets embedded is the **heading path plus the chunk**, while the stored text is
+the chunk alone, which is what the models read and cite.
 
-On the **first run** the script downloads the models it needs into `models/`
-(Docling layout/table models and `Qwen/Qwen3-Embedding-0.6B`, about 1.2 GB in total).
-Later runs reuse them. To download ahead of time: `python src/ingest/download_models.py`.
+**PDFs** (`src/ingest/ingest.py`, `chunking.py`)
+- Docling converts each PDF with its layout and table models. OCR is off, so only text PDFs work.
+- `fix_structure()` fixes two layout mistakes before chunking: an "Annex n - ..." table caption becomes a real heading
+  placed before its table, and a bare "Note:" mislabelled as a section header is demoted to plain text, so it can't
+  replace the real heading.
+- Docling's `HybridChunker` splits by document structure and merges small sibling sections (`merge_peers`). Tables are
+  serialised as Markdown rows under their header row, not as cell triplets.
 
-What it does: PDF -> Docling -> chunks -> embeddings -> ChromaDB (`chroma_db/`, collection `manuals`).
+**Web pages** (`src/ingest/ingest_web.py`, `web_chunking.py`)
+- Pages with identical text are merged, keeping the most specific URL. Text is cleaned of file-size tags ("(PDF, 61KB)"),
+  button labels and extra whitespace.
+- The scraped text has almost no structure, so headings are recovered from Markdown `#` lines if any exist, or else
+  from short Title-Case lines and "Example / Step n" lines. The rest is split into paragraphs, lists and tables. A
+  line ending in ":" stays with the list or table it introduces.
+- Blocks are packed into chunks within each section. A block that is too big on its own is split: tables by rows
+  (the header repeats in every piece), lists by item, and paragraphs by sentence, then by word.
 
-| Command | Effect |
-|---|---|
-| `python src/ingest/ingest.py` | Ingest new PDFs, skip ones already stored |
-| `python src/ingest/ingest.py --force` | Re-ingest every PDF |
-| `python src/ingest/ingest.py --reset` | Wipe the collection and rebuild (required after changing `EMBED_MODEL`) |
+## Components
 
-### Scraped web pages
-
-Put the scraper output (JSON lines with `url`, `title`, `text`, `retrieved_at`, `source`, `source_type: "webpage"`) in `data/raw/`, then run:
-
-```powershell
-python src/ingest/ingest_web.py            # new or re-scraped pages only (--force redoes everything)
-```
-
-Exact duplicate pages are merged, text is cleaned, and each page is split by section and table into chunks stored in
-the same collection as the PDFs (`source` = the page URL, `source_type` = `webpage`).
-
-## Searching
-
-Edit the settings at the top of `src/retrieval/query.py`, then run `python src/retrieval/query.py`.
-Each question is matched against all chunks (web pages and PDFs together) by vector and keyword search, the best
-candidates are re-scored by a long-context reranker (`BAAI/bge-reranker-v2-m3`), and the top chunks are returned
-with their `source_type`. Environment variables `RERANK_MODEL`, `RERANK_QUANTIZE=1` and
-`CANDIDATES` change the reranker, switch it to faster int8 weights, and set the candidate pool size.
-`python src/retrieval/evaluate.py` scores retrieval on `src/retrieval/eval_questions.json` (add your own
-questions there).
-
-Measured speed options for the reranker on the 40-question set (one search, CPU; accuracy figures are
-simple-question hit@1 / hit@5 and multi-hop all-facts@5):
-
-| Setting | Seconds per search | hit@1 | hit@5 | all@5 |
-|---|---|---|---|---|
-| default (full precision, pool 10) | 17.6 | 95% | 100% | 95% |
-| `RERANK_QUANTIZE=1` | 11.9 | 85% | 100% | 95% |
-| `CANDIDATES=6` | 10.5 | 90% | 95% | 95% |
-| both | 6.6 | 85% | 95% | 95% |
-
-The differences are one or two questions each, so treat them as indications. The default favours accuracy.
-
-Inspecting with a GUI: after ingest finishes, run `chroma run --path chroma_db` and connect the GUI to
-`http://localhost:8000`. **Stop the server (Ctrl+C) before running `ingest.py` or `inspect_db.py`**: two processes
-using `chroma_db/` at the same time can lock or corrupt it.
-
-Notes:
-- OCR is off, so scanned (image-only) PDFs produce no text and are reported as failed.
-- One failing PDF does not stop the run; failures are listed at the end.
-- `models/`, `chroma_db/` and the virtual environment are git-ignored.
-
-## Web chatbot
-
-`app.py` is a Flask front end (`templates/index.html`) for the supervisor: pick or add a user, chat, and see the saved
-profile and the agent trace for each answer.
-
-**Locally:** run `python app.py` (with Ollama running) and open `http://localhost:8080`. The page shows the start-up
-progress; the first answer is available once the models and reranker are loaded.
-
-### On the GPU cluster (`IS469_app.sh`)
-
-The app runs as a Slurm job on a compute node, and you reach it from your laptop through an SSH tunnel via the login
-node, the same way the cluster's Jupyter notebooks work. You need to be on the SMU network or VPN.
-
-1. From the project directory on the cluster, submit the job:
-   ```bash
-   sbatch IS469_app.sh
-   ```
-2. Once it is running (`squeue -u $USER` shows `R`), print this job's connection details:
-   ```bash
-   cat app_connect.<jobid>.txt
-   ```
-3. On your laptop, in a terminal or PowerShell window, run the `ssh` command from that file and leave the window open
-   (after the password prompt it prints nothing, which is normal). It looks like:
-   ```powershell
-   ssh -N -L <port>:<node-ip>:<port> <your-id>@origami.smu.edu.sg
-   ```
-4. Open `http://127.0.0.1:<port>` in your browser. The job log (`<user>.<jobid>.out`) prints `>>> App is ready` once
-   the models are warm, which can take a minute or two.
-
-Stop the app with `scancel <jobid>`.
-
-What the script does: starts Ollama, pulls the models set in `src/config.py`, then starts the app on this node's
-cluster IP with a per-job port (30000-39999, the next free one if taken), so jobs don't clash with each other or with
-Ollama. It runs `app.py` as is; nothing in `app.py` needs changing.
-
-Good to know:
-- **The URL works only while the job runs** (`--time`, 2 hours by default; the student QOS allows up to 1 day).
-- **The job holds its GPU, CPUs and memory the whole time, even when nobody is chatting**, and counts toward your job
-  limit like any other job. Your eval jobs may queue (`PD`) while it runs, so cancel it when you are done.
-- **There is no login.** Anyone on the cluster network who finds the node and port can open the app and pick any
-  user id, so don't enter real company data.
-- If your laptop's port is busy, change only the first number in the `ssh` command (e.g. `-L 18080:<node-ip>:<port>`)
-  and open `http://127.0.0.1:18080`.
-- If the tunnel connects but the page doesn't load, the node's IP may have been picked from the wrong network
-  interface (`hostname -I` in the script); check the address in `app_connect.<jobid>.txt`.
-- Paths: edit `PROJECT_DIR` / `SCRATCH_DIR` at the top of the script (or export them), as in the other job scripts.
-  `LOGIN_HOST` defaults to `origami.smu.edu.sg`.
-
-## Troubleshooting
-
-- `WinError 1314` (symlink privilege) from Hugging Face: turn on Windows Developer Mode
-  (Settings > System > For developers). The `models/` download avoids this, but other
-  Hugging Face downloads may still hit it.
-- `No matching distribution found for torch`: the venv uses an unsupported Python version; recreate it with 3.12.
-
-## Agent interfaces (for mocking while agents are unfinished)
-
-Each agent is described by what to call, what goes in and what comes out, so the supervisor can be built against
-mock data. Only the Retrieval agent is filled in; owners complete the others in the same format.
-
-### Harness
-- **Call:** ```python3 src/supervisor/harness.py --user <id> --trace```
-- **To call with only one model:** `AUDITOR_MODEL=qwen3.5:4b python3 src/supervisor/harness.py  --user <id> --trace`
-- remove `--trace` for a cleaner output
-
-### Decomposer agent
-- **Call:** TODO (file, function)
-- **Input:** TODO
-- **Output:** TODO
-
-### Retrieval agent
-Finds the chunks (web pages and PDFs, ranked together) that best answer **one** question. Returns chunks, not an answer.
-
-**Call** - `src/retrieval/retriever.py`, `Retriever.search()`. Run from the project root.
-```python
-from src.retrieval.retriever import Retriever
-
-retriever = Retriever()   # create ONCE and reuse: loads the models (first search also loads the reranker, ~25 s)
-hits = retriever.search("What is the corporate tax rate in Singapore?", k=5)
-```
-
-**Input** - `Retriever.search(query, k=5, source=None, min_score=None, candidates=10)`
-
-| Argument | Type | Default | Meaning |
-|---|---|---|---|
-| `query` | `str` (required) | | One standalone question, no pronouns. One sub-question per call. |
-| `k` | `int` | 5 | Maximum number of chunks to return. |
-| `source` | `str` or `None` | `None` | Search only one document: a PDF filename or a page URL. |
-| `min_score` | `float` or `None` | `None` | Drop hits whose `score` is below this (0 to 1). |
-| `candidates` | `int` | 10 | Reranker pool size. Leave at the default. |
-
-**Output** - returned by `Retriever.search()` itself (nothing is written to disk): a `list[dict]`, best first, at most `k`
-items; an empty list if nothing passes `min_score`. Each dict:
-
-| Key | Type | Meaning |
+| Part | Code | Role |
 |---|---|---|
-| `id` | `str` | Chunk id, e.g. `web:a5627a3f6e:1` or `<pdf-stem>:24`. |
-| `score` | `float` | Reranker relevance, 0 to 1, higher is better. Comparable only within one query. |
-| `text` | `str` | The chunk text (may contain Markdown tables). |
-| `source` | `str` | Page URL (web) or PDF filename. Use for citations. |
-| `source_type` | `"webpage"` or `"pdf"` | Where the chunk comes from. |
-| `headings` | `str` | Section path such as `Payments > Credit Card Payment` (may be empty). |
-| `pages` | `str` | PDF page numbers (`"9"` or `"9,10"`); empty for web pages. |
-| `title` | `str` | Page title for web pages; empty for PDFs. |
-| `vector_score`, `bm25_score` | `float` or `None` | First-stage scores, for diagnostics only. |
+| Ingest | `src/ingest/` | Converts, chunks and embeds PDFs and web pages into ChromaDB (see above). |
+| Retrieval | `src/retrieval/retriever.py` | `Retriever.search(query, k)`: dense (Qwen3-Embedding) and BM25 candidates merged by reciprocal rank fusion, then reranked by the `BAAI/bge-reranker-v2-m3` cross-encoder. Returns chunks, not answers. |
+| User store | `src/retrieval/user_store.py` | Per-user profile in ChromaDB. Company facts (year end, new company, tax residency) carry over to later questions. Stores pending facts across a clarification and keeps a history log. |
+| Intake gate | `src/decomposer/decomposer.py` (`intake_and_plan`) | One LLM call classifies domain and intent and extracts entities. Deterministic gates then refuse out-of-scope requests, ask for missing mandatory facts (e.g. chargeable income for a computation) and normalise facts (e.g. FYE 2025 → YA 2026). |
+| Decomposer (query planner) | `src/decomposer/decomposer.py` (`plan_queries`) | Called by the supervisor only when needed. Splits a multi-fact question into 1-3 keyword queries in IRAS terms, or later writes queries for just the fact the auditor reports missing. |
+| Supervisor | `src/supervisor/supervisor.py` | Runs the loop. Step 1 is a route call (search as written, or decompose). After that, a decide call picks the next action. Code guard rails keep the small model in check: no answering from nothing, near-duplicate queries dropped, stops when the auditor says the chunks are sufficient or when searches stop finding anything new, and a retry after a failed search. It writes the final answer with `[Doc n]` citations, assumptions and sources. |
+| Auditor | `src/auditor/auditor.py` | For each batch of chunks, approves or rejects each one for the question and year asked. It also splits the question into parts and names the chunk covering each part. From that it reports whether the batch is sufficient, what is missing and a new query to try. If it fails, chunks are kept unjudged ("fails open"). |
+| Tools | passed to `Supervisor(tools=...)` | Optional calculators (e.g. `compute_tax`), offered only for computation questions. Their output becomes a citable document. |
+| Front ends | `src/supervisor/harness.py`, `app.py` | Terminal chat with a `--trace` view of every step, and a Flask web chat that shows the profile and trace. |
 
-**Mock example** (what `hits` looks like):
-```json
-[
-  {"id": "web:a5627a3f6e:1", "score": 0.993,
-   "text": "We do not offer credit cards as a payment mode ...",
-   "source": "https://www.iras.gov.sg/taxes/corporate-income-tax/corporate-income-tax-payment/paying-corporate-income-taxes",
-   "source_type": "webpage", "headings": "Payments > Credit Card Payment", "pages": "", "title": "Payments",
-   "vector_score": 0.68, "bm25_score": 28.25},
-  {"id": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition:16", "score": 0.964,
-   "text": "| Class of Business | Maximum IBNR Factor ... | Motor | 20 |",
-   "source": "etaxguide_tax-deductibility-of-general-insurers-reserves-against-ibnr-claims_forth-edition.pdf",
-   "source_type": "pdf", "headings": "Annex 1 - General Direct Insurance IBNR Percentage Table", "pages": "9", "title": "",
-   "vector_score": 0.77, "bm25_score": null}
-]
+
+## What was evaluated
+
+All evaluation runs use the question set `src/evaluation/eval_questions.json` (80 questions in five types: simple,
+multi-part, multi-step, computation and out-of-scope), with gold passages and reference answers.
+
+**RAG evaluation** (`src/evaluation/rag_eval/`, run in order by `run_all.py`)
+- **Retrieval ablation R0-R4:** dense, BM25, hybrid, dense + rerank, hybrid + rerank, scored on part recall, MRR and
+  latency. A selection rule fixed in advance picks the mode used in every later run.
+- **Systems compared:** naive RAG with dense retrieval (S1), naive RAG with the selected mode (N1), naive RAG given as
+  many chunks as the agent uses (N2), and the agent (A1). Naive and agentic runs were also made with API generators
+  (Anthropic, OpenAI, gpt-oss-120b).
+- **Scores:** retrieval hit rates, LLM-judged correctness and correct refusal, faithfulness and context precision,
+  and an optional RAGAS cross-check. `analyze.py` reports paired comparisons (A1 vs N2, A1 vs N1, N1 vs S1).
+
+**Agent evaluation** (`src/evaluation/agent_eval/`)
+- **Task success:** answered, faithfulness ≥ 0.8 and answer relevance ≥ 0.7 (LLM judge), with bootstrap CIs. On
+  out-of-scope questions, success means declining.
+- **Tool-call accuracy:** schema and argument validity, route agreement with question type, tool-step accuracy,
+  repeated queries, and recovery from injected search faults (empty results or errors).
+- **Step efficiency:** step counts, looping and wandering, budget hits.
+- **Cost and latency (RQ4):** tokens, LLM calls and wall-clock time per question, agentic vs naive, with paired ratios.
+- **Robustness and consistency:** 98 rewrites (paraphrase, scenario, terse, verbose, colloquial, typos) covering every
+  question. Measures whether the agent still answers, and whether it gives the same answer (number agreement and a
+  consistency judge).
+- **Safety:** 11 poisoned-chunk and 5 user-message prompt injections, scored on attack success, which layer blocked
+  them, leaks, hijacked searches and memory writes.
+
+## Running it
+
+Python 3.12 (3.11 also works), with Ollama running:
+
+```powershell
+python3 -m venv projenv; .\projenv\Scripts\Activate.ps1 # windows
+python3 -m venv projenv; ./projenc/bin/activate # macOS
+pip install -r requirements.txt
+ollama pull qwen3.5:4b
+
+python src/ingest/ingest.py          # PDFs in data/manual (--force redo, --reset rebuild); downloads models on first run
+python src/ingest/ingest_web.py      # scraped pages in data/raw/*.jsonl
+
+python src/supervisor/harness.py --user acme --trace   # terminal chat
+python app.py                                          # web chat at http://localhost:8080
+python -m pytest src/supervisor/ -q                    # offline tests, no Ollama needed
 ```
 
-**Good to know:** a search takes about 10 to 20 s on CPU; neither source is preferred (chunks are ranked together by
-`score`); hits carry no dates yet. To see real output quickly, edit `QUERIES` in `src/retrieval/query.py` and run it.
-
-### Auditor agent
-- **Call:** TODO (file, function)
-- **Input:** TODO
-- **Output:** TODO
-
-
-## Pytest
-```
-python3 -m pytest src/supervisor/test_supervisor.py -q
-```
+On the SMU GPU cluster, `sbatch IS469_app.sh` serves the web app (connection details go to `app_connect.<jobid>.txt`),
+and `IS469_eval.sh`, `IS469_score.sh` and `IS469_task_success.sh` run the evaluations.
